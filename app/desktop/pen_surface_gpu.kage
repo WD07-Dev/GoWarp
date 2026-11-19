@@ -1,0 +1,46 @@
+//kage:unit pixels
+
+package main
+
+var Textured float
+var Linear float
+var Premultiplied float
+var Repeated float
+var MultiplyTextureAlpha float
+
+func surfaceSample(p, size vec2) vec4 {
+	p = clamp(p, vec2(0.5), size-vec2(0.5))
+	if Repeated != 0 {
+		p *= 0.5
+	}
+	c := imageSrc0UnsafeAt(imageSrc0Origin() + p)
+	if Premultiplied == 0 {
+		c.rgb *= c.a
+	}
+	return c
+}
+
+func Fragment(dstPos vec4, srcPos vec2, color vec4, custom vec4) vec4 {
+	c := color
+	if Textured != 0 {
+		size := imageSrc0Size()
+		if Repeated != 0 {
+			size *= 2
+		}
+		p := fract(custom.xy) * size
+		var texel vec4
+		if Linear == 0 {
+			texel = surfaceSample(floor(p)+vec2(0.5), size)
+		} else {
+			base := floor(p-vec2(0.5)) + vec2(0.5)
+			f := fract(p-vec2(0.5))
+			texel = mix(mix(surfaceSample(base, size), surfaceSample(base+vec2(1, 0), size), f.x),
+				mix(surfaceSample(base+vec2(0, 1), size), surfaceSample(base+vec2(1, 1), size), f.x), f.y)
+		}
+		if MultiplyTextureAlpha == 0 && texel.a > 0 {
+			texel.rgb /= texel.a
+		}
+		c *= texel
+	}
+	return clamp(vec4(c.rgb*c.a, c.a), vec4(0), vec4(1))
+}

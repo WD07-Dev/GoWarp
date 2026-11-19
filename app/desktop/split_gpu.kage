@@ -1,0 +1,17 @@
+//kage:unit pixels
+package main
+
+var OutputSize vec2
+var Seam vec2 // x at top and bottom
+var Move vec2
+
+func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
+	size:=imageSrc0Size()
+	p:=(texCoord-imageSrc0Origin())/size*OutputSize
+	x:=mix(Seam.x,Seam.y,p.y/OutputSize.y)
+	shift:=Move
+	if p.x<x {shift=-Move}
+	uv:=(p-shift)/OutputSize
+	if uv.x<0 || uv.y<0 || uv.x>=1 || uv.y>=1 {return vec4(0)}
+	return imageSrc0At(imageSrc0Origin()+floor(uv*size)+vec2(.5))
+}

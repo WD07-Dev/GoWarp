@@ -1,0 +1,57 @@
+//kage:unit pixels
+package main
+
+var Filters vec4 // contrast, saturation, hue radians, brightness
+var Filters2 vec4 // invert, sepia, opacity, border radius
+var Blur vec2
+var SourceSize vec2
+var Nearest int
+
+func sample(p vec2) vec4 {
+	if p.x < 0 || p.y < 0 || p.x >= SourceSize.x || p.y >= SourceSize.y { return vec4(0) }
+	if Nearest != 0 { return imageSrc0At(imageSrc0Origin()+floor(p)+vec2(.5)) }
+	p -= vec2(.5)
+	b := floor(p)
+	f := fract(p)
+	a := imageSrc0At(imageSrc0Origin()+clamp(b,vec2(0),SourceSize-1)+vec2(.5))
+	c := imageSrc0At(imageSrc0Origin()+clamp(b+vec2(1,0),vec2(0),SourceSize-1)+vec2(.5))
+	d := imageSrc0At(imageSrc0Origin()+clamp(b+vec2(0,1),vec2(0),SourceSize-1)+vec2(.5))
+	e := imageSrc0At(imageSrc0Origin()+clamp(b+vec2(1,1),vec2(0),SourceSize-1)+vec2(.5))
+	return mix(mix(a,c,f.x),mix(d,e,f.x),f.y)
+}
+
+func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
+	p := texCoord-imageSrc0Origin()
+	c := sample(p)
+	if Blur.x > 0 || Blur.y > 0 {
+		c=vec4(0)
+		total:=float(0)
+		for i:= -12; i<=12; i++ {
+			x:=float(i)*.25
+			w:=exp(-x*x/2)
+			c+=sample(p+Blur*x)*w
+			total+=w
+		}
+		return c/total
+	}
+	if Filters2.w > 0 {
+		r:=min(vec2(.5),vec2(Filters2.w))*SourceSize
+		corner:=max(abs(p-SourceSize/2)-(SourceSize/2-r),vec2(0))/max(r,vec2(.0001))
+		if dot(corner,corner)>1 {return vec4(0)}
+	}
+	rgb:=c.rgb/max(c.a,.00001)
+	rgb=clamp((rgb-.5)*Filters.x+.5,0,1)
+	lum:=dot(rgb,vec3(.213,.715,.072))
+	rgb=clamp(vec3(lum)+(rgb-vec3(lum))*Filters.y,0,1)
+	co,si:=cos(Filters.z),sin(Filters.z)
+	rgb=clamp(vec3(
+		dot(rgb,vec3(.213+.787*co-.213*si,.715-.715*co-.715*si,.072-.072*co+.928*si)),
+		dot(rgb,vec3(.213-.213*co+.143*si,.715+.285*co+.140*si,.072-.072*co-.283*si)),
+		dot(rgb,vec3(.213-.213*co-.787*si,.715-.715*co+.715*si,.072+.928*co+.072*si))),0,1)
+	rgb=clamp(rgb*Filters.w,0,1)
+	rgb=mix(rgb,1-rgb,Filters2.x)
+	sepia:=vec3(dot(rgb,vec3(.393,.769,.189)),dot(rgb,vec3(.349,.686,.168)),dot(rgb,vec3(.272,.534,.131)))
+	rgb=clamp(mix(rgb,sepia,Filters2.y),0,1)
+	alpha:=c.a*Filters2.z
+	return vec4(rgb*alpha,alpha)
+}

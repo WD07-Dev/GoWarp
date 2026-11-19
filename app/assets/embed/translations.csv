@@ -1,0 +1,168 @@
+key,en,ko
+language.name,English,한국어
+language.changed,Interface language changed.,표시 언어를 변경했습니다.
+status.open_hint,Open an SB3 file or drag it here.,SB3 파일을 열거나 이 창으로 끌어오세요.
+job.open_project,Loading project…,프로젝트 불러오는 중…
+job.open_settings,Loading settings and project…,설정과 프로젝트 불러오는 중…
+job.preview,Preparing preview…,테스트 실행 준비 중…
+job.save,Saving settings…,설정 저장 중…
+job.export,Creating executable…,실행 파일 만드는 중…
+job.select,Waiting for file selection…,파일 선택 기다리는 중…
+job.directory,Reading folder…,폴더 읽는 중…
+job.icon,Loading app icon…,앱 아이콘 불러오는 중…
+job.loading_image,Loading image…,로딩 이미지 불러오는 중…
+job.canceling,Canceling…,작업을 취소하는 중…
+status.project_loaded,%s · %d×%d · %g FPS · Turbo %s,%s · %d×%d · %g FPS · 터보 %s
+status.settings_loaded,Settings loaded.,설정을 불러왔습니다.
+status.preview,Preview running · Local saves use the preview profile.,"테스트 실행 중 · 로컬 저장은 preview 영역, 네트워크는 설정한 서버 사용"
+status.no_preview_runtime,No player template for this OS. Check the runtimes folder.,현재 OS용 플레이어 템플릿이 없습니다. runtimes 폴더를 확인하세요.
+status.no_runtime,No runtime templates available for export.,내보낼 런타임 템플릿이 없습니다.
+status.saved,Saved: %s,저장 완료: %s
+status.icon_loaded,App icon applied: %s,앱 아이콘 적용: %s
+status.image_loaded,Loading image applied: %s,로딩 이미지 적용: %s
+dialog.project,Choose project,프로젝트 선택
+dialog.icon,Choose app icon,앱 아이콘 선택
+dialog.loading_image,Choose loading image,로딩 화면 이미지 선택
+dialog.save_executable,Save executable,실행 파일 저장
+status.selection_canceled,File selection canceled.,파일 선택 취소
+status.fallback_browser,System file picker unavailable. Using the built-in picker.,시스템 파일 선택 도구가 없어 내장 선택기를 사용합니다.
+status.canceled,Operation canceled.,작업을 취소했습니다.
+status.preview_ended,Preview ended.,테스트 실행 종료
+section.project,Project,프로젝트
+section.runtime,Runtime,실행
+section.window,Stage / window,무대 / 창
+section.player,Player,플레이어
+section.cloud,Cloud,클라우드
+section.loading,Loading screen,로딩 화면
+section.export,Export,내보내기
+action.open_project,Open SB3 file,SB3 파일 열기
+action.open_settings,Open project,프로젝트 열기
+action.save_settings,Save project,프로젝트 저장
+action.preview,Preview (F5),테스트 실행 (F5)
+action.stop,Stop preview,실행 중지
+action.export,Create executable,실행 파일 만들기
+action.cancel,Cancel,취소
+action.close,Close,닫기
+action.cancel_job,Cancel,작업 취소
+error.title,Error,오류
+choice.on,On,켜짐
+choice.off,Off,꺼짐
+choice.cloud_off,Off (normal variable),비활성 (일반 변수)
+choice.local,Local storage,로컬 저장
+choice.websocket,WebSocket server,WebSocket 서버
+choice.inherit,Use default mode,기본 모드 사용
+choice.preserve,Keep aspect ratio,가로세로 비율 유지
+choice.stretch,Stretch to window,창에 맞춰 늘이기
+choice.integer,Keep aspect ratio (fullscreen: integer scaling),가로세로 비율 유지 (전체화면: 정수배)
+choice.empty,No options available,선택할 항목 없음
+browser.title,Select file · %s,파일 선택 · %s
+browser.go,Go,이동
+browser.up,Up,상위
+browser.folder,[Folder] %s,[폴더] %s
+browser.select,Select,선택
+browser.drive,Change drive,드라이브 변경
+action.choose_image,Choose image,이미지 선택
+icon.default,Default icon,기본 아이콘
+icon.reset,Use default,기본값 복원
+image.none,No image,이미지 없음
+image.remove,Remove image,이미지 제거
+field.project,Project path,프로젝트 경로
+field.app_id,App ID (save data),앱 ID (저장 데이터 구분)
+field.fps,Frame rate,실행 FPS
+field.turbo,Turbo mode,터보 모드
+field.interpolation,Motion interpolation,움직임 보간
+field.hq_pen,High quality pen,고품질 펜
+field.fencing,Remove fencing and size limits,화면 밖 이동·크기 제한 해제
+field.misc_limits,Remove other limits,기타 제한 해제
+field.width,Window width,창 너비
+field.height,Window height,창 높이
+field.antialias,Antialiasing,안티앨리어싱
+field.resizable,Allow window resizing,창 크기 변경 허용
+field.no_minimize,Disable minimize button,최소화 버튼 비활성화
+field.no_maximize,Disable maximize button,최대화 버튼 비활성화
+field.fullscreen,Start in fullscreen,전체 화면으로 시작
+field.fit,Screen fit,화면 맞춤
+field.background,Window background (outside stage),창 배경색 (무대 바깥)
+field.title,Window title,창 제목
+field.icon,App icon (PNG / JPG),앱 아이콘 (PNG / JPG)
+field.autostart,Start automatically,자동 시작
+field.close_on_stop,Close window on stop all,모두 멈추기 실행 시 창 닫기
+field.controls,Show player controls,플레이어 버튼 표시
+field.mute,Mute,음소거
+field.username,Username,사용자 이름
+field.accent,Accent color,강조색
+field.cloud_mode,Default cloud mode,기본 클라우드 모드
+field.cloud_server,WebSocket server URL,WebSocket 서버 URL
+field.cloud_id,Server project ID,서버 프로젝트 ID
+field.cloud_username,Connection username,연결 사용자 이름
+field.cloud_contact,Client contact,클라이언트 연락처
+field.loading_background,Background color (#RRGGBB),배경색 (#RRGGBB)
+field.loading_progress,Progress bar color (#RRGGBB),진행 막대 색상 (#RRGGBB)
+field.loading_text,Loading text (blank to hide),로딩 문구 (비워 두면 숨김)
+field.loading_logo,Logo image (PNG / JPG),로고 이미지 (PNG / JPG)
+field.loading_image,Background image (PNG / JPG),배경 이미지 (PNG / JPG)
+field.loading_preview,Loading screen preview,로딩 화면 미리보기
+hint.project,Opening a project imports its saved runtime settings.,프로젝트를 열면 저장된 실행 설정을 자동으로 불러옵니다.
+hint.runtime,Set execution speed and motion options.,실행 속도와 움직임을 설정하세요.
+hint.window,Canvas resolution stays fixed when resizing the window.,창 크기를 바꿔도 캔버스 해상도는 유지됩니다.
+hint.player,Set startup behavior and player appearance.,시작 방식과 플레이어 표시를 설정하세요.
+hint.cloud,Choose how cloud variables are stored and connected.,클라우드 변수의 저장 방식과 연결 정보를 설정하세요.
+hint.loading,"Choose startup colors, text and images (up to 8 MiB each).","시작할 때 표시할 색상, 문구와 이미지를 설정하세요. 이미지는 각각 최대 8 MiB입니다."
+hint.export,Choose the target operating system and architecture.,배포할 운영체제와 아키텍처를 선택하세요.
+status.selected_project,Selected project · %s,선택한 프로젝트 · %s
+field.platform,Target platform,대상 플랫폼
+hint.single_executable,Create one executable containing the project and settings.,프로젝트와 설정을 포함한 단일 실행 파일을 만듭니다.
+hint.no_install,Players do not need to install Go or GoWarp.,게임 실행에는 Go 또는 GoWarp 설치가 필요하지 않습니다.
+loading.preview_phase,Loading project · 67%,프로젝트 불러오는 중 · 67%
+loading.open_project,Opening project,프로젝트 열기
+loading.ready,Preparing to start,시작 준비
+loading.prepare_project,Preparing project,프로젝트 준비
+loading.costumes,Reading costume information,모양 정보 읽는 중
+loading.sounds,Reading sound information,소리 정보 읽는 중
+loading.first_frame,Preparing the first frame,첫 화면 준비 중
+loading.sound_effects,Preparing sound effects,효과음 준비 중
+player.start,Click or press Enter to start,클릭 또는 Enter로 시작
+player.error,Runtime error: %s,실행 오류: %s
+player.error_title,GoWarp runtime error,GoWarp 실행 오류
+action.close_hint,Enter / Esc: Close,Enter / Esc: 닫기
+error.sdk_missing,Cannot find the source SDK for compiling games. Reinstall the GoWarp distribution or build the development sources with build.sh.,게임 컴파일에 필요한 소스를 찾을 수 없습니다. GoWarp 배포 파일을 다시 설치하거나 개발 소스에서 build.sh로 빌드해 주세요
+error.go_missing,"Go executable not found.
+Go is required to preview or export projects.
+Install Go, then restart GoWarp.
+If Go is already installed, check that its executable directory is on PATH.
+
+Details: %w","Go 실행 파일을 찾을 수 없습니다.
+프로젝트를 테스트하거나 내보내려면 Go가 필요합니다.
+Go를 설치한 뒤 GoWarp를 다시 실행해 주세요.
+이미 설치했다면 PATH에 Go 실행 경로가 등록되어 있는지 확인해 주세요.
+
+상세 정보: %w"
+error.clipboard,Clipboard: %s,클립보드: %s
+field.render_fps,Display FPS (logic unchanged),표시 FPS (블록 실행 속도 유지)
+choice.display_default,Default,기본값
+section.extensions,Extensions,확장
+hint.extensions,Edit the JavaScript and Go source used by this SB3.,이 SB3에서 사용하는 JavaScript와 Go 코드를 편집합니다.
+extensions.open,Edit extension sources,확장 코드 편집
+extensions.description,Select an extension to edit its JS and Go comment header.,확장을 선택해 JS와 Go 주석 헤더를 편집할 수 있습니다.
+extensions.save_hint,Save writes your changes directly to the current SB3.,저장하면 현재 SB3 파일에 바로 반영됩니다.
+extensions.title,Extension source editor,확장 코드 편집기
+extensions.open_sb3,Open an SB3 file first.,먼저 SB3 파일을 열어주세요.
+extensions.loading,Loading extension sources…,확장 코드 불러오는 중…
+extensions.saving,Saving extension sources to SB3…,SB3에 확장 코드 저장 중…
+extensions.saved,Extension sources saved to SB3. Preview or export to compile.,SB3에 저장했습니다. 미리보기 또는 내보내기로 컴파일하세요.
+extensions.no_changes,No changes to save.,저장할 변경 사항이 없습니다.
+extensions.empty,This project has no custom extensions.,이 프로젝트에는 사용자 확장이 없습니다.
+extensions.add_go,Add Go header,Go 헤더 추가
+extensions.header_exists,A Go header marker already exists; edit it in place.,Go 헤더가 이미 있습니다. 기존 헤더를 편집하세요.
+extensions.header_added,Go skeleton added. Implement the blocks before previewing.,Go 틀을 추가했습니다. 미리보기 전에 블록을 구현하세요.
+extensions.check,Check Go syntax,Go 구문 검사
+extensions.valid,Go syntax is valid. Preview/export also checks types and blocks.,Go 구문이 올바릅니다. 타입과 블록은 미리보기·내보내기에서 검사합니다.
+extensions.save,Save SB3,SB3에 저장
+extensions.unsaved,There are unsaved extension changes.,저장하지 않은 확장 변경 사항이 있습니다.
+extensions.discard_hint,"Keep editing to save them, or discard them and close.",저장하려면 편집을 계속하거나 변경 사항을 버리고 닫으세요.
+extensions.keep_editing,Keep editing,계속 편집
+extensions.discard,Discard and close,버리고 닫기
+extensions.back,Back,돌아가기
+extensions.import,Import JS file,JS 파일 가져오기
+extensions.importing,Reading extension file…,확장 파일 읽는 중…
+extensions.imported,Imported %s.,%s 파일을 가져왔습니다.

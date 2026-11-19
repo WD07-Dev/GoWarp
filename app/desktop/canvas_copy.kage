@@ -1,0 +1,13 @@
+//kage:unit pixels
+
+package main
+
+var SourceSize vec2
+
+func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
+	p := texCoord - imageSrc0Origin()
+	if p.x < 0 || p.y < 0 || p.x >= SourceSize.x || p.y >= SourceSize.y {
+		return vec4(0)
+	}
+	return imageSrc0At(imageSrc0Origin() + floor(p) + vec2(.5))
+}
