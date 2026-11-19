@@ -249,6 +249,9 @@ func (g *game) close() {
 	if g.stageCanvas != nil {
 		g.stageCanvas.Deallocate()
 	}
+	if g.backgroundFrame != nil {
+		g.backgroundFrame.Deallocate()
+	}
 	if g.displayFace != nil {
 		g.displayFace.Close()
 	}

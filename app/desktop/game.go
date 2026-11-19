@@ -65,6 +65,7 @@ type game struct {
 	face                        font.Face
 	canvas                      *ebiten.Image
 	stageCanvas                 *ebiten.Image
+	backgroundFrame             *ebiten.Image
 	gpu                         stageGPU
 	texts                       gpuTextCache
 	controlsCanvas              *ebiten.Image
@@ -383,8 +384,7 @@ func (g *game) advanceController(in Input) error {
 			g.updateBudgetUntil = now.Add(budget)
 		}
 		remaining := budget - g.updateTime
-		// Present first on focus return; advance still collects input and tick credit.
-		c.deferTick = g.focusDraws > 0 || remaining <= 0 || (g.updateTime > 0 && remaining <= g.tickCost)
+		c.deferTick = remaining <= 0 || (g.updateTime > 0 && remaining <= g.tickCost)
 		c.tickLimit = 2
 		if realtime {
 			// Normal high-FPS ticks must fit too; the allowance spans all callbacks before Draw.
@@ -531,6 +531,10 @@ func (g *game) updateFocus(focused bool) {
 	if g.unfocused {
 		g.unfocused = false
 		g.focusDraws = host.FocusRestoreDraws
+		// Visibility probes must not suspend the VM while audio keeps playing.
+		g.updateTime, g.updateBudget = 0, 0
+		g.frameTicks = 0
+		g.updateBudgetUntil = time.Time{}
 	}
 }
 
@@ -560,7 +564,29 @@ func (g *game) draw(screen *ebiten.Image, focused bool) {
 	g.logDisplaySize(screen.Bounds().Size())
 	g.sampleHostFrame()
 	if !focused && !g.limitReached {
+		// Finish pen work offscreen instead of accumulating it until focus returns.
+		if pen := g.gpu.nativePen; pen != nil {
+			pen.replayCommands()
+			pen.flushStamps()
+			pen.flushLines()
+			pen.flushClear([4]*ebiten.Image{})
+		}
+		if !g.windowMinimized {
+			// Keep presentation active without recomposing the scene after losing focus.
+			if g.backgroundFrame == nil {
+				g.backgroundFrame = ebiten.NewImage(screen.Bounds().Dx(), screen.Bounds().Dy())
+				g.backgroundFrame.DrawImage(screen, &ebiten.DrawImageOptions{Blend: ebiten.BlendCopy})
+			}
+			options := ebiten.DrawImageOptions{Blend: ebiten.BlendCopy}
+			options.GeoM.Scale(float64(screen.Bounds().Dx())/float64(g.backgroundFrame.Bounds().Dx()),
+				float64(screen.Bounds().Dy())/float64(g.backgroundFrame.Bounds().Dy()))
+			screen.DrawImage(g.backgroundFrame, &options)
+		}
 		return
+	}
+	if g.backgroundFrame != nil {
+		g.backgroundFrame.Deallocate()
+		g.backgroundFrame = nil
 	}
 	if !g.shouldPresent(time.Now(), screen.Bounds().Size()) {
 		return

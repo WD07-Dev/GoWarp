@@ -5,7 +5,6 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -32,13 +31,20 @@ func TestUnfocusedPlayerKeepsRunningWithoutComposingScreen(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		c.vm.SetGraphics(graphics)
-		graphics.Pen(vm.PenCommand{Kind: "line", Line: [4]float64{-20, 0, 20, 0}, Size: 8, Color: color.NRGBA{R: 255, A: 255}})
+		pen := deferredPen{graphics}
+		c.vm.SetGraphics(pen)
 		for i := 0; i < 60; i++ {
+			pen.Pen(vm.PenCommand{Kind: "line", Line: [4]float64{-20, 0, 20, 0}, Size: 8, Color: color.NRGBA{R: 255, A: 255}})
 			if err := g.advanceController(Input{}); err != nil {
 				t.Fatal(err)
 			}
 			g.draw(screen, false)
+			if len(graphics.commands) != 0 || len(graphics.draws) != 0 || len(graphics.lineVertices) != 0 || len(graphics.stampVertices) != 0 {
+				t.Fatalf("frame %d left pen work waiting for focus", i)
+			}
+		}
+		if graphics.pixels != nil {
+			t.Fatal("background drawing read the pen image back to the CPU")
 		}
 		if c.vm.Frames() != 60 {
 			t.Fatalf("background simulation completed %d frames, want 60", c.vm.Frames())
@@ -52,6 +58,9 @@ func TestUnfocusedPlayerKeepsRunningWithoutComposingScreen(t *testing.T) {
 		g.draw(screen, true)
 		if g.drawErr != nil {
 			t.Fatal(g.drawErr)
+		}
+		if g.backgroundFrame != nil {
+			t.Fatal("restored window retained its background frame")
 		}
 		if got := color.RGBAModel.Convert(screen.At(240, 180)); got != (color.RGBA{R: 255, A: 255}) {
 			t.Fatalf("pen drawing missing after focus returned: %v", got)
@@ -80,6 +89,55 @@ func TestUnfocusedPlayerStillCapturesFinalFrame(t *testing.T) {
 	})
 }
 
+func TestUnfocusedPlayerResubmitsLastFrame(t *testing.T) {
+	runGPUFrame(t, func() {
+		for _, alpha := range []uint8{255, 128} {
+			c := cadenceController(t, 60, `{}`)
+			settings := config.Default(nil)
+			c.options.Settings = &settings
+			g := &game{controller: c}
+			defer g.close()
+			screen := ebiten.NewImage(32, 24)
+			defer screen.Deallocate()
+			frozen := color.RGBA{R: 23, G: 41, B: 57, A: alpha}
+			screen.Fill(frozen)
+			g.draw(screen, false)
+			cached := g.backgroundFrame
+			for range 8 {
+				// A new back buffer must receive the cached frame, without running scene composition.
+				screen.Clear()
+				g.draw(screen, false)
+				if g.backgroundFrame != cached {
+					t.Fatal("background presentation allocated another frame")
+				}
+				if got := color.RGBAModel.Convert(screen.At(10, 10)); got != frozen {
+					t.Fatalf("background frame not resubmitted: got %v, want %v", got, frozen)
+				}
+			}
+			if g.stageCanvas != nil {
+				t.Fatal("background presentation recomposed the scene")
+			}
+			g.windowMinimized = true
+			screen.Clear()
+			g.draw(screen, false)
+			if got := color.RGBAModel.Convert(screen.At(10, 10)); got != (color.RGBA{}) {
+				t.Fatal("minimized window submitted a frame")
+			}
+			g.windowMinimized = false
+			g.draw(screen, false)
+			if got := color.RGBAModel.Convert(screen.At(10, 10)); got != frozen {
+				t.Fatal("minimizing lost the cached frame")
+			}
+			resized := ebiten.NewImage(64, 48)
+			defer resized.Deallocate()
+			g.draw(resized, false)
+			if got := color.RGBAModel.Convert(resized.At(60, 40)); got != frozen || g.backgroundFrame != cached {
+				t.Fatal("background resize lost or reallocated the cached frame")
+			}
+		}
+	})
+}
+
 func TestFocusedCLIReplacesTransparentFrame(t *testing.T) {
 	runGPUFrame(t, func() {
 		c := cadenceController(t, 60, `{}`)
@@ -100,7 +158,7 @@ func TestFocusedCLIReplacesTransparentFrame(t *testing.T) {
 	})
 }
 
-func TestFocusReturnPresentsBeforeCatchUp(t *testing.T) {
+func TestFocusReturnKeepsRealtimeTicksAndInput(t *testing.T) {
 	runGPUFrame(t, func() {
 		c := cadenceController(t, 60, `{
 		 "key":{"opcode":"event_whenkeypressed","topLevel":true,"next":"add","fields":{"KEY_OPTION":["space",null]}},
@@ -109,41 +167,54 @@ func TestFocusReturnPresentsBeforeCatchUp(t *testing.T) {
 		settings := config.Default(nil)
 		settings.Player.Controls = false
 		c.options.Settings = &settings
+		now := time.Unix(100, 0)
+		c.cadenceNow = func() time.Time { return now }
 		g := &game{ctx: context.Background(), controller: c}
 		defer g.close()
 		screen := ebiten.NewImage(480, 360)
 		defer screen.Deallocate()
-		g.updateFocus(false)
-		g.updateFocus(true)
-		// On focus return, present before overdue updates and retain the newly pressed key.
-		for i := 0; i < 3; i++ {
-			g.updateFocus(true)
-			g.updateBudgetUntil = time.Now().Add(-time.Second)
+		for i := range 60 {
+			focused := i%6 != 0
+			g.updateFocus(focused)
 			in := Input{}
-			if i == 0 {
+			if i%6 == 1 {
 				in.Pressed = []string{"space"}
 			}
 			if err := g.advanceController(in); err != nil {
 				t.Fatal(err)
 			}
-		}
-		if c.vm.Frames() != 0 || c.credit != 3 {
-			t.Fatalf("catch-up ran before the first restored frame: frames=%d credit=%g", c.vm.Frames(), c.credit)
-		}
-		g.draw(screen, true)
-		if g.stageCanvas == nil || g.drawErr != nil {
-			t.Fatalf("focus return did not render: %v", g.drawErr)
-		}
-		if runtime.GOOS == "windows" {
-			g.draw(screen, true) // The first present can be a visibility probe.
-		}
-		if err := g.advanceController(Input{}); err != nil {
-			t.Fatal(err)
-		}
-		if c.vm.Frames() == 0 || c.vm.Snapshot()[0].Variables["score"].Value != float64(1) {
-			t.Fatalf("simulation or queued key did not resume: frames=%d score=%v", c.vm.Frames(), c.vm.Snapshot()[0].Variables["score"].Value)
+			if c.vm.Frames() != i+1 {
+				t.Fatalf("frame %d: focus transition lost a tick: frames=%d credit=%g", i, c.vm.Frames(), c.credit)
+			}
+			if got := c.vm.Snapshot()[0].Variables["score"].Value; got != float64((i+5)/6) {
+				t.Fatalf("frame %d: restored input delayed: score=%v", i, got)
+			}
+			g.draw(screen, focused)
+			if g.drawErr != nil {
+				t.Fatal(g.drawErr)
+			}
+			now = now.Add(c.vm.TickInterval())
 		}
 	})
+}
+
+func TestFocusReturnRenewsSpentBackgroundBudget(t *testing.T) {
+	c := cadenceController(t, 60, `{}`)
+	settings := config.Default(nil)
+	c.options.Settings = &settings
+	c.cadenceNow = func() time.Time { return time.Unix(100, 0) }
+	g := &game{
+		ctx: context.Background(), controller: c, unfocused: true,
+		updateTime: time.Second, frameTicks: 2,
+		updateBudget: time.Second / 30, updateBudgetUntil: time.Now().Add(time.Second),
+	}
+	g.updateFocus(true)
+	if err := g.advanceController(Input{}); err != nil {
+		t.Fatal(err)
+	}
+	if c.vm.Frames() != 1 {
+		t.Fatal("restored window reused an exhausted background budget")
+	}
 }
 
 func TestFocusPresentationDoesNotPauseBackgroundOrReplay(t *testing.T) {
@@ -176,7 +247,7 @@ func TestFocusPresentationDoesNotPauseBackgroundOrReplay(t *testing.T) {
 	}
 }
 
-func TestFocusReturnWaitsForVisibilityProbeAndPresentation(t *testing.T) {
+func TestFocusVisibilityProbeDoesNotSuspendSimulation(t *testing.T) {
 	runGPUFrame(t, func() {
 		c := cadenceController(t, 60, `{
 		 "key":{"opcode":"event_whenkeypressed","topLevel":true,"next":"add","fields":{"KEY_OPTION":["space",null]}},
@@ -197,15 +268,15 @@ func TestFocusReturnWaitsForVisibilityProbeAndPresentation(t *testing.T) {
 		if err := g.advanceController(Input{Pressed: []string{"space"}}); err != nil {
 			t.Fatal(err)
 		}
-		if c.vm.Frames() != 0 {
-			t.Fatal("simulation resumed after the visibility probe, before actual presentation")
+		if c.vm.Frames() != 1 || c.vm.Snapshot()[0].Variables["score"].Value != float64(1) {
+			t.Fatal("visibility probe delayed simulation or input")
 		}
 		g.draw(screen, true)
 		if err := g.advanceController(Input{}); err != nil {
 			t.Fatal(err)
 		}
-		if c.vm.Frames() == 0 || c.vm.Snapshot()[0].Variables["score"].Value != float64(1) {
-			t.Fatal("simulation or queued input did not resume after presentation")
+		if c.vm.Frames() != 2 || c.vm.Snapshot()[0].Variables["score"].Value != float64(1) {
+			t.Fatal("presentation delayed simulation or repeated input")
 		}
 	})
 }
