@@ -15,6 +15,7 @@ import (
 	"strings"
 	"weak"
 
+	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 	"golang.org/x/image/font/opentype"
@@ -234,6 +235,28 @@ func DecodeSound(format string, data []byte) (*Sound, error) {
 		return nil, err
 	}
 	return &Sound{Rate: decoded.SampleRate(), Samples: samples}, nil
+}
+
+// ResampleSound converts decoded PCM once, before repeated playback.
+func ResampleSound(sound *Sound, rate int) (*Sound, error) {
+	if sound.Rate < 1 || rate < 1 || sound.Rate > 384000 || rate > 384000 {
+		return nil, fmt.Errorf("invalid sound sample rate")
+	}
+	if sound.Rate == rate || len(sound.Samples) == 0 {
+		return sound, nil
+	}
+	length := int64(len(sound.Samples)) * 4
+	outputLength := length * int64(rate) / int64(sound.Rate)
+	if outputLength > maxSoundBytes {
+		return nil, fmt.Errorf("excessive resampled audio")
+	}
+	source := NewStream(sound, sound.Rate)
+	reader := audio.ResampleReaderF32(source, length, sound.Rate, rate)
+	samples, err := readSoundSamples(reader, outputLength)
+	if err != nil {
+		return nil, err
+	}
+	return &Sound{Rate: rate, Samples: samples}, nil
 }
 
 // Decode chunks into the sample buffer without retaining a second full PCM copy.

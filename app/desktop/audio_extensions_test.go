@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -214,6 +215,8 @@ func TestMutedURLAudioDoesNotFetch(t *testing.T) {
 
 func TestEmbeddedURLAudioDecode(t *testing.T) {
 	wav := urlAudioWAV()
+	binary.LittleEndian.PutUint32(wav[24:], sampleRate)
+	binary.LittleEndian.PutUint32(wav[28:], sampleRate*2)
 	uri := "data:audio/wav;base64," + base64.StdEncoding.EncodeToString(wav)
 	first, err := loadURLSound(context.Background(), uri)
 	if err != nil {
@@ -224,6 +227,48 @@ func TestEmbeddedURLAudioDecode(t *testing.T) {
 	}
 	if _, err := loadURLSound(context.Background(), "data:audio/wav;base64,broken"); err == nil {
 		t.Fatal("invalid embedded audio accepted")
+	}
+}
+
+func TestURLAudioPreservesHighFrequencies(t *testing.T) {
+	const frames = 2205
+	const rate = 22050
+	wav := append(urlAudioWAV()[:44], make([]byte, frames*2)...)
+	binary.LittleEndian.PutUint32(wav[4:], uint32(len(wav)-8))
+	binary.LittleEndian.PutUint32(wav[24:], rate)
+	binary.LittleEndian.PutUint32(wav[28:], rate*2)
+	binary.LittleEndian.PutUint32(wav[40:], frames*2)
+	for i := range frames {
+		value := int16(16000 * math.Sin(2*math.Pi*6000*float64(i)/rate))
+		binary.LittleEndian.PutUint16(wav[44+i*2:], uint16(value))
+	}
+	uri := "data:audio/wav;base64," + base64.StdEncoding.EncodeToString(wav)
+	sound, err := loadURLSound(context.Background(), uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pcm, err := io.ReadAll(media.NewStream(sound, sampleRate))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(pcm) / 8; got != frames*2 {
+		t.Fatalf("playback frames = %d, want %d", got, frames*2)
+	}
+	var squaredError float64
+	const margin = 64
+	for i := margin; i < frames*2-margin; i++ {
+		want := 16000.0 / 32768 * math.Sin(2*math.Pi*6000*float64(i)/sampleRate)
+		left := math.Float32frombits(binary.LittleEndian.Uint32(pcm[i*8:]))
+		right := math.Float32frombits(binary.LittleEndian.Uint32(pcm[i*8+4:]))
+		if left != right {
+			t.Fatal("mono URL sound differs between channels")
+		}
+		squaredError += math.Pow(float64(left)-want, 2)
+	}
+	rms := math.Sqrt(squaredError / (frames*2 - margin*2))
+	t.Logf("6 kHz playback RMS error = %.5f", rms)
+	if rms > .005 {
+		t.Fatalf("sample-rate conversion changed the tone: RMS error %.5f", rms)
 	}
 }
 

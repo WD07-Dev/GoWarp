@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 	"gowarp/core/project"
@@ -102,6 +103,44 @@ func TestReadSoundSamples(t *testing.T) {
 		if _, err := readSoundSamples(failingSoundReader{failure}, 0); !errors.Is(err, failure) {
 			t.Fatalf("decoder error lost: got %v, want %v", err, failure)
 		}
+	}
+}
+
+func TestResampleSound(t *testing.T) {
+	for _, rate := range []int{22050, 32000, 44100, 48000} {
+		t.Run(fmt.Sprint(rate), func(t *testing.T) {
+			sound := &Sound{Rate: rate, Samples: make([]float32, rate/10*2)}
+			for i := 0; i < len(sound.Samples)/2; i++ {
+				sound.Samples[i*2] = .25
+				sound.Samples[i*2+1] = -.125
+			}
+			converted, err := ResampleSound(sound, 44100)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if converted.Rate != 44100 || len(converted.Samples) != 8820 {
+				t.Fatalf("converted rate=%d samples=%d", converted.Rate, len(converted.Samples))
+			}
+			if rate == 44100 && converted != sound {
+				t.Fatal("matching sample rate copied PCM")
+			}
+			for i := 64; i < len(converted.Samples)/2-64; i++ {
+				if math.Abs(float64(converted.Samples[i*2])-.25) > .001 ||
+					math.Abs(float64(converted.Samples[i*2+1])+.125) > .001 {
+					t.Fatalf("stereo gain changed at frame %d: %v", i, converted.Samples[i*2:i*2+2])
+				}
+			}
+		})
+	}
+}
+
+func TestResampleSoundLimit(t *testing.T) {
+	sound := &Sound{Rate: 1, Samples: make([]float32, 100)}
+	if _, err := ResampleSound(sound, 384000); err == nil {
+		t.Fatal("accepted excessive resampled PCM")
+	}
+	if _, err := ResampleSound(sound, 0); err == nil {
+		t.Fatal("accepted zero output sample rate")
 	}
 }
 

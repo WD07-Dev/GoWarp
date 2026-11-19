@@ -369,6 +369,9 @@ func loadURLSound(ctx context.Context, path string) (*media.Sound, error) {
 		return nil, err
 	}
 	sound, err := media.DecodeSound(format, data)
+	if err == nil {
+		sound, err = media.ResampleSound(sound, sampleRate)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("decode URL audio: %w", err)
 	}
