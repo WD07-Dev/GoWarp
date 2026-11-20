@@ -23,7 +23,7 @@ type form struct {
 	base                      config.Settings
 	fields                    []field
 	icon                      image.Image
-	loadingLogo, loadingImage image.Image
+	loadingLogo, loadingImage *assets.LoadingImage
 }
 
 func newForm(s config.Settings, variables map[string]string) *form {

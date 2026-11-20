@@ -3,7 +3,6 @@ package desktop
 import (
 	"context"
 	"fmt"
-	"image"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -22,7 +21,7 @@ type loadingResult struct {
 }
 
 type loadingImages struct {
-	background, logo image.Image
+	background, logo *assets.LoadingImage
 }
 
 // CPU preparation hands ownership to the native event loop through the result channel.
@@ -65,6 +64,9 @@ func (l *projectLoader) prepare(ctx context.Context, path string, p *project.Pro
 		return nil, err
 	}
 	if s := options.Settings; s != nil {
+		if err := s.Loading.Validate(); err != nil {
+			return nil, err
+		}
 		var pictures loadingImages
 		var err error
 		if len(s.Loading.Image) > 0 {

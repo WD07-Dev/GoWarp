@@ -46,7 +46,7 @@ type result struct {
 	committed                              bool
 	icon                                   []byte
 	loadingData                            []byte
-	loadingImage                           image.Image
+	loadingImage                           *assets.LoadingImage
 	loadingKey                             string
 	selectedPath, selectMode, fallbackMode string
 	browser                                *browser
@@ -349,7 +349,7 @@ func (a *application) choose(mode string) {
 		options.Patterns = []string{"*.png", "*.jpg", "*.jpeg"}
 	case "loading.logo", "loading.image":
 		options.Title = i18n.Tr("dialog.loading_image")
-		options.Patterns = []string{"*.png", "*.jpg", "*.jpeg"}
+		options.Patterns = []string{"*.png", "*.jpg", "*.jpeg", "*.gif"}
 	case "open":
 		options.Title = i18n.Tr("action.open_settings")
 		options.Patterns = []string{"*.gowarp.json", "*.json"}
@@ -821,6 +821,17 @@ func (a *application) textWidth(s string) int {
 }
 
 func (a *application) Draw(screen *ebiten.Image) {
+	if a.section == 5 && a.form != nil && !a.busy {
+		now := time.Now()
+		for _, picture := range []*assets.LoadingImage{a.form.loadingLogo, a.form.loadingImage} {
+			changed, err := picture.Advance(now)
+			if err != nil {
+				a.status = err.Error()
+				a.dirty = true
+			}
+			a.dirty = a.dirty || changed
+		}
+	}
 	if a.pixels == nil || a.pixels.Bounds() != screen.Bounds() {
 		a.pixels = image.NewRGBA(screen.Bounds())
 		if a.canvas != nil {

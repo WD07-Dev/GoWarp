@@ -32,11 +32,5 @@ func (s LoadingSettings) Validate() error {
 	if len(s.Text) > 16384 {
 		return fmt.Errorf("loading text is too long")
 	}
-	if err := assets.ValidateLoadingImage(s.Logo); err != nil {
-		return fmt.Errorf("loading logo: %w", err)
-	}
-	if err := assets.ValidateLoadingImage(s.Image); err != nil {
-		return fmt.Errorf("loading background: %w", err)
-	}
-	return nil
+	return assets.ValidateLoadingImages(s.Logo, s.Image)
 }

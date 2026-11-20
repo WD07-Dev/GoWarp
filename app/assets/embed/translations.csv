@@ -102,8 +102,8 @@ field.cloud_contact,Client contact,클라이언트 연락처
 field.loading_background,Background color (#RRGGBB),배경색 (#RRGGBB)
 field.loading_progress,Progress bar color (#RRGGBB),진행 막대 색상 (#RRGGBB)
 field.loading_text,Loading text (blank to hide),로딩 문구 (비워 두면 숨김)
-field.loading_logo,Logo image (PNG / JPG),로고 이미지 (PNG / JPG)
-field.loading_image,Background image (PNG / JPG),배경 이미지 (PNG / JPG)
+field.loading_logo,Logo image (PNG / JPG / GIF),로고 이미지 (PNG / JPG / GIF)
+field.loading_image,Background image (PNG / JPG / GIF),배경 이미지 (PNG / JPG / GIF)
 field.loading_preview,Loading screen preview,로딩 화면 미리보기
 hint.project,Opening a project imports its saved runtime settings.,프로젝트를 열면 저장된 실행 설정을 자동으로 불러옵니다.
 hint.runtime,Set execution speed and motion options.,실행 속도와 움직임을 설정하세요.

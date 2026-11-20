@@ -16,9 +16,18 @@ import (
 )
 
 func (a *application) loadLoadingImage(key, path string) {
+	loading := a.form.base.Loading
 	a.job(i18n.Tr("job.loading_image"), func(ctx context.Context) result {
 		data, err := assets.LoadLoadingImage(path)
 		if err != nil {
+			return result{err: err}
+		}
+		if key == "loading.logo" {
+			loading.Logo = data
+		} else {
+			loading.Image = data
+		}
+		if err := assets.ValidateLoadingImages(loading.Logo, loading.Image); err != nil {
 			return result{err: err}
 		}
 		decoded, err := assets.DecodeLoadingImage(data)
@@ -32,7 +41,7 @@ func (a *application) loadLoadingImage(key, path string) {
 	})
 }
 
-func (f *form) setLoadingImage(key string, data []byte, decoded image.Image) {
+func (f *form) setLoadingImage(key string, data []byte, decoded *assets.LoadingImage) {
 	if key == "loading.logo" {
 		f.base.Loading.Logo, f.loadingLogo = data, decoded
 	} else if key == "loading.image" {
@@ -116,7 +125,6 @@ func (a *application) renderLoadingPreview(rect image.Rectangle) {
 	}
 	panelWidth := min(360, rect.Dx()-32)
 	x := rect.Min.X + (rect.Dx()-panelWidth)/2
-	a.fill(image.Rect(x, panelTop, x+panelWidth, panelTop+88), loadingPreviewColor(background, ui.Background))
 	text = a.fitText(strings.ReplaceAll(text, "\n", " "), panelWidth-24)
 	a.label(rect.Min.X+(rect.Dx()-a.textWidth(text))/2, panelTop+24, text, ui.Text)
 	bar := image.Rect(x+16, panelTop+40, x+panelWidth-16, panelTop+48)

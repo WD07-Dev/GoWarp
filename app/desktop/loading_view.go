@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"golang.org/x/image/font"
 
+	"gowarp/app/assets"
 	"gowarp/app/config"
 	"gowarp/app/i18n"
 	"gowarp/app/ui"
@@ -35,13 +37,12 @@ func (g *game) drawLoading(screen *ebiten.Image) {
 	background := vm.ParseColor(s.Background)
 	screen.Fill(background)
 	view := &g.loading
-	if view.images.background != nil {
-		view.background = ebiten.NewImageFromImage(view.images.background)
-		view.images.background = nil
+	now := time.Now()
+	if err := updateLoadingTexture(view.images.background, &view.background, now); err != nil {
+		g.failure = err
 	}
-	if view.images.logo != nil {
-		view.logo = ebiten.NewImageFromImage(view.images.logo)
-		view.images.logo = nil
+	if err := updateLoadingTexture(view.images.logo, &view.logo, now); err != nil {
+		g.failure = err
 	}
 	w, h := screen.Bounds().Dx(), screen.Bounds().Dy()
 	face := g.face
@@ -65,7 +66,6 @@ func (g *game) drawLoading(screen *ebiten.Image) {
 	lines := wrapText(face, message, max(1, panelWidth-g.pixels(32)))
 	panelHeight = max(panelHeight, g.pixels(64+20*len(lines)))
 	frame := image.NewRGBA(image.Rect(0, 0, panelWidth, panelHeight))
-	ui.Fill(frame, frame.Bounds(), background)
 	for i, line := range lines {
 		x := max(g.pixels(8), (panelWidth-font.MeasureString(face, line).Ceil())/2)
 		ui.Label(frame, face, x, g.pixels(28+i*20), line, ui.Text)
@@ -102,6 +102,22 @@ func (g *game) drawLoading(screen *ebiten.Image) {
 	}
 	op.GeoM.Translate(float64((w-panelWidth)/2), float64(max(0, y)))
 	screen.DrawImage(g.canvas, op)
+}
+
+func updateLoadingTexture(picture *assets.LoadingImage, texture **ebiten.Image, now time.Time) error {
+	if picture == nil {
+		return nil
+	}
+	changed, err := picture.Advance(now)
+	if err != nil {
+		return err
+	}
+	if *texture == nil {
+		*texture = ebiten.NewImageFromImage(picture)
+	} else if changed {
+		(*texture).WritePixels(picture.Image.(*image.RGBA).Pix)
+	}
+	return nil
 }
 
 func loadingProgressText(label string) string {

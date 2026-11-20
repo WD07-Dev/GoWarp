@@ -1,19 +1,80 @@
 package desktop
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"image"
+	"image/color"
+	"image/gif"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/hajimehoshi/ebiten/v2"
+	"gowarp/app/assets"
 	"gowarp/app/config"
+	"gowarp/app/ui"
 	"gowarp/core/extension"
 	"gowarp/core/project"
 	"gowarp/core/vm"
 )
+
+func TestLoadingGIFUpdatesExistingTexture(t *testing.T) {
+	palette := color.Palette{color.RGBA{255, 0, 0, 255}, color.RGBA{0, 255, 0, 255}}
+	first := image.NewPaletted(image.Rect(0, 0, 2, 2), palette)
+	second := image.NewPaletted(first.Bounds(), palette)
+	for i := range second.Pix {
+		second.Pix[i] = 1
+	}
+	var data bytes.Buffer
+	if err := gif.EncodeAll(&data, &gif.GIF{Image: []*image.Paletted{first, second}, Delay: []int{10, 10}, LoopCount: 0}); err != nil {
+		t.Fatal(err)
+	}
+	picture, err := assets.DecodeLoadingImage(data.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runGPUFrame(t, func() {
+		var texture *ebiten.Image
+		start := time.Unix(1, 0)
+		if err := updateLoadingTexture(picture, &texture, start); err != nil {
+			t.Fatal(err)
+		}
+		defer texture.Deallocate()
+		original := texture
+		if err := updateLoadingTexture(picture, &texture, start.Add(100*time.Millisecond)); err != nil {
+			t.Fatal(err)
+		}
+		if texture != original {
+			t.Fatal("GIF frame replaced the GPU texture")
+		}
+		pixels := make([]byte, 16)
+		texture.ReadPixels(pixels)
+		if !bytes.Equal(pixels[:4], []byte{0, 255, 0, 255}) {
+			t.Fatalf("second GIF frame = %v", pixels[:4])
+		}
+	})
+}
+
+func TestLoadingPanelIsTransparent(t *testing.T) {
+	runGPUFrame(t, func() {
+		g := &game{face: ui.Font(14)}
+		defer g.face.Close()
+		defer g.releaseLoadingImages()
+		screen := ebiten.NewImage(480, 360)
+		defer screen.Deallocate()
+		g.drawLoading(screen)
+		defer g.canvas.Deallocate()
+		pixels := make([]byte, g.canvas.Bounds().Dx()*g.canvas.Bounds().Dy()*4)
+		g.canvas.ReadPixels(pixels)
+		if pixels[3] != 0 {
+			t.Fatal("loading panel still has an opaque background")
+		}
+	})
+}
 
 func TestLoadingWaitsForFirstDrawAndCloseJoinsPrepare(t *testing.T) {
 	entered := make(chan struct{})

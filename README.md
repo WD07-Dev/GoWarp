@@ -51,6 +51,10 @@ The settings file does not replace the SB3 file. Keep both the settings file and
 | Cloud variables | Disabled, local storage, WebSocket connection, per-variable storage modes |
 | Loading screen | Text, background color, progress bar color, logo, background image |
 
+Loading logos and backgrounds accept PNG, JPEG and animated GIF files up to 8 MiB each.
+GIFs support up to 120 frames, with a maximum canvas of 512×512 for logos and 1280×720 for backgrounds.
+The combined decoded image buffers are limited to 64 MiB.
+
 For WebSocket cloud variables, choose a server type in the connection settings:
 
 - **TurboWarp:** enter a project ID and contact information.
