@@ -68,3 +68,34 @@ func TestLoadingTabFitsMinimumWindow(t *testing.T) {
 		t.Fatal("loading image controls cannot be reached")
 	}
 }
+
+func TestLoadingProgressCanBeHidden(t *testing.T) {
+	a := renderedApplication(t)
+	a.section = 5
+	found := false
+	for i := range a.form.fields {
+		f := &a.form.fields[i]
+		switch f.key {
+		case "loading.showProgress":
+			f.value = "false"
+			found = true
+		case "loading.text":
+			f.value = "Please wait"
+		}
+	}
+	if !found {
+		t.Fatal("loading progress visibility setting is missing")
+	}
+	s, err := a.form.settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Loading.Text != "Please wait" || s.Loading.ShowProgress {
+		t.Fatal("hiding progress changed the custom loading message")
+	}
+	for _, i := range a.form.visibleFields(5) {
+		if a.form.fields[i].key == "loading.progress" {
+			t.Fatal("hidden progress still exposes its color setting")
+		}
+	}
+}

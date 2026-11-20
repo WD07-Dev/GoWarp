@@ -20,10 +20,10 @@ func TestLoadingSettingsRoundTripAndLegacyDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	defaults := DefaultLoadingSettings()
-	if defaults.Text != "loading" {
+	if defaults.Text != "loading" || !defaults.ShowProgress {
 		t.Fatalf("default loading text = %q", defaults.Text)
 	}
-	if s.Loading.Background != defaults.Background || s.Loading.Progress != defaults.Progress || s.Loading.Text != defaults.Text {
+	if s.Loading.Background != defaults.Background || s.Loading.Progress != defaults.Progress || s.Loading.Text != defaults.Text || !s.Loading.ShowProgress {
 		t.Fatalf("missing loading defaults: %+v", s.Loading)
 	}
 	var encoded bytes.Buffer
@@ -38,7 +38,7 @@ func TestLoadingSettingsRoundTripAndLegacyDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Loading.Background != s.Loading.Background || got.Loading.Progress != s.Loading.Progress || got.Loading.Text != "" || !bytes.Equal(got.Loading.Logo, s.Loading.Logo) || !bytes.Equal(got.Loading.Image, s.Loading.Image) {
+	if got.Loading.Background != s.Loading.Background || got.Loading.Progress != s.Loading.Progress || got.Loading.Text != "" || got.Loading.ShowProgress || !bytes.Equal(got.Loading.Logo, s.Loading.Logo) || !bytes.Equal(got.Loading.Image, s.Loading.Image) {
 		t.Fatalf("loading settings changed: %+v", got.Loading)
 	}
 }

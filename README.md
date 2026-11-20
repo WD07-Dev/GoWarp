@@ -49,7 +49,7 @@ The settings file does not replace the SB3 file. Keep both the settings file and
 | Window | Window size, antialiasing, fullscreen, resizing, disabling minimize/maximize, scaling mode, background color |
 | Player | Title, icon, username, automatic start, player controls, mute |
 | Cloud variables | Disabled, local storage, WebSocket connection, per-variable storage modes |
-| Loading screen | Text, background color, progress bar color, logo, background image |
+| Loading screen | Text, background color, progress visibility and color, logo, background image |
 
 Loading logos and backgrounds accept PNG, JPEG and animated GIF files up to 8 MiB each.
 GIFs support up to 120 frames, with a maximum canvas of 512×512 for logos and 1280×720 for backgrounds.

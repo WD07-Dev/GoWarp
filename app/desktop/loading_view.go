@@ -33,6 +33,7 @@ func (g *game) drawLoading(screen *ebiten.Image) {
 			s.Progress = settings.Loading.Progress
 		}
 		s.Text = settings.Loading.Text
+		s.ShowProgress = settings.Loading.ShowProgress
 	}
 	background := vm.ParseColor(s.Background)
 	screen.Fill(background)
@@ -70,7 +71,7 @@ func (g *game) drawLoading(screen *ebiten.Image) {
 		x := max(g.pixels(8), (panelWidth-font.MeasureString(face, line).Ceil())/2)
 		ui.Label(frame, face, x, g.pixels(28+i*20), line, ui.Text)
 	}
-	if g.failure == nil {
+	if s.ShowProgress && g.failure == nil {
 		progress := view.progress
 		fraction := 0.0
 		if progress.Total > 0 {

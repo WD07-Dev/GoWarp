@@ -76,6 +76,48 @@ func TestLoadingPanelIsTransparent(t *testing.T) {
 	})
 }
 
+func TestLoadingProgressHiddenKeepsCustomTextAndErrors(t *testing.T) {
+	runGPUFrame(t, func() {
+		s := config.Default(nil)
+		s.Loading.ShowProgress = false
+		s.Loading.Text = "Please wait"
+		g := &game{options: Options{Settings: &s}}
+		defer g.close()
+		screen := ebiten.NewImage(480, 360)
+		defer screen.Deallocate()
+		g.drawLoading(screen)
+		bounds := g.canvas.Bounds()
+		pixels := make([]byte, bounds.Dx()*bounds.Dy()*4)
+		g.canvas.ReadPixels(pixels)
+		messageVisible := false
+		for y := range bounds.Dy() {
+			for x := range bounds.Dx() {
+				alpha := pixels[(y*bounds.Dx()+x)*4+3]
+				if y >= bounds.Dy()/2 && alpha != 0 {
+					t.Fatal("hidden progress still draws its bar or status text")
+				}
+				messageVisible = messageVisible || alpha != 0
+			}
+		}
+		if !messageVisible {
+			t.Fatal("custom loading message was hidden")
+		}
+		s.Loading.Text = ""
+		g.drawLoading(screen)
+		g.canvas.ReadPixels(pixels)
+		if !bytes.Equal(pixels, make([]byte, len(pixels))) {
+			t.Fatal("empty message and hidden progress still draw an overlay")
+		}
+		g.failure = errors.New("test error")
+		g.drawLoading(screen)
+		pixels = make([]byte, g.canvas.Bounds().Dx()*g.canvas.Bounds().Dy()*4)
+		g.canvas.ReadPixels(pixels)
+		if bytes.Equal(pixels, make([]byte, len(pixels))) {
+			t.Fatal("hiding loading progress also hid the runtime error")
+		}
+	})
+}
+
 func TestLoadingWaitsForFirstDrawAndCloseJoinsPrepare(t *testing.T) {
 	entered := make(chan struct{})
 	finished := make(chan struct{})

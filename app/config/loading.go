@@ -10,23 +10,25 @@ import (
 const MaxSettingsSize = 24 << 20
 
 type LoadingSettings struct {
-	Background string `json:"background"`
-	Progress   string `json:"progress"`
-	Text       string `json:"text"`
-	Logo       []byte `json:"logo,omitempty"`
-	Image      []byte `json:"image,omitempty"`
+	ShowProgress bool   `json:"showProgress"`
+	Background   string `json:"background"`
+	Progress     string `json:"progress"`
+	Text         string `json:"text"`
+	Logo         []byte `json:"logo,omitempty"`
+	Image        []byte `json:"image,omitempty"`
 }
 
 func DefaultLoadingSettings() LoadingSettings {
 	return LoadingSettings{
-		Background: "#1f1f1f",
-		Progress:   "#ff4b51",
-		Text:       "loading",
+		ShowProgress: true,
+		Background:   "#1f1f1f",
+		Progress:     "#ff4b51",
+		Text:         "loading",
 	}
 }
 
 func (s LoadingSettings) Validate() error {
-	if !hexColor.MatchString(s.Background) || !hexColor.MatchString(s.Progress) {
+	if !hexColor.MatchString(s.Background) || (s.ShowProgress && !hexColor.MatchString(s.Progress)) {
 		return fmt.Errorf("loading screen colors must be #RRGGBB")
 	}
 	if len(s.Text) > 16384 {

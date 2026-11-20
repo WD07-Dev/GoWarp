@@ -107,8 +107,9 @@ func newForm(s config.Settings, variables map[string]string) *form {
 	add(4, "cloud.projectId", "field.cloud_id")
 	add(4, "cloud.contact", "field.cloud_contact")
 	add(5, "loading.background", "field.loading_background")
-	add(5, "loading.progress", "field.loading_progress")
 	add(5, "loading.text", "field.loading_text")
+	add(5, "loading.showProgress", "field.loading_show_progress")
+	add(5, "loading.progress", "field.loading_progress")
 	f.fields = append(f.fields,
 		field{label: "field.loading_logo", key: "loading.logo", kind: "loadingImage", section: 5},
 		field{label: "field.loading_image", key: "loading.image", kind: "loadingImage", section: 5},
@@ -139,6 +140,7 @@ func newForm(s config.Settings, variables map[string]string) *form {
 func (f *form) visibleFields(section int) []int {
 	usesNetwork := false
 	showsControls := false
+	showsProgress := false
 	provider := ""
 	for _, field := range f.fields {
 		if field.kind == "variable" {
@@ -152,6 +154,8 @@ func (f *form) visibleFields(section int) []int {
 			provider = field.value
 		case "player.controls":
 			showsControls = field.value == "true"
+		case "loading.showProgress":
+			showsProgress = field.value == "true"
 		}
 	}
 
@@ -176,6 +180,10 @@ func (f *form) visibleFields(section int) []int {
 				}
 			case "player.accent":
 				if !showsControls {
+					continue
+				}
+			case "loading.progress":
+				if !showsProgress {
 					continue
 				}
 			}

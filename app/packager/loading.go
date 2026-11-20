@@ -92,6 +92,7 @@ func loadingPreviewColor(value string, fallback color.Color) color.Color {
 
 func (a *application) renderLoadingPreview(rect image.Rectangle) {
 	background, progress, text := a.form.base.Loading.Background, a.form.base.Loading.Progress, a.form.base.Loading.Text
+	showProgress := a.form.base.Loading.ShowProgress
 	for _, f := range a.form.fields {
 		switch f.key {
 		case "loading.background":
@@ -100,6 +101,8 @@ func (a *application) renderLoadingPreview(rect image.Rectangle) {
 			progress = f.value
 		case "loading.text":
 			text = f.value
+		case "loading.showProgress":
+			showProgress = f.value == "true"
 		}
 	}
 	a.fill(rect, loadingPreviewColor(background, ui.Background))
@@ -127,6 +130,9 @@ func (a *application) renderLoadingPreview(rect image.Rectangle) {
 	x := rect.Min.X + (rect.Dx()-panelWidth)/2
 	text = a.fitText(strings.ReplaceAll(text, "\n", " "), panelWidth-24)
 	a.label(rect.Min.X+(rect.Dx()-a.textWidth(text))/2, panelTop+24, text, ui.Text)
+	if !showProgress {
+		return
+	}
 	bar := image.Rect(x+16, panelTop+40, x+panelWidth-16, panelTop+48)
 	a.fill(bar, ui.Field)
 	bar.Max.X = bar.Min.X + bar.Dx()*2/3
