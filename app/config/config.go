@@ -52,6 +52,7 @@ type Player struct {
 
 type Cloud struct {
 	Mode      string            `json:"mode"`
+	Provider  string            `json:"provider"`
 	Server    string            `json:"server"`
 	ProjectID string            `json:"projectId"`
 	Contact   string            `json:"contact"`
@@ -103,8 +104,8 @@ func Default(p *project.Project) Settings {
 			Accent:    "#ff4b51",
 		},
 		Cloud: Cloud{
-			Mode:   "off",
-			Server: "wss://clouddata.turbowarp.org",
+			Mode:     "off",
+			Provider: "turbowarp",
 		},
 	}
 	applyProjectSettings(&s, p)
@@ -184,12 +185,18 @@ func (s Settings) Validate() error {
 		network = network || m == "websocket"
 	}
 	if network {
-		u, err := url.Parse(s.Cloud.Server)
-		if err != nil || u.Host == "" || (u.Scheme != "ws" && u.Scheme != "wss") || u.User != nil {
-			return fmt.Errorf("cloud server must be a ws:// or wss:// URL")
-		}
-		if strings.TrimSpace(s.Cloud.ProjectID) == "" || strings.TrimSpace(s.Cloud.Contact) == "" {
-			return fmt.Errorf("cloud project ID and contact are required")
+		switch s.Cloud.Provider {
+		case "turbowarp":
+			if strings.TrimSpace(s.Cloud.ProjectID) == "" || strings.TrimSpace(s.Cloud.Contact) == "" {
+				return fmt.Errorf("TurboWarp cloud project ID and contact are required")
+			}
+		case "custom":
+			u, err := url.Parse(s.Cloud.Server)
+			if err != nil || u.Host == "" || (u.Scheme != "ws" && u.Scheme != "wss") || u.User != nil {
+				return fmt.Errorf("cloud server must be a ws:// or wss:// URL")
+			}
+		default:
+			return fmt.Errorf("invalid cloud provider")
 		}
 	}
 	return nil

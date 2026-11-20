@@ -2,6 +2,7 @@ package player
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"gowarp/app/config"
@@ -26,6 +27,28 @@ func TestCloudUsesPlayerUsername(t *testing.T) {
 	options := cloudOptions(s, &project.Project{})
 	if options.Username != s.Player.Username {
 		t.Fatalf("cloud username = %q, want %q", options.Username, s.Player.Username)
+	}
+}
+
+func TestCloudProviderConnection(t *testing.T) {
+	for _, tc := range []struct {
+		name, cloud, server, projectID, contact string
+	}{
+		{"turbowarp", `{"provider":"turbowarp","server":"wss://unused.invalid","projectId":"example.com/game","contact":"example.com/contact"}`, "wss://clouddata.turbowarp.org", "example.com/game", "example.com/contact"},
+		{"custom default ID", `{"provider":"custom","server":"ws://localhost:8080","contact":"unused"}`, "ws://localhost:8080", "test-game", ""},
+		{"custom explicit ID", `{"provider":"custom","server":"wss://example.com/cloud","projectId":"shared-game"}`, "wss://example.com/cloud", "shared-game", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := config.Default(nil)
+			s.AppID = "test-game"
+			if err := json.Unmarshal([]byte(tc.cloud), &s.Cloud); err != nil {
+				t.Fatal(err)
+			}
+			o := cloudOptions(s, &project.Project{})
+			if o.Server != tc.server || o.ProjectID != tc.projectID || o.Contact != tc.contact {
+				t.Fatalf("connection = %+v", o)
+			}
+		})
 	}
 }
 

@@ -69,16 +69,32 @@ func (a *application) renderSettings() {
 		rect  image.Rectangle
 	}
 	var fields []positionedField
+	var connection image.Rectangle
+	inConnection, customProvider := false, false
 	y, column := 146, 0
 	half := (right - left - 12) / 2
 	for _, i := range a.form.visibleFields(a.section) {
 		f := a.form.fields[i]
+		connectionField := a.section == 4 && f.kind != "variable" && f.key != "cloud.mode"
+		if connectionField && !inConnection {
+			y += 36
+		} else if !connectionField && inConnection {
+			y += 16
+		}
+		inConnection = connectionField
+		if f.key == "cloud.provider" {
+			customProvider = f.value == "custom"
+		}
 		compact := f.kind == "bool" || f.kind == "number"
 		if !compact && column == 1 {
 			y += 96
 			column = 0
 		}
 		x, width := left, right-left
+		if connectionField {
+			x += 12
+			width -= 24
+		}
 		if compact {
 			x += column * (half + 12)
 			width = half
@@ -88,6 +104,13 @@ func (a *application) renderSettings() {
 			height = 204
 		}
 		fields = append(fields, positionedField{i, image.Rect(x, y, x+width, y+height)})
+		if connectionField {
+			if connection.Empty() {
+				connection = image.Rect(left, y-36, right, y+height+12)
+			} else {
+				connection.Max.Y = y + height + 12
+			}
+		}
 		if compact && column == 0 {
 			column = 1
 		} else {
@@ -105,6 +128,12 @@ func (a *application) renderSettings() {
 	a.scroll = min(a.scroll, maxScroll)
 	canvas := a.pixels
 	a.pixels = canvas.SubImage(a.pixelRect(image.Rect(left, 146, right, bottom))).(*image.RGBA)
+	if !connection.Empty() {
+		r := connection.Sub(image.Pt(0, a.scroll))
+		a.fill(r, color.RGBA{75, 75, 75, 255})
+		a.fill(r.Inset(1), ui.Background)
+		a.label(r.Min.X+12, r.Min.Y+24, i18n.Tr("cloud.connection"), ui.Muted)
+	}
 	for _, position := range fields {
 		f := &a.form.fields[position.index]
 		r := position.rect.Sub(image.Pt(0, a.scroll))
@@ -113,6 +142,9 @@ func (a *application) renderSettings() {
 		}
 		a.fill(r, panel)
 		label := f.label
+		if f.key == "cloud.projectId" && customProvider {
+			label = "field.cloud_custom_id"
+		}
 		if f.kind != "variable" {
 			label = i18n.Tr(label)
 		}

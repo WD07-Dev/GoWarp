@@ -50,6 +50,7 @@ choice.off,Off,꺼짐
 choice.cloud_off,Off (normal variable),비활성 (일반 변수)
 choice.local,Local storage,로컬 저장
 choice.websocket,WebSocket server,WebSocket 서버
+choice.custom,Custom,사용자 지정
 choice.inherit,Use default mode,기본 모드 사용
 choice.preserve,Keep aspect ratio,가로세로 비율 유지
 choice.stretch,Stretch to window,창에 맞춰 늘이기
@@ -92,6 +93,9 @@ field.mute,Mute,음소거
 field.username,Username,사용자 이름
 field.accent,Accent color,강조색
 field.cloud_mode,Default cloud mode,기본 클라우드 모드
+field.cloud_provider,Server type,서버 종류
+cloud.connection,Connection settings,연결 설정
+field.cloud_custom_id,Project ID (blank: app ID),프로젝트 ID (비워 두면 앱 ID)
 field.cloud_server,WebSocket server URL,WebSocket 서버 URL
 field.cloud_id,Server project ID,서버 프로젝트 ID
 field.cloud_contact,Client contact,클라이언트 연락처

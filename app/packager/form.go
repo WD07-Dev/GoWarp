@@ -102,6 +102,7 @@ func newForm(s config.Settings, variables map[string]string) *form {
 	add(3, "player.username", "field.username")
 	add(3, "player.accent", "field.accent")
 	add(4, "cloud.mode", "field.cloud_mode", "off", "local", "websocket")
+	add(4, "cloud.provider", "field.cloud_provider", "turbowarp", "custom")
 	add(4, "cloud.server", "field.cloud_server")
 	add(4, "cloud.projectId", "field.cloud_id")
 	add(4, "cloud.contact", "field.cloud_contact")
@@ -138,6 +139,7 @@ func newForm(s config.Settings, variables map[string]string) *form {
 func (f *form) visibleFields(section int) []int {
 	usesNetwork := false
 	showsControls := false
+	provider := ""
 	for _, field := range f.fields {
 		if field.kind == "variable" {
 			usesNetwork = usesNetwork || field.value == "websocket"
@@ -146,6 +148,8 @@ func (f *form) visibleFields(section int) []int {
 		switch field.key {
 		case "cloud.mode":
 			usesNetwork = usesNetwork || field.value == "websocket"
+		case "cloud.provider":
+			provider = field.value
 		case "player.controls":
 			showsControls = field.value == "true"
 		}
@@ -158,8 +162,16 @@ func (f *form) visibleFields(section int) []int {
 		}
 		if field.kind != "variable" {
 			switch field.key {
-			case "cloud.server", "cloud.projectId", "cloud.contact":
+			case "cloud.provider", "cloud.projectId":
 				if !usesNetwork {
+					continue
+				}
+			case "cloud.server":
+				if !usesNetwork || provider != "custom" {
+					continue
+				}
+			case "cloud.contact":
+				if !usesNetwork || provider != "turbowarp" {
 					continue
 				}
 			case "player.accent":

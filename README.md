@@ -51,6 +51,11 @@ The settings file does not replace the SB3 file. Keep both the settings file and
 | Cloud variables | Disabled, local storage, WebSocket connection, per-variable storage modes |
 | Loading screen | Text, background color, progress bar color, logo, background image |
 
+For WebSocket cloud variables, choose a server type in the connection settings:
+
+- **TurboWarp:** enter a project ID and contact information.
+- **Custom:** enter a WebSocket server URL and an optional project ID. A blank project ID uses the app ID.
+
 Supported TurboWarp settings saved in the SB3 are imported when you open the project. Before exporting, check that the FPS and runtime settings match what the game expects.
 
 ## Go requirements

@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"gowarp/app/compiler"
@@ -211,6 +212,15 @@ func cloudOptions(s config.Settings, p *project.Project) cloud.Options {
 		ProjectID: s.Cloud.ProjectID,
 		Username:  s.Player.Username,
 		Contact:   s.Cloud.Contact,
+	}
+	switch s.Cloud.Provider {
+	case "turbowarp":
+		o.Server = "wss://clouddata.turbowarp.org"
+	case "custom":
+		o.Contact = ""
+		if strings.TrimSpace(o.ProjectID) == "" {
+			o.ProjectID = s.AppID
+		}
 	}
 	for id, v := range vm.New(p).CloudValues() {
 		o.Names[id] = v.Name

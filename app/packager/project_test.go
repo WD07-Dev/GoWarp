@@ -64,8 +64,8 @@ func TestOpenProjectAutofillsJSONAndSB3(t *testing.T) {
 				if s.Player.Username != s.Player.Title {
 					t.Fatalf("username was not filled from the project name: %+v", s)
 				}
-				if s.Cloud.Server != "wss://clouddata.turbowarp.org" {
-					t.Fatalf("default cloud server = %q", s.Cloud.Server)
+				if s.Cloud.Provider != "turbowarp" {
+					t.Fatalf("default cloud provider = %q", s.Cloud.Provider)
 				}
 				for i := range result.form.fields {
 					if result.form.fields[i].key == "turbo" {

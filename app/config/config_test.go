@@ -17,6 +17,7 @@ func TestSettingsRoundTripPreservesExplicitFalse(t *testing.T) {
 	s.Player.Controls = false
 	s.Player.CloseOnStop = true
 	s.Player.Username = "Player One"
+	s.Cloud.Provider = "custom"
 	s.Cloud.Server = "wss://example.invalid/cloud"
 	path := filepath.Join(t.TempDir(), "game.gowarp.json")
 	if err := Save(path, s); err != nil {
@@ -29,7 +30,7 @@ func TestSettingsRoundTripPreservesExplicitFalse(t *testing.T) {
 	if got.FPS != 1.5 || got.Player.AutoStart || got.Player.Controls || !got.Player.CloseOnStop || got.AppID != s.AppID {
 		t.Fatalf("lost settings: %+v", got)
 	}
-	if got.Player.Username != "Player One" || got.Cloud.Server != "wss://example.invalid/cloud" {
+	if got.Player.Username != "Player One" || got.Cloud.Provider != "custom" || got.Cloud.Server != "wss://example.invalid/cloud" {
 		t.Fatalf("explicit connection settings overwritten: %+v", got)
 	}
 }
@@ -105,7 +106,7 @@ func TestPartialSettingsUseProjectDefaultsAndExplicitFalse(t *testing.T) {
 	if got.FPS != 60 || got.Width != 640 || !got.Interpolation || got.Turbo || got.Player.AutoStart {
 		t.Fatalf("bad precedence: %+v", got)
 	}
-	if got.Player.Title != "project" || got.Player.Username != "project" || got.Cloud.Server != "wss://clouddata.turbowarp.org" {
+	if got.Player.Title != "project" || got.Player.Username != "project" || got.Cloud.Provider != "turbowarp" {
 		t.Fatalf("missing project defaults: %+v", got)
 	}
 }
@@ -145,6 +146,33 @@ func TestSettingsRejectInvalidValues(t *testing.T) {
 		if s.Validate() == nil {
 			t.Fatalf("accepted invalid settings: %+v", s)
 		}
+	}
+}
+
+func TestCloudProviderValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name, cloud string
+		valid       bool
+	}{
+		{"turbowarp", `{"provider":"turbowarp","projectId":"example.com/game","contact":"example.com/contact"}`, true},
+		{"turbowarp without contact", `{"provider":"turbowarp","projectId":"example.com/game"}`, false},
+		{"turbowarp without project", `{"provider":"turbowarp","contact":"example.com/contact"}`, false},
+		{"custom uses app ID", `{"provider":"custom","server":"wss://example.com/cloud"}`, true},
+		{"custom project", `{"provider":"custom","server":"ws://localhost:8080","projectId":"game"}`, true},
+		{"custom missing server", `{"provider":"custom"}`, false},
+		{"custom invalid URL", `{"provider":"custom","server":"https://example.com"}`, false},
+		{"unknown provider", `{"provider":"unknown","projectId":"game","contact":"example.com"}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := Default(nil)
+			s.Cloud.Mode = "websocket"
+			if err := json.Unmarshal([]byte(tc.cloud), &s.Cloud); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.Validate(); (err == nil) != tc.valid {
+				t.Fatalf("Validate() = %v, want valid=%t", err, tc.valid)
+			}
+		})
 	}
 }
 
