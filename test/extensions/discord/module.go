@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -224,6 +225,14 @@ type Activity struct {
 }
 
 func (a Activity) validate() error {
+	for _, field := range []struct{ name, value string }{
+		{"details", a.Details}, {"state", a.State},
+		{"largeImageText", a.LargeImageText}, {"smallImageText", a.SmallImageText},
+	} {
+		if field.value != "" && utf8.RuneCountInString(field.value) < 2 {
+			return fmt.Errorf("discord: %s must be empty or contain at least 2 characters", field.name)
+		}
+	}
 	for _, field := range []struct {
 		name, value string
 		limit       int
@@ -351,6 +360,11 @@ func (c *Client) Connect(id string) error {
 }
 
 func (c *Client) Update(activity Activity) error {
+	for _, text := range []*string{&activity.Details, &activity.State, &activity.LargeImageText, &activity.SmallImageText} {
+		if strings.TrimSpace(*text) == "" {
+			*text = ""
+		}
+	}
 	if err := activity.validate(); err != nil {
 		return err
 	}
