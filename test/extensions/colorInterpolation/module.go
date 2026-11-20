@@ -27,7 +27,6 @@ func hexToRGB(hex string) uint32 {
 	if len(hex) == 3 {
 		hex = string([]byte{hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]})
 	}
-	// JavaScript parseInt accepts whitespace, signs, and a valid hex prefix.
 	hex = strings.TrimSpace(hex)
 	sign := 1.0
 	if strings.HasPrefix(hex, "-") {

@@ -8,7 +8,6 @@ import (
 	"unicode/utf16"
 )
 
-// This native port covers the utility opcodes used in Dusttrust.
 func New() e.Extension {
 	x := e.Extension{ID: "lmsutilsblocks"}
 	add := func(op string, inputs []string, h e.Handler) {

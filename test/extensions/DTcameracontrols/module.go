@@ -26,7 +26,6 @@ func New() e.Extension {
 		if _, err := c.Call("options.set", "fencing", false); err != nil {
 			return e.Result{}, err
 		}
-		// The original camera extension disables incompatible sprite interpolation.
 		return call(c, "options.set", "interpolation", false)
 	}}}
 	for _, entry := range []struct{ name, key string }{{"X", "x"}, {"Y", "y"}, {"Zoom", "zoom"}, {"Direction", "direction"}, {"Col", "color"}} {

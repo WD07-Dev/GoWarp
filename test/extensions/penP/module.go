@@ -133,7 +133,6 @@ func New() e.Extension {
 
 const stageSurface = "Scratch Stage"
 
-// Each point stores U, V, R, G, B, Z, W, opacity, matching Pen+ attributes.
 type triangleAttributes [3][8]float64
 
 func defaultTriangle() triangleAttributes {
@@ -323,15 +322,13 @@ func drawPenTriangle(host e.Host, destination string, source any, vertices [3]e.
 		}
 	}
 	return host.Call("graphics.surface.triangle", destination, e.SurfaceTriangle{
-		Vertices: vertices,
-		Texture:  texture,
-		Linear:   linear,
-		// Pen+ multiplies premultiplied texture RGB by alpha a second time.
+		Vertices:             vertices,
+		Texture:              texture,
+		Linear:               linear,
 		MultiplyTextureAlpha: true,
 	})
 }
 
-// ShaderCompiler translates Pen+ fragment programs and binds their uniforms.
 type ShaderCompiler struct{}
 
 func (ShaderCompiler) ID() string {
@@ -358,7 +355,6 @@ func (ShaderCompiler) Compile(source string) (e.ShaderProgram, error) {
 		case "vec4":
 			fallback = []float32{0, 0, 0, 0}
 		case "mat4":
-			// Preserve Pen+'s existing unset-matrix values.
 			fallback = []float32{1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 		}
 		bindings = append(bindings, uniform{name: name, key: "U_" + name, fallback: fallback})
@@ -416,9 +412,6 @@ var shaderIdentifier = regexp.MustCompile(`\b[A-Za-z_]\w*\b`)
 
 type shaderFunc struct{ result, args, body string }
 
-// translateStageShader converts reachable Pen+ GLSL functions to Kage. Unused helpers are omitted;
-
-// unsupported live syntax remains a compiler error.
 func translateStageShader(source string) (string, map[string]string, error) {
 	source = shaderComments.ReplaceAllString(source, "")
 	functions := map[string]shaderFunc{}
