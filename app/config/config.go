@@ -54,7 +54,6 @@ type Cloud struct {
 	Mode      string            `json:"mode"`
 	Server    string            `json:"server"`
 	ProjectID string            `json:"projectId"`
-	Username  string            `json:"username"`
 	Contact   string            `json:"contact"`
 	Variables map[string]string `json:"variables,omitempty"`
 }
@@ -104,9 +103,8 @@ func Default(p *project.Project) Settings {
 			Accent:    "#ff4b51",
 		},
 		Cloud: Cloud{
-			Mode:     "off",
-			Server:   "wss://clouddata.turbowarp.org",
-			Username: "GoWarp",
+			Mode:   "off",
+			Server: "wss://clouddata.turbowarp.org",
 		},
 	}
 	applyProjectSettings(&s, p)
@@ -116,14 +114,12 @@ func Default(p *project.Project) Settings {
 	return s
 }
 
-// DefaultForProject uses the project name for the initial title and usernames.
 func DefaultForProject(path string, p *project.Project) Settings {
 	s := Default(p)
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	s.Project = path
 	s.Player.Title = name
 	s.Player.Username = name
-	s.Cloud.Username = name
 	return s
 }
 

@@ -17,7 +17,6 @@ func TestSettingsRoundTripPreservesExplicitFalse(t *testing.T) {
 	s.Player.Controls = false
 	s.Player.CloseOnStop = true
 	s.Player.Username = "Player One"
-	s.Cloud.Username = "Cloud User"
 	s.Cloud.Server = "wss://example.invalid/cloud"
 	path := filepath.Join(t.TempDir(), "game.gowarp.json")
 	if err := Save(path, s); err != nil {
@@ -30,7 +29,7 @@ func TestSettingsRoundTripPreservesExplicitFalse(t *testing.T) {
 	if got.FPS != 1.5 || got.Player.AutoStart || got.Player.Controls || !got.Player.CloseOnStop || got.AppID != s.AppID {
 		t.Fatalf("lost settings: %+v", got)
 	}
-	if got.Player.Username != "Player One" || got.Cloud.Username != "Cloud User" || got.Cloud.Server != "wss://example.invalid/cloud" {
+	if got.Player.Username != "Player One" || got.Cloud.Server != "wss://example.invalid/cloud" {
 		t.Fatalf("explicit connection settings overwritten: %+v", got)
 	}
 }
@@ -106,7 +105,7 @@ func TestPartialSettingsUseProjectDefaultsAndExplicitFalse(t *testing.T) {
 	if got.FPS != 60 || got.Width != 640 || !got.Interpolation || got.Turbo || got.Player.AutoStart {
 		t.Fatalf("bad precedence: %+v", got)
 	}
-	if got.Player.Title != "project" || got.Player.Username != "project" || got.Cloud.Username != "project" || got.Cloud.Server != "wss://clouddata.turbowarp.org" {
+	if got.Player.Title != "project" || got.Player.Username != "project" || got.Cloud.Server != "wss://clouddata.turbowarp.org" {
 		t.Fatalf("missing project defaults: %+v", got)
 	}
 }

@@ -94,7 +94,6 @@ field.accent,Accent color,강조색
 field.cloud_mode,Default cloud mode,기본 클라우드 모드
 field.cloud_server,WebSocket server URL,WebSocket 서버 URL
 field.cloud_id,Server project ID,서버 프로젝트 ID
-field.cloud_username,Connection username,연결 사용자 이름
 field.cloud_contact,Client contact,클라이언트 연락처
 field.loading_background,Background color (#RRGGBB),배경색 (#RRGGBB)
 field.loading_progress,Progress bar color (#RRGGBB),진행 막대 색상 (#RRGGBB)

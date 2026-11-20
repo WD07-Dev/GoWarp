@@ -46,7 +46,7 @@ func TestCloudFieldsFollowSelectedModes(t *testing.T) {
 			}
 			a.form = newForm(s, map[string]string{"score": "Score"})
 			a.render()
-			for _, key := range []string{"cloud.server", "cloud.projectId", "cloud.username", "cloud.contact"} {
+			for _, key := range []string{"cloud.server", "cloud.projectId", "cloud.contact"} {
 				if got := fieldInputVisible(a, key); got != tc.showConnection {
 					t.Fatalf("%s visible=%t, want %t", key, got, tc.showConnection)
 				}
@@ -64,7 +64,7 @@ func TestHiddenSettingsAreRetainedAndRestored(t *testing.T) {
 	s.Cloud.Mode = "websocket"
 	s.Cloud.Server = "wss://example.invalid/cloud"
 	s.Cloud.ProjectID = "saved-project"
-	s.Cloud.Username = "saved-user"
+	s.Player.Username = "saved-user"
 	s.Cloud.Contact = "saved-contact"
 	a.form = newForm(s, nil)
 	a.render()
@@ -78,7 +78,7 @@ func TestHiddenSettingsAreRetainedAndRestored(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if local.Cloud.Mode != "local" || local.Cloud.Server != s.Cloud.Server || local.Cloud.ProjectID != s.Cloud.ProjectID || local.Cloud.Username != s.Cloud.Username || local.Cloud.Contact != s.Cloud.Contact {
+	if local.Cloud.Mode != "local" || local.Cloud.Server != s.Cloud.Server || local.Cloud.ProjectID != s.Cloud.ProjectID || local.Player.Username != s.Player.Username || local.Cloud.Contact != s.Cloud.Contact {
 		t.Fatalf("hidden connection settings lost: %+v", local.Cloud)
 	}
 	a.hits[3+len(sections)].action()

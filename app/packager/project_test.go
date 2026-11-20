@@ -61,8 +61,8 @@ func TestOpenProjectAutofillsJSONAndSB3(t *testing.T) {
 				if s.Project != path || s.Width != 800 || s.Height != 360 || s.Window.Width != 800 || s.FPS != 75 || !s.Turbo || !s.Interpolation {
 					t.Fatalf("auto-filled settings: %+v", s)
 				}
-				if s.Player.Username != s.Player.Title || s.Cloud.Username != s.Player.Title {
-					t.Fatalf("usernames were not filled from the project name: %+v", s)
+				if s.Player.Username != s.Player.Title {
+					t.Fatalf("username was not filled from the project name: %+v", s)
 				}
 				if s.Cloud.Server != "wss://clouddata.turbowarp.org" {
 					t.Fatalf("default cloud server = %q", s.Cloud.Server)

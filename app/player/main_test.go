@@ -20,6 +20,15 @@ func TestCloudNumberEncodingKeepsDecimalDigits(t *testing.T) {
 	}
 }
 
+func TestCloudUsesPlayerUsername(t *testing.T) {
+	s := config.Default(nil)
+	s.Player.Username = "Player One"
+	options := cloudOptions(s, &project.Project{})
+	if options.Username != s.Player.Username {
+		t.Fatalf("cloud username = %q, want %q", options.Username, s.Player.Username)
+	}
+}
+
 func TestLocalCloudIdentitySurvivesRename(t *testing.T) {
 	p := &project.Project{Targets: []*project.Target{{
 		IsStage:   true,

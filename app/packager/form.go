@@ -104,7 +104,6 @@ func newForm(s config.Settings, variables map[string]string) *form {
 	add(4, "cloud.mode", "field.cloud_mode", "off", "local", "websocket")
 	add(4, "cloud.server", "field.cloud_server")
 	add(4, "cloud.projectId", "field.cloud_id")
-	add(4, "cloud.username", "field.cloud_username")
 	add(4, "cloud.contact", "field.cloud_contact")
 	add(5, "loading.background", "field.loading_background")
 	add(5, "loading.progress", "field.loading_progress")
@@ -159,7 +158,7 @@ func (f *form) visibleFields(section int) []int {
 		}
 		if field.kind != "variable" {
 			switch field.key {
-			case "cloud.server", "cloud.projectId", "cloud.username", "cloud.contact":
+			case "cloud.server", "cloud.projectId", "cloud.contact":
 				if !usesNetwork {
 					continue
 				}

@@ -209,7 +209,7 @@ func cloudOptions(s config.Settings, p *project.Project) cloud.Options {
 		Names:     map[string]string{},
 		Server:    s.Cloud.Server,
 		ProjectID: s.Cloud.ProjectID,
-		Username:  s.Cloud.Username,
+		Username:  s.Player.Username,
 		Contact:   s.Cloud.Contact,
 	}
 	for id, v := range vm.New(p).CloudValues() {
