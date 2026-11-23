@@ -1,0 +1,127 @@
+package vm
+
+import (
+	"testing"
+
+	"gowarp/core/project"
+)
+
+type extensionTouchGraphics struct {
+	Graphics
+	object  string
+	x, y    float64
+	target  string
+	inspect func([]DisplayTarget)
+}
+
+func (g *extensionTouchGraphics) Touching(scene []DisplayTarget, target DisplayTarget, object string, x, y float64) bool {
+	g.object, g.x, g.y, g.target = object, x, y, target.State.Name
+	if g.inspect != nil {
+		g.inspect(scene)
+	}
+	return true
+}
+func TestExtensionTargetTouching(t *testing.T) {
+	r := fixture(t, `{}`)
+	c := &extensionContext{r: r, th: &thread{target: r.stage}}
+	if _, err := c.Call("target.touching", "_mouse_"); err == nil {
+		t.Fatal("missing geometry must be reported")
+	}
+	g := &extensionTouchGraphics{}
+	r.graphics = g
+	r.mouseX, r.mouseY = 15, -21
+	v, err := c.Call("target.touching", "_mouse_")
+	if err != nil || v != true || g.object != "_mouse_" || g.x != 15 || g.y != -21 || g.target != r.stage.state.Name {
+		t.Fatalf("%v %v %+v", v, err, g)
+	}
+}
+
+func TestExtensionFullscreenCommandUpdatesReportedState(t *testing.T) {
+	r := fixture(t, `{}`)
+	c := &extensionContext{r: r}
+	for _, enabled := range []bool{true, false} {
+		value := "false"
+		if enabled {
+			value = "true"
+		}
+		if _, err := c.Call("host.command", "fullscreen", value); err != nil {
+			t.Fatalf("fullscreen command: %v", err)
+		}
+		got, err := c.Call("host.projectFullscreen")
+		if err != nil || got != enabled {
+			t.Fatalf("fullscreen state=%v %v", got, err)
+		}
+		command := r.host.commands[len(r.host.commands)-1]
+		if command.Kind != "fullscreen" || command.Value != value {
+			t.Fatalf("queued command=%+v", command)
+		}
+	}
+}
+
+func TestObjectSensingReusesQueryStorage(t *testing.T) {
+	r := eventProject(t, `[{"isStage":true},{"name":"Probe","visible":true},{"name":"Obstacle","visible":true}]`)
+	r.graphics = &extensionTouchGraphics{}
+	th := &thread{target: r.targets[1]}
+	block := &project.Block{Opcode: "sensing_touchingobject"}
+	for _, name := range []string{"Obstacle", "_edge_", "_mouse_"} {
+		t.Run(name, func(t *testing.T) {
+			// Box the input once; this measures query storage, not string boxing.
+			value := any(name)
+			input := func(string) (any, error) { return value, nil }
+			allocations := testing.AllocsPerRun(100, func() {
+				_, handled, err := r.graphicsReporter(th, block, input)
+				if err != nil || !handled {
+					t.Fatalf("query: handled=%v err=%v", handled, err)
+				}
+			})
+			if allocations != 0 {
+				t.Fatalf("query allocates a scene each time: %g allocations", allocations)
+			}
+		})
+	}
+}
+
+func TestSensingCandidatesFollowCloneChanges(t *testing.T) {
+	r := eventProject(t, `[{"isStage":true},{"name":"Probe","visible":true},{"name":"Obstacle","visible":true},{"name":"Other","visible":true}]`)
+	probe, source := r.targets[1], r.targets[2]
+	want := []int{0}
+	wantX := 0.0
+	r.graphics = &extensionTouchGraphics{inspect: func(scene []DisplayTarget) {
+		if len(scene) != len(want) {
+			t.Fatalf("candidate count=%d, want %d", len(scene), len(want))
+		}
+		for i, candidate := range scene {
+			if candidate.State.Name != "Obstacle" || candidate.State.CloneID != want[i] || candidate.State.X != wantX {
+				t.Fatalf("stale candidate: %+v", candidate)
+			}
+			if candidate.State.Variables != nil || candidate.State.Lists != nil {
+				t.Fatal("collision query leaked VM data")
+			}
+		}
+	}}
+	query := func() {
+		t.Helper()
+		c := &extensionContext{r: r, th: &thread{target: probe}}
+		if _, err := c.Call("target.touching", "Obstacle"); err != nil {
+			t.Fatalf("extension touching: %v", err)
+		}
+		for _, entry := range r.sensingScene[:cap(r.sensingScene)] {
+			if entry.State.Name != "" || entry.State.Text != nil {
+				t.Fatal("query retained target references")
+			}
+		}
+	}
+	query()
+	r.createClone(source)
+	clone := r.targets[len(r.targets)-1]
+	want = []int{clone.state.CloneID, 0}
+	query()
+	source.state.Visible = false
+	clone.state.X = 42
+	clone.state.Effects.Ghost = 100
+	want, wantX = []int{clone.state.CloneID}, 42
+	query()
+	r.deleteClone(clone)
+	want = nil
+	query()
+}

@@ -1,0 +1,90 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+
+	"gowarp/core/extension"
+	"gowarp/core/project"
+	"gowarp/core/vm"
+	{{range $i, $_ := .Sources}}
+	extension{{$i}} "gowarp/generatedextensions/extension{{$i}}"
+	{{end}}
+)
+
+func run() error {
+	var request struct {
+		IDs, Opcodes []string
+		Project *project.Project
+		ScriptOrder [][]string
+		NativePath string
+	}
+	if err := json.NewDecoder(os.Stdin).Decode(&request); err != nil {
+		return err
+	}
+	factories := extension.Bundle{
+		{{range $i, $_ := .Sources}}extension{{$i}}.New,
+		{{end}}
+	}
+	// Construct once: validation and preparation must see the same definition.
+	defs := make([]*extension.Extension, len(factories))
+	registered := make(extension.Bundle, len(factories))
+	for i, factory := range factories {
+		def := factory()
+		defs[i] = &def
+		registered[i] = func() extension.Extension { return def }
+	}
+	opcodes := request.Opcodes
+	if request.Project != nil {
+		opcodes = nil
+	}
+	if err := extension.Validate(registered, request.IDs, opcodes); err != nil {
+		return err
+	}
+	if request.Project == nil {
+		return nil
+	}
+	for i, order := range request.ScriptOrder {
+		request.Project.Targets[i].ScriptOrder = order
+	}
+	prepared, err := extension.PrepareProject(request.Project, defs)
+	if err != nil {
+		return err
+	}
+	opcodes = nil
+	for _, target := range prepared.Targets {
+		for _, block := range target.Blocks {
+			if block != nil {
+				opcodes = append(opcodes, block.Opcode)
+			}
+		}
+	}
+	for _, monitor := range prepared.Monitors {
+		if monitor.Opcode != "" {
+			opcodes = append(opcodes, monitor.Opcode)
+		}
+	}
+	if err := extension.Validate(registered, request.IDs, opcodes); err != nil {
+		return err
+	}
+	if request.NativePath == "" {
+		return nil
+	}
+	native, err := vm.GenerateNative(prepared)
+	if err != nil {
+		return err
+	}
+	if len(native) == 0 {
+		return nil
+	}
+	return os.WriteFile(request.NativePath, native, 0644)
+}
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Print({{printf "%q" .Success}})
+}

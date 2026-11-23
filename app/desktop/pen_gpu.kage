@@ -1,0 +1,28 @@
+//kage:unit pixels
+
+package main
+
+// Each quad supplies its start point, delta, radius and antialias setting.
+// Use pixel centers for the distance test so hard edges stay deterministic.
+func Fragment(dstPos vec4, srcPos vec2, color vec4, custom vec4) vec4 {
+	// Deferred clears use zero colors across the entire pen layer.
+	if color.a == 0 {
+		return vec4(0)
+	}
+	point := dstPos.xy-imageDstOrigin()-srcPos
+	delta := custom.xy
+	fraction := 0.0
+	if squaredLength := dot(delta, delta); squaredLength > 0 {
+		fraction = clamp(dot(point, delta)/squaredLength, 0, 1)
+	}
+	distance := length(point-fraction*delta)
+	coverage := clamp(custom.z+0.5-distance, 0, 1)
+	if custom.w != 0 {
+		coverage = 0
+		if distance < custom.z {
+			coverage = 1
+		}
+	}
+	alpha := floor(color.a*coverage+0.5) / 255
+	return vec4(color.rgb*alpha, alpha)
+}

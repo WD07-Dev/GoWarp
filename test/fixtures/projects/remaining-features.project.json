@@ -1,0 +1,1234 @@
+{
+  "targets": [
+    {
+      "isStage": true,
+      "name": "Stage",
+      "variables": {
+        "penTouch": [
+          "penTouch",
+          0
+        ],
+        "edge": [
+          "edge",
+          0
+        ],
+        "fencedX": [
+          "fencedX",
+          0
+        ],
+        "bounceX": [
+          "bounceX",
+          0
+        ],
+        "bounceDirection": [
+          "bounceDirection",
+          0
+        ],
+        "json": [
+          "json",
+          0
+        ],
+        "delayed": [
+          "delayed",
+          0
+        ],
+        "cloneStretch": [
+          "cloneStretch",
+          0
+        ],
+        "fps": [
+          "fps",
+          0
+        ],
+        "width": [
+          "width",
+          0
+        ],
+        "height": [
+          "height",
+          0
+        ],
+        "cameraX": [
+          "cameraX",
+          0
+        ],
+        "cameraZoom": [
+          "cameraZoom",
+          0
+        ],
+        "ready": [
+          "ready",
+          0
+        ]
+      },
+      "lists": {
+        "items": [
+          "items",
+          []
+        ]
+      },
+      "broadcasts": {},
+      "blocks": {},
+      "costumes": [],
+      "sounds": [],
+      "currentCostume": 0,
+      "volume": 100,
+      "tempo": 60,
+      "layerOrder": 0
+    },
+    {
+      "isStage": false,
+      "name": "Painter",
+      "variables": {
+        "marker": [
+          "marker",
+          "stretch clone"
+        ]
+      },
+      "lists": {},
+      "broadcasts": {},
+      "blocks": {
+        "flag": {
+          "opcode": "event_whenflagclicked",
+          "next": "dimensions",
+          "parent": null,
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": true
+        },
+        "dimensions": {
+          "opcode": "runtimeoptions_setDimensions",
+          "next": "framerate",
+          "parent": "flag",
+          "inputs": {
+            "width": [
+              1,
+              [
+                4,
+                "600"
+              ]
+            ],
+            "height": [
+              1,
+              [
+                4,
+                "400"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "framerate": {
+          "opcode": "runtimeoptions_setFramerate",
+          "next": "fencing",
+          "parent": "dimensions",
+          "inputs": {
+            "fps": [
+              1,
+              [
+                4,
+                "60"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "fencing": {
+          "opcode": "runtimeoptions_setEnabled",
+          "next": "camera",
+          "parent": "framerate",
+          "inputs": {
+            "thing": [
+              1,
+              [
+                10,
+                "remove fencing"
+              ]
+            ],
+            "enabled": [
+              1,
+              [
+                10,
+                "false"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "camera": {
+          "opcode": "DTcameracontrols_setBoth",
+          "next": "zoom",
+          "parent": "fencing",
+          "inputs": {
+            "x": [
+              1,
+              [
+                4,
+                "10"
+              ]
+            ],
+            "y": [
+              1,
+              [
+                4,
+                "-5"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "zoom": {
+          "opcode": "DTcameracontrols_setZoom",
+          "next": "background",
+          "parent": "camera",
+          "inputs": {
+            "val": [
+              1,
+              [
+                4,
+                "110"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "background": {
+          "opcode": "DTcameracontrols_setCol",
+          "next": "record_fps",
+          "parent": "zoom",
+          "inputs": {
+            "val": [
+              1,
+              [
+                10,
+                "#edf3ff"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "read_fps": {
+          "opcode": "runtimeoptions_getFramerate",
+          "next": null,
+          "parent": null,
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_fps": {
+          "opcode": "data_setvariableto",
+          "next": "record_width",
+          "parent": "background",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_fps"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "fps",
+              "fps"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "read_width": {
+          "opcode": "runtimeoptions_getDimension",
+          "next": null,
+          "parent": null,
+          "inputs": {
+            "dimension": [
+              1,
+              [
+                10,
+                "width"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_width": {
+          "opcode": "data_setvariableto",
+          "next": "record_height",
+          "parent": "record_fps",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_width"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "width",
+              "width"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "read_height": {
+          "opcode": "runtimeoptions_getDimension",
+          "next": null,
+          "parent": null,
+          "inputs": {
+            "dimension": [
+              1,
+              [
+                10,
+                "height"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_height": {
+          "opcode": "data_setvariableto",
+          "next": "record_cameraX",
+          "parent": "record_width",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_height"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "height",
+              "height"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "read_cameraX": {
+          "opcode": "DTcameracontrols_getX",
+          "next": null,
+          "parent": null,
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_cameraX": {
+          "opcode": "data_setvariableto",
+          "next": "record_cameraZoom",
+          "parent": "record_height",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_cameraX"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "cameraX",
+              "cameraX"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "read_cameraZoom": {
+          "opcode": "DTcameracontrols_getZoom",
+          "next": null,
+          "parent": null,
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_cameraZoom": {
+          "opcode": "data_setvariableto",
+          "next": "clear",
+          "parent": "record_cameraX",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_cameraZoom"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "cameraZoom",
+              "cameraZoom"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "clear": {
+          "opcode": "pen_clear",
+          "next": "color",
+          "parent": "record_cameraZoom",
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "color": {
+          "opcode": "pen_setPenColorToColor",
+          "next": "size",
+          "parent": "clear",
+          "inputs": {
+            "COLOR": [
+              1,
+              [
+                10,
+                "#d93663"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "size": {
+          "opcode": "pen_setPenSizeTo",
+          "next": "left",
+          "parent": "color",
+          "inputs": {
+            "SIZE": [
+              1,
+              [
+                4,
+                "6"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "left": {
+          "opcode": "motion_gotoxy",
+          "next": "down",
+          "parent": "size",
+          "inputs": {
+            "X": [
+              1,
+              [
+                4,
+                "-100"
+              ]
+            ],
+            "Y": [
+              1,
+              [
+                4,
+                "-40"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "down": {
+          "opcode": "pen_penDown",
+          "next": "right",
+          "parent": "left",
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "right": {
+          "opcode": "motion_gotoxy",
+          "next": "up",
+          "parent": "down",
+          "inputs": {
+            "X": [
+              1,
+              [
+                4,
+                "100"
+              ]
+            ],
+            "Y": [
+              1,
+              [
+                4,
+                "-40"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "up": {
+          "opcode": "pen_penUp",
+          "next": "record_penTouch",
+          "parent": "right",
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "read_penTouch": {
+          "opcode": "sensing_touchingcolor",
+          "next": null,
+          "parent": null,
+          "inputs": {
+            "COLOR": [
+              1,
+              [
+                10,
+                "#d93663"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_penTouch": {
+          "opcode": "data_setvariableto",
+          "next": "stretch",
+          "parent": "up",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_penTouch"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "penTouch",
+              "penTouch"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "stretch": {
+          "opcode": "stretch_setStretch",
+          "next": "clone",
+          "parent": "record_penTouch",
+          "inputs": {
+            "X": [
+              1,
+              [
+                4,
+                "150"
+              ]
+            ],
+            "Y": [
+              1,
+              [
+                4,
+                "50"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "clone": {
+          "opcode": "control_create_clone_of",
+          "next": "array",
+          "parent": "stretch",
+          "inputs": {
+            "CLONE_OPTION": [
+              1,
+              [
+                10,
+                "_myself_"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "array": {
+          "opcode": "data_set_list_to_array",
+          "next": "record_json",
+          "parent": "clone",
+          "inputs": {
+            "ARRAY": [
+              1,
+              [
+                10,
+                "[3,true,null,[\"a\",\"b\"]]"
+              ]
+            ]
+          },
+          "fields": {
+            "LIST": [
+              "items",
+              "items"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "read_json": {
+          "opcode": "data_get_list_as",
+          "next": null,
+          "parent": null,
+          "inputs": {},
+          "fields": {
+            "LIST": [
+              "items",
+              "items"
+            ],
+            "FORMAT": [
+              "JSON",
+              null
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_json": {
+          "opcode": "data_setvariableto",
+          "next": "showlist",
+          "parent": "array",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_json"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "json",
+              "json"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "showlist": {
+          "opcode": "data_showlist",
+          "next": "showtouch",
+          "parent": "record_json",
+          "inputs": {},
+          "fields": {
+            "LIST": [
+              "items",
+              "items"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "showtouch": {
+          "opcode": "data_showvariable",
+          "next": "hidecamera",
+          "parent": "showlist",
+          "inputs": {},
+          "fields": {
+            "VARIABLE": [
+              "penTouch",
+              "penTouch"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "hidecamera": {
+          "opcode": "data_hidevariable",
+          "next": "showresult",
+          "parent": "showtouch",
+          "inputs": {},
+          "fields": {
+            "VARIABLE": [
+              "cameraX",
+              "cameraX"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "showresult": {
+          "opcode": "data_showvariable",
+          "next": "offedge",
+          "parent": "hidecamera",
+          "inputs": {},
+          "fields": {
+            "VARIABLE": [
+              "delayed",
+              "delayed"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "offedge": {
+          "opcode": "motion_gotoxy",
+          "next": "record_fencedX",
+          "parent": "showresult",
+          "inputs": {
+            "X": [
+              1,
+              [
+                4,
+                "999"
+              ]
+            ],
+            "Y": [
+              1,
+              [
+                4,
+                "0"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "read_fencedX": {
+          "opcode": "motion_xposition",
+          "next": null,
+          "parent": null,
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_fencedX": {
+          "opcode": "data_setvariableto",
+          "next": "record_edge",
+          "parent": "offedge",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_fencedX"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "fencedX",
+              "fencedX"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "read_edge": {
+          "opcode": "sensing_touchingobject",
+          "next": null,
+          "parent": null,
+          "inputs": {
+            "TOUCHINGOBJECTMENU": [
+              1,
+              [
+                10,
+                "_edge_"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_edge": {
+          "opcode": "data_setvariableto",
+          "next": "bounce",
+          "parent": "record_fencedX",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_edge"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "edge",
+              "edge"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "bounce": {
+          "opcode": "motion_ifonedgebounce",
+          "next": "record_bounceX",
+          "parent": "record_edge",
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "read_bounceX": {
+          "opcode": "motion_xposition",
+          "next": null,
+          "parent": null,
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_bounceX": {
+          "opcode": "data_setvariableto",
+          "next": "record_bounceDirection",
+          "parent": "bounce",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_bounceX"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "bounceX",
+              "bounceX"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "read_bounceDirection": {
+          "opcode": "motion_direction",
+          "next": null,
+          "parent": null,
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_bounceDirection": {
+          "opcode": "data_setvariableto",
+          "next": "center",
+          "parent": "record_bounceX",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_bounceDirection"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "bounceDirection",
+              "bounceDirection"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "center": {
+          "opcode": "motion_gotoxy",
+          "next": "record_delayed",
+          "parent": "record_bounceDirection",
+          "inputs": {
+            "X": [
+              1,
+              [
+                4,
+                "-60"
+              ]
+            ],
+            "Y": [
+              1,
+              [
+                4,
+                "40"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "delayedCall": {
+          "opcode": "procedures_call",
+          "next": null,
+          "parent": null,
+          "inputs": {
+            "n": [
+              1,
+              [
+                4,
+                "7"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false,
+          "mutation": {
+            "proccode": "delayed six times %s",
+            "argumentids": "[\"n\"]",
+            "return": "true"
+          }
+        },
+        "record_delayed": {
+          "opcode": "data_setvariableto",
+          "next": "ready",
+          "parent": "center",
+          "inputs": {
+            "VALUE": [
+              2,
+              "delayedCall"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "delayed",
+              "delayed"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "ready": {
+          "opcode": "data_setvariableto",
+          "next": "say",
+          "parent": "record_delayed",
+          "inputs": {
+            "VALUE": [
+              1,
+              [
+                4,
+                "1"
+              ]
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "ready",
+              "ready"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "say": {
+          "opcode": "looks_say",
+          "next": null,
+          "parent": "ready",
+          "inputs": {
+            "MESSAGE": [
+              1,
+              [
+                10,
+                "42 — reporter resumed"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "cloneHat": {
+          "opcode": "control_start_as_clone",
+          "next": "record_cloneStretch",
+          "parent": null,
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": true
+        },
+        "read_cloneStretch": {
+          "opcode": "stretch_getX",
+          "next": null,
+          "parent": null,
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "record_cloneStretch": {
+          "opcode": "data_setvariableto",
+          "next": "cloneMove",
+          "parent": "cloneHat",
+          "inputs": {
+            "VALUE": [
+              2,
+              "read_cloneStretch"
+            ]
+          },
+          "fields": {
+            "VARIABLE": [
+              "cloneStretch",
+              "cloneStretch"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "cloneMove": {
+          "opcode": "motion_gotoxy",
+          "next": "cloneMonitor",
+          "parent": "record_cloneStretch",
+          "inputs": {
+            "X": [
+              1,
+              [
+                4,
+                "80"
+              ]
+            ],
+            "Y": [
+              1,
+              [
+                4,
+                "50"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "cloneMonitor": {
+          "opcode": "data_showvariable",
+          "next": "cloneSay",
+          "parent": "cloneMove",
+          "inputs": {},
+          "fields": {
+            "VARIABLE": [
+              "marker",
+              "marker"
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "cloneSay": {
+          "opcode": "looks_say",
+          "next": null,
+          "parent": "cloneMonitor",
+          "inputs": {
+            "MESSAGE": [
+              1,
+              [
+                10,
+                "clone: 150% × 50%"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "definition": {
+          "opcode": "procedures_definition",
+          "next": "reporterWait",
+          "parent": null,
+          "inputs": {
+            "custom_block": [
+              2,
+              "prototype"
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": true
+        },
+        "prototype": {
+          "opcode": "procedures_prototype",
+          "next": null,
+          "parent": null,
+          "inputs": {},
+          "fields": {},
+          "shadow": false,
+          "topLevel": false,
+          "mutation": {
+            "proccode": "delayed six times %s",
+            "argumentids": "[\"n\"]",
+            "argumentnames": "[\"n\"]",
+            "argumentdefaults": "[0]",
+            "warp": "false",
+            "return": "true"
+          }
+        },
+        "reporterWait": {
+          "opcode": "control_wait",
+          "next": "return",
+          "parent": "definition",
+          "inputs": {
+            "DURATION": [
+              1,
+              [
+                4,
+                "0.05"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "arg": {
+          "opcode": "argument_reporter_string_number",
+          "next": null,
+          "parent": null,
+          "inputs": {},
+          "fields": {
+            "VALUE": [
+              "n",
+              null
+            ]
+          },
+          "shadow": false,
+          "topLevel": false
+        },
+        "multiply": {
+          "opcode": "operator_multiply",
+          "next": null,
+          "parent": null,
+          "inputs": {
+            "NUM1": [
+              2,
+              "arg"
+            ],
+            "NUM2": [
+              1,
+              [
+                4,
+                "6"
+              ]
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        },
+        "return": {
+          "opcode": "procedures_return",
+          "next": null,
+          "parent": "reporterWait",
+          "inputs": {
+            "VALUE": [
+              2,
+              "multiply"
+            ]
+          },
+          "fields": {},
+          "shadow": false,
+          "topLevel": false
+        }
+      },
+      "costumes": [
+        {
+          "name": "blue square",
+          "assetId": "51c333e0641ce89a9caf43680e85af95",
+          "md5ext": "51c333e0641ce89a9caf43680e85af95.svg",
+          "dataFormat": "svg",
+          "bitmapResolution": 1,
+          "rotationCenterX": 10,
+          "rotationCenterY": 10
+        }
+      ],
+      "sounds": [],
+      "currentCostume": 0,
+      "volume": 100,
+      "layerOrder": 1,
+      "visible": true,
+      "x": 0,
+      "y": 0,
+      "size": 100,
+      "direction": 90,
+      "draggable": false,
+      "rotationStyle": "don't rotate"
+    }
+  ],
+  "monitors": [
+    {
+      "id": "penTouch",
+      "opcode": "data_variable",
+      "mode": "default",
+      "params": {
+        "VARIABLE": "penTouch"
+      },
+      "spriteName": null,
+      "visible": false,
+      "x": 12,
+      "y": 12,
+      "width": 0,
+      "height": 0
+    },
+    {
+      "id": "delayed",
+      "opcode": "data_variable",
+      "mode": "large",
+      "params": {
+        "VARIABLE": "delayed"
+      },
+      "spriteName": null,
+      "visible": false,
+      "x": 12,
+      "y": 42,
+      "width": 0,
+      "height": 0
+    },
+    {
+      "id": "items",
+      "opcode": "data_listcontents",
+      "mode": "list",
+      "params": {
+        "LIST": "items"
+      },
+      "spriteName": null,
+      "visible": false,
+      "x": 12,
+      "y": 80,
+      "width": 140,
+      "height": 120
+    },
+    {
+      "id": "cameraX",
+      "opcode": "data_variable",
+      "mode": "default",
+      "params": {
+        "VARIABLE": "cameraX"
+      },
+      "spriteName": null,
+      "visible": true,
+      "x": 12,
+      "y": 220,
+      "width": 0,
+      "height": 0
+    },
+    {
+      "id": "marker",
+      "opcode": "data_variable",
+      "mode": "default",
+      "params": {
+        "VARIABLE": "marker"
+      },
+      "spriteName": "Painter",
+      "visible": false,
+      "x": 260,
+      "y": 12,
+      "width": 0,
+      "height": 0
+    }
+  ],
+  "extensions": [
+    "pen",
+    "stretch",
+    "DTcameracontrols",
+    "runtimeoptions"
+  ],
+  "meta": {
+    "semver": "3.0.0",
+    "vm": "GoWarp",
+    "agent": "remaining feature integration fixture"
+  }
+}

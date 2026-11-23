@@ -1,0 +1,240 @@
+{
+  "targets": [
+    {
+      "isStage": true,
+      "name": "Stage",
+      "variables": {
+        "started": [
+          "started",
+          0
+        ]
+      },
+      "broadcasts": {
+        "start": "start"
+      },
+      "blocks": {}
+    },
+    {
+      "isStage": false,
+      "name": "Title",
+      "visible": true,
+      "currentCostume": 0,
+      "costumes": [
+        {
+          "name": "logo",
+          "assetId": "19135f317d2caa3db0f998a0f7181733",
+          "md5ext": "19135f317d2caa3db0f998a0f7181733.svg",
+          "dataFormat": "svg",
+          "bitmapResolution": 1,
+          "rotationCenterX": 10,
+          "rotationCenterY": 10
+        },
+        {
+          "name": "level",
+          "assetId": "19135f317d2caa3db0f998a0f7181733",
+          "md5ext": "19135f317d2caa3db0f998a0f7181733.svg",
+          "dataFormat": "svg",
+          "bitmapResolution": 1,
+          "rotationCenterX": 10,
+          "rotationCenterY": 10
+        }
+      ],
+      "blocks": {
+        "flag": {
+          "opcode": "event_whenflagclicked",
+          "topLevel": true,
+          "next": "release"
+        },
+        "release": {
+          "opcode": "control_wait_until",
+          "next": "press",
+          "inputs": {
+            "CONDITION": [
+              2,
+              "notPressed"
+            ]
+          }
+        },
+        "notPressed": {
+          "opcode": "operator_not",
+          "inputs": {
+            "OPERAND": [
+              2,
+              "heldAtStart"
+            ]
+          }
+        },
+        "heldAtStart": {
+          "opcode": "sensing_keypressed",
+          "inputs": {
+            "KEY_OPTION": [
+              1,
+              [
+                10,
+                "space"
+              ]
+            ]
+          }
+        },
+        "press": {
+          "opcode": "control_wait_until",
+          "next": "level",
+          "inputs": {
+            "CONDITION": [
+              2,
+              "pressed"
+            ]
+          }
+        },
+        "pressed": {
+          "opcode": "sensing_keypressed",
+          "inputs": {
+            "KEY_OPTION": [
+              1,
+              [
+                10,
+                "space"
+              ]
+            ]
+          }
+        },
+        "level": {
+          "opcode": "looks_switchcostumeto",
+          "next": "start",
+          "inputs": {
+            "COSTUME": [
+              1,
+              [
+                10,
+                "level"
+              ]
+            ]
+          }
+        },
+        "start": {
+          "opcode": "event_broadcast",
+          "next": "running",
+          "inputs": {
+            "BROADCAST_INPUT": [
+              1,
+              [
+                11,
+                "start",
+                "start"
+              ]
+            ]
+          }
+        },
+        "running": {
+          "opcode": "control_forever",
+          "inputs": {
+            "SUBSTACK": [
+              2,
+              "tick"
+            ]
+          }
+        },
+        "tick": {
+          "opcode": "control_wait",
+          "inputs": {
+            "DURATION": [
+              1,
+              [
+                4,
+                "0.1"
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "isStage": false,
+      "name": "Worker",
+      "visible": false,
+      "costumes": [
+        {
+          "name": "worker",
+          "assetId": "19135f317d2caa3db0f998a0f7181733",
+          "md5ext": "19135f317d2caa3db0f998a0f7181733.svg",
+          "dataFormat": "svg",
+          "bitmapResolution": 1,
+          "rotationCenterX": 10,
+          "rotationCenterY": 10
+        }
+      ],
+      "blocks": {
+        "start": {
+          "opcode": "event_whenbroadcastreceived",
+          "topLevel": true,
+          "next": "spawn",
+          "fields": {
+            "BROADCAST_OPTION": [
+              "start",
+              "start"
+            ]
+          }
+        },
+        "spawn": {
+          "opcode": "control_repeat",
+          "inputs": {
+            "TIMES": [
+              1,
+              [
+                4,
+                "3"
+              ]
+            ],
+            "SUBSTACK": [
+              2,
+              "clone"
+            ]
+          }
+        },
+        "clone": {
+          "opcode": "control_create_clone_of",
+          "inputs": {
+            "CLONE_OPTION": [
+              1,
+              [
+                10,
+                "_myself_"
+              ]
+            ]
+          }
+        },
+        "cloneHat": {
+          "opcode": "control_start_as_clone",
+          "topLevel": true,
+          "next": "show"
+        },
+        "show": {
+          "opcode": "looks_show",
+          "next": "count"
+        },
+        "count": {
+          "opcode": "data_changevariableby",
+          "fields": {
+            "VARIABLE": [
+              "started",
+              "started"
+            ]
+          },
+          "inputs": {
+            "VALUE": [
+              1,
+              [
+                4,
+                "1"
+              ]
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "meta": {
+    "semver": "3.0.0",
+    "agent": "GoWarp synthetic gameplay startup fixture"
+  }
+}
