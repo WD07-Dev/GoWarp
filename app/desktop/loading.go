@@ -227,7 +227,7 @@ func (g *game) updateLoading() error {
 			graphics.keepHistory = g.controller.vm.UsesColorSensing()
 			g.controller.graphics = newGraphicsPipeline(deferredPen{graphics}, graphics.replayCommands)
 			g.controller.vm.SetGraphics(g.controller.graphics)
-			g.waitingStart = !s.Player.AutoStart
+			g.waitingStart = !s.Player.AutoStart && g.options.Editor == nil
 		} else if w, h := g.controller.renderer.Size(); w != 480 || h != 360 {
 			scale := g.options.Scale
 			if scale <= 0 {

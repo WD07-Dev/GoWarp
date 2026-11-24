@@ -14,6 +14,7 @@ import (
 	"gowarp/app/compiler"
 	"gowarp/app/config"
 	"gowarp/app/desktop"
+	"gowarp/app/editorbridge"
 	"gowarp/app/host"
 	"gowarp/app/i18n"
 	"gowarp/app/ui"
@@ -141,6 +142,14 @@ func runPrepared(ctx context.Context, path string, s config.Settings, preview bo
 		FPS:      s.FPS,
 		Turbo:    s.Turbo,
 		Mute:     s.Player.Mute,
+	}
+	if address := os.Getenv("GOWARP_EDITOR"); preview && address != "" {
+		peer, err := editorbridge.ConnectRuntime(ctx, address, os.Getenv("GOWARP_EDITOR_DISPLAY") == "embedded")
+		if err != nil {
+			return err
+		}
+		defer peer.Close()
+		options.Editor = peer
 	}
 	if diagnostics, ok := ctx.Value(runtimeLogKey{}).(*runtimeLog); ok {
 		options.Diagnostic = diagnostics.record

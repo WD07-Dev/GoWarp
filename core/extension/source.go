@@ -13,6 +13,7 @@ import (
 )
 
 type Source struct {
+	Ignored      bool
 	Go           []byte
 	Requirements []ModuleRequirement
 }
@@ -54,6 +55,16 @@ func ExtractSource(name string, js []byte) (Source, error) {
 			comment = strings.TrimLeftFunc(comment, unicode.IsSpace)
 			if comment == "" {
 				break
+			}
+			line, remaining, _ := strings.Cut(comment, "\n")
+			if strings.TrimSpace(line) == "@gowarp-ignore" {
+				if source.Ignored {
+					return Source{}, fmt.Errorf("%s: multiple @gowarp-ignore directives", name)
+				}
+				source.Ignored = true
+				parsed = true
+				comment = remaining
+				continue
 			}
 			marker := ""
 			for _, candidate := range []string{"@gowarp-config", "@gowarp-go"} {
@@ -98,6 +109,12 @@ func ExtractSource(name string, js []byte) (Source, error) {
 			comment = remaining
 		}
 		rest = rest[end+4:]
+	}
+	if source.Ignored {
+		if goSeen || configSeen {
+			return Source{}, fmt.Errorf("%s: @gowarp-ignore cannot be combined with Go or config blocks", name)
+		}
+		return source, nil
 	}
 	if !goSeen {
 		return Source{}, fmt.Errorf("%s: missing @gowarp-go header; use an extension with a Go implementation", name)

@@ -26,6 +26,7 @@ import (
 	"gowarp/app/compiler"
 	"gowarp/app/config"
 	"gowarp/app/dialog"
+	"gowarp/app/editorbridge"
 	"gowarp/app/host"
 	"gowarp/app/i18n"
 	"gowarp/app/ui"
@@ -40,6 +41,7 @@ type hit struct {
 }
 
 type result struct {
+	closedEditor                           *editorbridge.Server
 	importedExtension                      *extensionImport
 	extensions                             *extensionEditor
 	savedExtensions                        *compiler.ExtensionDocument
@@ -63,6 +65,9 @@ type browser struct {
 }
 
 type application struct {
+	editorBridge    *editorbridge.Server
+	editorScreen    bool
+	editorStatus    editorbridge.Status
 	quit            bool
 	extensions      *extensionEditor
 	scale           float64
@@ -103,6 +108,11 @@ func Main() {
 		return
 	}
 	defer a.cancel()
+	defer func() {
+		if a.editorBridge != nil {
+			a.editorBridge.Close()
+		}
+	}()
 	defer func() {
 		a.face.Close()
 		a.title.Close()
@@ -494,6 +504,13 @@ func (a *application) Update() error {
 		return ebiten.Termination
 	}
 	a.pollClipboard()
+	if a.editorBridge != nil {
+		status := a.editorBridge.Status()
+		if status != a.editorStatus {
+			a.editorStatus = status
+			a.dirty = true
+		}
+	}
 	select {
 	case r := <-a.results:
 		a.busy = false
@@ -508,6 +525,9 @@ func (a *application) Update() error {
 				a.errorText = r.err.Error()
 			}
 		} else {
+			if r.closedEditor != nil && a.editorBridge == r.closedEditor {
+				a.editorBridge = nil
+			}
 			a.status = r.status
 			a.applyExtensionImport(r.importedExtension)
 			if r.extensions != nil {
@@ -586,7 +606,7 @@ func (a *application) Update() error {
 		a.updateDropdown()
 		return nil
 	}
-	if dropped := ebiten.DroppedFiles(); dropped != nil && !a.busy && a.extensions == nil {
+	if dropped := ebiten.DroppedFiles(); dropped != nil && !a.busy && a.extensions == nil && !a.editorScreen {
 		entries, err := fs.ReadDir(dropped, ".")
 		if err == nil && len(entries) > 0 {
 			if p, ok := entries[0].(ebiten.AbsPather); ok {
@@ -600,6 +620,9 @@ func (a *application) Update() error {
 		} else if a.browser != nil {
 			a.browser = nil
 			a.editor = nil
+		} else if a.editorScreen {
+			a.editorScreen = false
+			a.keyboardFocus = -1
 		} else if a.editor != nil {
 			a.editor = nil
 		} else if a.busy && a.jobCancel != nil {
@@ -651,7 +674,7 @@ func (a *application) Update() error {
 	if a.editor != nil {
 		a.edit()
 	}
-	if a.extensions == nil && a.browser == nil && a.errorText == "" {
+	if a.extensions == nil && !a.editorScreen && a.browser == nil && a.errorText == "" {
 		if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
 			a.runPreview()
 		}
@@ -904,6 +927,8 @@ func (a *application) render() {
 	ui.Fill(a.pixels, a.pixels.Bounds(), ui.Background)
 	if a.extensions != nil {
 		a.renderExtensionEditor()
+	} else if a.editorScreen {
+		a.renderTurboWarpScreen()
 	} else {
 		a.renderPackager()
 	}
@@ -967,10 +992,17 @@ func (a *application) renderPackager() {
 		status = status[:len(status)-n]
 	}
 	a.label(24, a.height-82, status, ui.Muted)
-	a.button(24, a.height-56, 146, i18n.Tr("action.preview"), a.runPreview)
+	a.button(24, a.height-56, 146, i18n.Tr("action.connect_turbowarp"), func() {
+		a.editorScreen = true
+		a.editor = nil
+		a.keyboardFocus = -1
+	})
 	a.button(180, a.height-56, 116, i18n.Tr("action.stop"), func() {
 		if a.preview != nil {
 			a.preview.cancel()
+		}
+		if a.editorBridge != nil {
+			a.editorBridge.Stop()
 		}
 	})
 	a.button(a.width-190, a.height-56, 166, i18n.Tr("action.export"), func() {

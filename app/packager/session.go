@@ -34,11 +34,12 @@ func (l *limitedLog) Write(p []byte) (int, error) {
 	return n, nil
 }
 
-func startProcess(ctx context.Context, path, dir string) (*preview, error) {
+func startProcess(ctx context.Context, path, dir string, environment ...string) (*preview, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(ctx, path)
 	stopPath := filepath.Join(dir, "stop")
 	cmd.Env = append(os.Environ(), "GOWARP_PREVIEW=1", "GOWARP_WORKDIR="+dir, "GOWARP_STOP_FILE="+stopPath)
+	cmd.Env = append(cmd.Env, environment...)
 	cmd.Cancel = func() error {
 		return os.WriteFile(stopPath, nil, 0600)
 	}
@@ -68,7 +69,7 @@ func startProcess(ctx context.Context, path, dir string) (*preview, error) {
 	return p, nil
 }
 
-func startPreview(ctx, runContext context.Context, t compiler.Template, input string, s config.Settings) (*preview, error) {
+func startPreview(ctx, runContext context.Context, t compiler.Template, input string, s config.Settings, environment ...string) (*preview, error) {
 	dir, err := os.MkdirTemp("", "gowarp-preview-*")
 	if err != nil {
 		return nil, err
@@ -82,5 +83,5 @@ func startPreview(ctx, runContext context.Context, t compiler.Template, input st
 		os.RemoveAll(dir)
 		return nil, err
 	}
-	return startProcess(runContext, path, dir)
+	return startProcess(runContext, path, dir, environment...)
 }

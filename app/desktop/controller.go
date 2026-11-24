@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gowarp/app/config"
+	"gowarp/app/editorbridge"
 	"gowarp/core/extension"
 	"gowarp/core/media"
 	"gowarp/core/project"
@@ -19,6 +20,7 @@ const ToolbarHeight = 36
 const AnswerHeight = 52
 
 type Options struct {
+	Editor     *editorbridge.Peer
 	Extensions extension.Bundle
 	// Prepare loads a project after the native window has drawn its first frame.
 	Prepare     func(context.Context) (*project.Project, error)

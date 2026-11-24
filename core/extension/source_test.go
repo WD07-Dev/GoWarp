@@ -17,6 +17,30 @@ func New() extension.Extension {
 }
 */`
 
+func TestIgnoredExtensionHeader(t *testing.T) {
+	for _, js := range []string{"/* @gowarp-ignore */\nvoid 0;", "// license\n/*\n@gowarp-ignore\n*/\n(function () {})();"} {
+		source, err := ExtractSource("editor.js", []byte(js))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(source.Go) != 0 || len(source.Requirements) != 0 {
+			t.Fatal("ignored extension still supplies executable Go")
+		}
+	}
+	for _, js := range []string{
+		"const text = '/* @gowarp-ignore */';",
+		"void 0; /* @gowarp-ignore */",
+		"/* @gowarp-ignore-extra */",
+		"/* @gowarp-ignore extra */",
+		"/* @gowarp-ignore */" + validGoHeader,
+		validGoHeader + "/* @gowarp-ignore */",
+	} {
+		if _, err := ExtractSource("editor.js", []byte(js)); err == nil {
+			t.Fatalf("accepted invalid ignore header: %s", js)
+		}
+	}
+}
+
 func TestExtractGoHeader(t *testing.T) {
 	for name, prefix := range map[string]string{
 		"plain header":         "",

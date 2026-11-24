@@ -9,6 +9,9 @@ import (
 )
 
 func (g *game) displayFPS() int {
+	if g.options.Editor != nil && g.options.Editor.Embedded {
+		return 60
+	}
 	if g.controller == nil || g.controller.options.Settings == nil || g.options.Replay || g.options.Screenshot != "" {
 		return 0
 	}

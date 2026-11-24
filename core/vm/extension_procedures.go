@@ -101,8 +101,12 @@ func (c *extensionContext) updateProcedureCalls(value any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := c.r
-	r.project, r.sourceProject, r.native = p, &copyProject, false
+	c.r.replaceBlockGraph(p, &copyProject)
+	return nil, nil
+}
+
+func (r *Runtime) replaceBlockGraph(p, source *project.Project) {
+	r.project, r.sourceProject, r.native = p, source, false
 	r.executionCodes, r.numericExpressions, r.calculations = nil, nil, nil
 	r.preparedInputs, r.listWrites, r.variableWrites, r.coordinateMoves = nil, nil, nil, nil
 	r.procedureCodeCache, r.procedureArgumentCache, r.controlInputs = nil, nil, nil
@@ -120,5 +124,4 @@ func (c *extensionContext) updateProcedureCalls(value any) (any, error) {
 			th.stack[i].nextLink, th.stack[i].bodyLink, th.stack[i].regions = nil, nil, nil
 		}
 	}
-	return nil, nil
 }

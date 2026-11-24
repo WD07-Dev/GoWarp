@@ -37,6 +37,7 @@ const extensionSDKLimit = 256 << 20
 const extensionCacheLimit = 512 << 20
 
 type extensionSource struct {
+	Ignored      bool
 	ID           string
 	Go           []byte
 	Path         string
@@ -69,7 +70,7 @@ func resolveExtensionSources(ctx context.Context, input string, p *project.Proje
 			failures = append(failures, fmt.Sprintf("%s: %v", id, err))
 			continue
 		}
-		sources = append(sources, extensionSource{ID: id, Go: source.Go, Path: path, Requirements: source.Requirements})
+		sources = append(sources, extensionSource{ID: id, Go: source.Go, Path: path, Requirements: source.Requirements, Ignored: source.Ignored})
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -199,7 +200,15 @@ func extensionRuntime(ctx context.Context, t Template, sources []extensionSource
 	if err != nil {
 		return t, err
 	}
-	return buildExtensionRuntime(ctx, t, sources, sdk, filepath.Join(cache, "gowarp", "extensions"), p)
+	cache = filepath.Join(cache, "gowarp", "extensions")
+	if sdk == work {
+		sdkHash, err := copyExtensionSDK(ctx, sdk, sdk)
+		if err != nil {
+			return t, err
+		}
+		return compileExtensionRuntime(ctx, t, sources, work, sdkHash, cache, p)
+	}
+	return buildExtensionRuntime(ctx, t, sources, sdk, cache, p)
 }
 
 func findExtensionSDK(ctx context.Context, t Template, work, output string) (string, error) {
@@ -367,6 +376,9 @@ func copyExtensionSDK(ctx context.Context, root, destination string) (string, er
 			total += int64(len(data))
 			fmt.Fprintf(hash, "%d:%s:%d:", len(rel), rel, len(data))
 			hash.Write(data)
+			if root == destination {
+				return nil
+			}
 			target := filepath.Join(destination, filepath.FromSlash(rel))
 			if err = os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return err
@@ -390,6 +402,9 @@ func copyExtensionSDK(ctx context.Context, root, destination string) (string, er
 func writeExtensionMain(root string, sources []extensionSource) error {
 	labels := strings.NewReplacer("\n", "_", "\r", "_", "/", "_", "\\", "_", ":", "_")
 	for i, source := range sources {
+		if source.Ignored {
+			continue
+		}
 		name := fmt.Sprintf("extension%d", i)
 		positions := token.NewFileSet()
 		file, err := parser.ParseFile(positions, source.ID+".js (Go comment)", source.Go, parser.AllErrors)
@@ -440,18 +455,14 @@ func extensionBuildEnv(t Template) ([]string, error) {
 }
 
 var extensionBuildMu sync.Mutex
+var lastExtensionBuild struct {
+	request string
+	binary  string
+}
 
 func buildExtensionRuntime(ctx context.Context, t Template, sources []extensionSource, sdk, cache string, p *project.Project) (Template, error) {
 	if err := ctx.Err(); err != nil {
 		return t, err
-	}
-	requirements, err := collectExtensionModules(sources)
-	if err != nil {
-		return t, err
-	}
-	goTool, err := exec.LookPath("go")
-	if err != nil {
-		return t, fmt.Errorf(i18n.Tr("error.go_missing"), err)
 	}
 	work, err := os.MkdirTemp("", "gowarp-extensions-*")
 	if err != nil {
@@ -461,6 +472,18 @@ func buildExtensionRuntime(ctx context.Context, t Template, sources []extensionS
 	sdkHash, err := copyExtensionSDK(ctx, sdk, work)
 	if err != nil {
 		return t, fmt.Errorf("Go extension SDK: %w", err)
+	}
+	return compileExtensionRuntime(ctx, t, sources, work, sdkHash, cache, p)
+}
+
+func compileExtensionRuntime(ctx context.Context, t Template, sources []extensionSource, work, sdkHash, cache string, p *project.Project) (Template, error) {
+	requirements, err := collectExtensionModules(sources)
+	if err != nil {
+		return t, err
+	}
+	goTool, err := exec.LookPath("go")
+	if err != nil {
+		return t, fmt.Errorf(i18n.Tr("error.go_missing"), err)
 	}
 	command := host.Command(ctx, goTool, "version")
 	command.Dir = work
@@ -479,26 +502,13 @@ func buildExtensionRuntime(ctx context.Context, t Template, sources []extensionS
 	hash := sha256.New()
 	fmt.Fprintf(hash, "gowarp-go-build-7\n%s\n%s\n%s/%s\nhost=%s/%s\n%d\n", sdkHash, version, t.OS, t.Arch, runtime.GOOS, runtime.GOARCH, t.Version)
 	for _, source := range sources {
-		fmt.Fprintf(hash, "%d:%s:%d:", len(source.ID), source.ID, len(source.Go))
+		fmt.Fprintf(hash, "%d:%s:%t:%d:", len(source.ID), source.ID, source.Ignored, len(source.Go))
 		hash.Write(source.Go)
 	}
 	for _, requirement := range requirements {
 		fmt.Fprintf(hash, "\nrequire %s %s\n", requirement.Path, requirement.Version)
 	}
-	request := preparationRequest(p)
-	projectData, err := json.Marshal(request)
-	if err != nil {
-		return t, err
-	}
-	fmt.Fprintf(hash, "\nproject:%d:", len(projectData))
-	hash.Write(projectData)
-	key := hex.EncodeToString(hash.Sum(nil))
-	name := key
-	if t.OS == "windows" {
-		name += ".exe"
-	}
-	cached := filepath.Join(cache, name)
-	validatorName := key + "-validator"
+	validatorName := hex.EncodeToString(hash.Sum(nil)) + "-validator"
 	if runtime.GOOS == "windows" {
 		validatorName += ".exe"
 	}
@@ -515,8 +525,19 @@ func buildExtensionRuntime(ctx context.Context, t Template, sources []extensionS
 		}
 	}
 	defer extensionBuildMu.Unlock()
-	if info, e := os.Stat(cached); e == nil && info.Size() > 0 {
-		if check, e := os.Stat(validator); e == nil && check.Size() > 0 {
+	projectData, err := json.Marshal(preparationRequest(p))
+	if err != nil {
+		return t, err
+	}
+	requestHash := sha256.New()
+	requestHash.Write(hash.Sum(nil))
+	requestHash.Write(projectData)
+	requestKey := hex.EncodeToString(requestHash.Sum(nil))
+	if lastExtensionBuild.request == requestKey {
+		cached := filepath.Join(cache, lastExtensionBuild.binary)
+		info, playerErr := os.Stat(cached)
+		check, validatorErr := os.Stat(validator)
+		if playerErr == nil && info.Size() > 0 && validatorErr == nil && check.Size() > 0 {
 			if p != nil {
 				if err = prepareExtensionProject(ctx, validator, p, ""); err != nil {
 					return t, err
@@ -526,30 +547,36 @@ func buildExtensionRuntime(ctx context.Context, t Template, sources []extensionS
 			return extensionTemplate(t, cached)
 		}
 	}
-	if err = writeExtensionMain(work, sources); err != nil {
-		return t, err
-	}
-	if err = writeExtensionProgram(work, "generatedvalidator", assets.ExtensionValidatorTemplate, sources); err != nil {
-		return t, err
-	}
-	if err = prepareExtensionModules(ctx, goTool, work, buildEnv, requirements); err != nil {
-		return t, fmt.Errorf("extensions %s: %w", extensionIDs(sources), err)
-	}
-	validatorBinary := filepath.Join(work, validatorName)
-	validatorTarget := t
-	validatorTarget.OS, validatorTarget.Arch = runtime.GOOS, runtime.GOARCH
-	hostEnv, err := extensionBuildEnv(validatorTarget)
-	if err != nil {
-		return t, err
-	}
-	command = host.Command(ctx, goTool, "build", "-mod=readonly", "-buildvcs=false", "-trimpath", "-o", validatorBinary, "./generatedvalidator")
-	command.Dir, command.Env = work, hostEnv
-	if output, buildErr := command.CombinedOutput(); buildErr != nil {
-		if ctx.Err() != nil {
-			return t, ctx.Err()
+	validatorBinary := validator
+	validatorInfo, validatorErr := os.Stat(validator)
+	buildValidator := validatorErr != nil || validatorInfo.Size() == 0
+	if buildValidator {
+		if err = writeExtensionMain(work, sources); err != nil {
+			return t, err
 		}
-		return t, fmt.Errorf("Go extension validator compilation failed (%s): %w\n%s", extensionIDs(sources), buildErr, output)
+		if err = writeExtensionProgram(work, "generatedvalidator", assets.ExtensionValidatorTemplate, sources); err != nil {
+			return t, err
+		}
+		if err = prepareExtensionModules(ctx, goTool, work, buildEnv, requirements); err != nil {
+			return t, fmt.Errorf("extensions %s: %w", extensionIDs(sources), err)
+		}
+		validatorBinary = filepath.Join(work, validatorName)
+		validatorTarget := t
+		validatorTarget.OS, validatorTarget.Arch = runtime.GOOS, runtime.GOARCH
+		hostEnv, err := extensionBuildEnv(validatorTarget)
+		if err != nil {
+			return t, err
+		}
+		command = host.Command(ctx, goTool, "build", "-mod=readonly", "-buildvcs=false", "-trimpath", "-o", validatorBinary, "./generatedvalidator")
+		command.Dir, command.Env = work, hostEnv
+		if output, buildErr := command.CombinedOutput(); buildErr != nil {
+			if ctx.Err() != nil {
+				return t, ctx.Err()
+			}
+			return t, fmt.Errorf("Go extension validator compilation failed (%s): %w\n%s", extensionIDs(sources), buildErr, output)
+		}
 	}
+	var native []byte
 	if p != nil {
 		nativePath := filepath.Join(work, "core", "vm", "native_project_generated.go")
 		if err = os.MkdirAll(filepath.Dir(nativePath), 0755); err != nil {
@@ -557,6 +584,36 @@ func buildExtensionRuntime(ctx context.Context, t Template, sources []extensionS
 		}
 		if err = prepareExtensionProject(ctx, validatorBinary, p, nativePath); err != nil {
 			return t, err
+		}
+		native, err = os.ReadFile(nativePath)
+		if err != nil && !os.IsNotExist(err) {
+			return t, err
+		}
+	}
+	// Initial values and assets can change without changing compiled code.
+	fmt.Fprintf(hash, "\nnative:%d:", len(native))
+	hash.Write(native)
+	name := hex.EncodeToString(hash.Sum(nil))
+	if t.OS == "windows" {
+		name += ".exe"
+	}
+	cached := filepath.Join(cache, name)
+	if info, e := os.Stat(cached); e == nil && info.Size() > 0 {
+		if buildValidator {
+			if err = publishExtensionBinary(ctx, validatorBinary, validator); err != nil {
+				return t, err
+			}
+		}
+		lastExtensionBuild.request, lastExtensionBuild.binary = requestKey, name
+		t.validatorPath = validator
+		return extensionTemplate(t, cached)
+	}
+	if !buildValidator {
+		if err = writeExtensionMain(work, sources); err != nil {
+			return t, err
+		}
+		if err = prepareExtensionModules(ctx, goTool, work, buildEnv, requirements); err != nil {
+			return t, fmt.Errorf("extensions %s: %w", extensionIDs(sources), err)
 		}
 	}
 	binary := filepath.Join(work, "player")
@@ -583,7 +640,7 @@ func buildExtensionRuntime(ctx context.Context, t Template, sources []extensionS
 	if err != nil {
 		return t, err
 	}
-	validatorInfo, err := os.Stat(validatorBinary)
+	validatorInfo, err = os.Stat(validatorBinary)
 	if err != nil {
 		return t, err
 	}
@@ -593,10 +650,13 @@ func buildExtensionRuntime(ctx context.Context, t Template, sources []extensionS
 	if err = publishExtensionBinary(ctx, binary, cached); err != nil {
 		return t, err
 	}
-	if err = publishExtensionBinary(ctx, validatorBinary, validator); err != nil {
-		return t, err
+	if buildValidator {
+		if err = publishExtensionBinary(ctx, validatorBinary, validator); err != nil {
+			return t, err
+		}
 	}
 	trimExtensionCache(cache, cached, validator)
+	lastExtensionBuild.request, lastExtensionBuild.binary = requestKey, name
 	t.validatorPath = validator
 	return extensionTemplate(t, cached)
 }

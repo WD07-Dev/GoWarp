@@ -24,6 +24,7 @@ import (
 )
 
 type game struct {
+	editor                      editorInput
 	stageNoAntialias            bool
 	displayLogged               bool
 	nextPresentation            time.Time
@@ -95,6 +96,11 @@ func Run(ctx context.Context, path string, p *project.Project, options Options, 
 	}
 	defer g.face.Close()
 	defer g.close()
+	defer func() {
+		if g.editor.frame != nil {
+			g.editor.frame.Deallocate()
+		}
+	}()
 	w, h := 480, 360
 	scale := options.Scale
 	if scale <= 0 {
@@ -206,6 +212,13 @@ func (g *game) update() error {
 	if err := g.ctx.Err(); err != nil {
 		return err
 	}
+	if g.options.Editor != nil {
+		select {
+		case <-g.options.Editor.Done():
+			return ebiten.Termination
+		default:
+		}
+	}
 	if g.captured {
 		return ebiten.Termination
 	}
@@ -263,7 +276,7 @@ func (g *game) update() error {
 			in.MouseDown = false
 		}
 	}
-	if g.waitingStart {
+	if g.waitingStart && g.options.Editor == nil {
 		if !pressed && !in.Enter && !in.Restart {
 			return nil
 		}
@@ -290,6 +303,7 @@ func (g *game) update() error {
 	for _, key := range inpututil.AppendJustReleasedKeys(nil) {
 		in.Released = append(in.Released, keyName(key, ""))
 	}
+	g.editorInput(&in)
 	if err := g.audio.poll(g.controller.vm); err != nil {
 		return err
 	}
@@ -311,6 +325,9 @@ func (g *game) update() error {
 }
 
 func (g *game) sampleWindowFocus() bool {
+	if g.options.Editor != nil {
+		return true
+	}
 	if !g.windowFocusRead {
 		g.windowMinimized = ebiten.IsWindowMinimized()
 		g.windowFocused = !g.windowMinimized && ebiten.IsFocused()
@@ -560,6 +577,7 @@ func (g *game) draw(screen *ebiten.Image, focused bool) {
 		// Start loading after its first frame, even without focus.
 		if focused || !g.drawn {
 			g.drawLoading(screen)
+			g.streamEditorFrame(screen)
 			g.drawn = true
 			g.focusDraws = max(0, g.focusDraws-1)
 		}
@@ -568,13 +586,17 @@ func (g *game) draw(screen *ebiten.Image, focused bool) {
 	// Sample host timing even when composition is skipped.
 	g.logDisplaySize(screen.Bounds().Size())
 	g.sampleHostFrame()
-	if !focused && !g.limitReached {
+	idlePreview := g.options.Editor != nil && g.options.Editor.Embedded && !g.options.Editor.WantsFrame()
+	if (!focused || idlePreview) && !g.limitReached {
 		// Finish pen work offscreen instead of accumulating it until focus returns.
 		if pen := g.gpu.nativePen; pen != nil {
 			pen.replayCommands()
 			pen.flushStamps()
 			pen.flushLines()
 			pen.flushClear([4]*ebiten.Image{})
+		}
+		if idlePreview {
+			return
 		}
 		if !g.windowMinimized {
 			// Keep presentation active without recomposing the scene after losing focus.
@@ -611,6 +633,7 @@ func (g *game) draw(screen *ebiten.Image, focused bool) {
 	}
 	if g.controller.options.Settings != nil {
 		g.drawPlayer(screen)
+		g.streamEditorFrame(screen)
 		g.captureFrame(screen)
 		return
 	}
@@ -627,6 +650,7 @@ func (g *game) draw(screen *ebiten.Image, focused bool) {
 	g.canvas.WritePixels(frame.Pix)
 	screen.Clear()
 	screen.DrawImage(g.canvas, nil)
+	g.streamEditorFrame(screen)
 	g.captureFrame(screen)
 }
 
@@ -645,6 +669,9 @@ func (g *game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	// Layout starts each host frame, including frames without an Update.
 	g.windowFocusRead, g.windowFullscreenRead = false, false
 	g.windowDPI = 1
+	if peer := g.options.Editor; peer != nil && peer.Embedded {
+		outsideWidth, outsideHeight = peer.FrameSize(max(1, outsideWidth), max(1, outsideHeight))
+	}
 	g.outsideWidth, g.outsideHeight = outsideWidth, outsideHeight
 	if g.controller == nil {
 		if g.options.Settings != nil {
@@ -681,6 +708,11 @@ func (g *game) layoutScale(width, height, scale float64) (float64, float64) {
 	g.windowDPI = scale
 	g.outsideWidth = max(1, int(math.Ceil(width*scale)))
 	g.outsideHeight = max(1, int(math.Ceil(height*scale)))
+	if peer := g.options.Editor; peer != nil && peer.Embedded {
+		w, h := peer.FrameSize(g.outsideWidth, g.outsideHeight)
+		g.windowDPI *= float64(w) / float64(g.outsideWidth)
+		g.outsideWidth, g.outsideHeight = w, h
+	}
 	return float64(g.outsideWidth), float64(g.outsideHeight)
 }
 

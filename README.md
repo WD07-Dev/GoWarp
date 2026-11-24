@@ -33,6 +33,14 @@ Each distribution ZIP includes runtimes for both platforms, allowing you to choo
 
 GoWarp is a tool for running and packaging games. To edit blocks, costumes, or sounds, make your changes in Scratch or TurboWarp and import the updated SB3 file.
 
+### Run directly from TurboWarp
+
+The [editor connection](extensions/editor/README.md) adds **GoWarp Run** and **GoWarp Stop** buttons to
+TurboWarp's top menu. It sends the current project to the local GoWarp application
+and opens a native preview without manually saving and reopening an SB3. Choose a
+separate window or an experimental streamed preview inside the editor. Block clicks
+and green-flag restarts reuse the running preview until the project changes.
+
 ### Saved projects and SB3 files
 
 - **Open SB3 file** loads the Scratch or TurboWarp project to run.
@@ -98,7 +106,7 @@ GoWarp does not run ordinary JavaScript extensions or automatically translate th
 
 A single file can contain both a JavaScript implementation for TurboWarp and a Go implementation for GoWarp. During preview or export, GoWarp extracts the Go implementation and compiles it together with the runtime.
 
-Use **Extensions → Edit extension sources** to edit an SB3's JavaScript and Go headers inside GoWarp. **Save SB3** writes the changed sources directly to that SB3.
+Use **Extensions -> Edit extension sources** to edit an SB3's JavaScript and Go headers inside GoWarp. **Save SB3** writes the changed sources directly to that SB3.
 
 - [How extensions run and how to use them](extensions/README.md)
 - [Go extension API](extensions/API.md)

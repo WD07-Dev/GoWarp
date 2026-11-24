@@ -92,6 +92,8 @@ type continuation struct {
 }
 
 type thread struct {
+	stackClick       bool
+	editorReport     func(string, error)
 	code             *executionCode
 	cursor           *executionBlock
 	regions          map[string]*nativeRegion

@@ -60,6 +60,63 @@ func TestResolveExtensionSources(t *testing.T) {
 	}
 }
 
+func TestIgnoredEditorExtensionBuild(t *testing.T) {
+	p := &project.Project{
+		Extensions: []string{"editor", "fresh"},
+		ExtensionURLs: map[string]string{
+			"editor": "data:application/javascript;base64," + base64.StdEncoding.EncodeToString([]byte("/* @gowarp-ignore */\nvoid 0;")),
+			"fresh":  "data:application/javascript;base64," + base64.StdEncoding.EncodeToString([]byte(testExtensionJS)),
+		},
+	}
+	sources, err := resolveExtensionSources(context.Background(), "", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sources) != 2 || !sources[0].Ignored || sources[1].Ignored {
+		t.Fatalf("sources: %+v", sources)
+	}
+	sdk := t.TempDir()
+	for name, data := range extensionSDKFixture(t) {
+		path := filepath.Join(sdk, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(data), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tpl := Template{Version: config.Version, OS: runtime.GOOS, Arch: runtime.GOARCH}
+	built, err := buildExtensionRuntime(context.Background(), tpl, sources, sdk, t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := exec.Command(built.Path).CombinedOutput()
+	if err != nil || string(output) != "editor\nfresh\n" {
+		t.Fatalf("output=%q err=%v", output, err)
+	}
+	if err := validateExtensionProject(context.Background(), built.validatorPath, p); err != nil {
+		t.Fatal(err)
+	}
+	p.Monitors = []project.Monitor{{ID: "editor_installed", Opcode: "editor_installed"}}
+	if err := prepareExtensionProject(context.Background(), built.validatorPath, p, ""); err != nil {
+		t.Fatalf("hidden editor reference: %v", err)
+	}
+	p.Monitors[0].Visible = true
+	if err := prepareExtensionProject(context.Background(), built.validatorPath, p, ""); err == nil {
+		t.Fatal("visible ignored reporter should fail validation")
+	}
+	p.Monitors[0].Visible = false
+	p.Monitors[0].Opcode = "fresh_missing"
+	if err := prepareExtensionProject(context.Background(), built.validatorPath, p, ""); err == nil {
+		t.Fatal("hidden reporter from a runtime extension should still be validated")
+	}
+	p.Monitors = nil
+	p.Targets = []*project.Target{{Blocks: project.Blocks{"used": {Opcode: "editor_run"}}}}
+	if err := validateExtensionProject(context.Background(), built.validatorPath, p); err == nil || !strings.Contains(err.Error(), "editor_run") {
+		t.Fatalf("ignored runtime block should still fail validation: %v", err)
+	}
+}
+
 func TestExtensionRuntimeBuildCacheAndFailure(t *testing.T) {
 	sdk := t.TempDir()
 	files := extensionSDKFixture(t)
@@ -164,6 +221,7 @@ import ("fmt"; "gowarp/core/project")
 func GenerateNative(p *project.Project) ([]byte,error) {
  return []byte(fmt.Sprintf("package vm\nfunc init() { NativeValue = %v }\n", p.Targets[0].Blocks["value"].Fields["VALUE"][0])),nil
 }
+
 var NativeValue int
 `
 	for name, data := range files {
@@ -201,13 +259,30 @@ var NativeValue int
 	if err != nil || built.Path != again.Path || !before.ModTime().Equal(after.ModTime()) {
 		t.Fatalf("unchanged native runtime was not reused: %v", err)
 	}
+	p.Targets[0].Name = "Renamed stage"
+	unchangedCode, err := buildExtensionRuntime(context.Background(), tpl, nil, sdk, cache, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err = os.Stat(unchangedCode.Path)
+	if err != nil || unchangedCode.Path != built.Path || !before.ModTime().Equal(after.ModTime()) {
+		t.Fatalf("identical generated code rebuilt after a project metadata change: %v", err)
+	}
 	p.Targets[0].Blocks["value"].Fields["VALUE"][0] = float64(43)
+	validatorBefore, err := os.Stat(built.validatorPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	changed, err := buildExtensionRuntime(context.Background(), tpl, nil, sdk, cache, p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if changed.Path == built.Path || changed.validatorPath == built.validatorPath {
-		t.Fatal("native source change reused cached runtime or validator")
+	if changed.Path == built.Path {
+		t.Fatal("native source change reused cached runtime")
+	}
+	validatorAfter, err := os.Stat(changed.validatorPath)
+	if err != nil || changed.validatorPath != built.validatorPath || !validatorBefore.ModTime().Equal(validatorAfter.ModTime()) {
+		t.Fatalf("project-only change rebuilt the extension validator: %v", err)
 	}
 	output, err = exec.Command(changed.Path).CombinedOutput()
 	if err != nil || string(output) != "43\n" {
@@ -745,5 +820,35 @@ func TestExtensionSDKPreservesPlatformSources(t *testing.T) {
 	}
 	if extensionSDKFile("platform/linux/native/dialog_linux_test.go") {
 		t.Fatal("SDK includes native tests")
+	}
+}
+
+func TestUnpackedSDKDoesNotRewriteItsFiles(t *testing.T) {
+	sdk := t.TempDir()
+	for name, content := range extensionSDKFixture(t) {
+		path := filepath.Join(sdk, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := filepath.Join(sdk, "go.mod")
+	old := time.Unix(1000, 0)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	hash, err := copyExtensionSDK(context.Background(), sdk, sdk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.ModTime().Equal(old) {
+		t.Fatalf("unpacked SDK was rewritten: %v", err)
+	}
+	copied, err := copyExtensionSDK(context.Background(), sdk, t.TempDir())
+	if err != nil || copied != hash {
+		t.Fatalf("reused SDK fingerprint differs: %v", err)
 	}
 }

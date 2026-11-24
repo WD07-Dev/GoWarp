@@ -1,16 +1,17 @@
 # GoWarp extensions
 
-GoWarp extensions run Go code embedded in JavaScript comments.
-The JavaScript part defines the extension for TurboWarp; GoWarp compiles and runs the Go part.
-
 - [API reference](API.md) — registration, handlers, scheduling, and host operations
 - [Examples and original authors](EXAMPLES.md) — existing implementations and credits
+- [Editor connection guide](editor/README.md) — This helper is separate from runtime extensions.
 - [GoWarp overview](../README.md)
+
+GoWarp extensions run Go code embedded in JavaScript comments.
+The JavaScript part defines the extension for TurboWarp; GoWarp compiles and runs the Go part.
 
 ## How execution works
 
 1. GoWarp reads the project's extension IDs and the sources referenced by `extensionURLs`.
-2. It finds one `@gowarp-go` header before the JavaScript file's first executable code.
+2. It reads the leading comment header: `@gowarp-go` supplies native code; `@gowarp-ignore` excludes an editor-only extension from execution.
 3. It compiles the Go sources into a host-side helper and checks their registrations.
 4. Registered `Prepare` callbacks transform a private copy of the project's block graphs. GoWarp validates the transformed blocks, then compiles the game scripts and extensions with the runtime.
 5. The runtime applies the same preparation to the saved source graph and dispatches extension blocks to their registered Go handlers.
@@ -30,12 +31,26 @@ GoWarp loads the sources referenced by the SB3. It does not scan this directory 
 
 ### Editing extension code in GoWarp
 
-1. Open an SB3 and select **Extensions → Edit extension sources** to switch to the extension editor screen.
+1. Open an SB3 and select **Extensions -> Edit extension sources** to switch to the extension editor screen.
 2. Select an extension on the left. Edit its full JavaScript source, including the Go comment header. Linked HTTP(S) sources are downloaded when the editor opens.
 3. Use **Add Go header** for a starter implementation if the source has no header yet. Implement its blocks using the [API reference](API.md); the starter does not translate JS.
 4. **Check Go syntax** checks the header without executing it. Type checking and block registration checks happen during preview/export.
 5. Choose **Save SB3** (Ctrl+S). This overwrites the current SB3, embedding only changed sources. Blocks, assets and unedited extension references stay intact.
 6. Choose **Back** to return to the packager, then preview or export again to compile your changes.
+
+### Editor-only extensions
+
+Place this comment before executable JavaScript to exclude an extension from
+GoWarp execution:
+
+```javascript
+/* @gowarp-ignore */
+```
+
+License comments may precede it. Do not combine it with `@gowarp-go` or
+`@gowarp-config`. GoWarp keeps the extension ID as an empty registration, without
+compiling its source or running handlers. The original JS remains in the SB3 for
+TurboWarp. The extension editor and source conversion accept this header too.
 
 ## Writing an extension
 

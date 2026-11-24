@@ -4,17 +4,105 @@ import (
 	"context"
 	"image"
 	"image/color"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"gowarp/app/config"
+	"gowarp/app/editorbridge"
 	"gowarp/core/media"
 	"gowarp/core/render"
 	"gowarp/core/vm"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
+
+func TestEmbeddedDisplayCadence(t *testing.T) {
+	g := &game{options: Options{Editor: &editorbridge.Peer{Embedded: true}}}
+	start := time.Unix(1, 0)
+	frames := 0
+	for i := range 120 {
+		if g.shouldPresent(start.Add(time.Duration(i)*time.Second/120), image.Pt(480, 360)) {
+			frames++
+		}
+	}
+	if frames != 60 {
+		t.Fatalf("embedded presentations = %d, want 60", frames)
+	}
+}
+
+func TestEmbeddedPreviewWithoutRequestsKeepsPenButSkipsComposition(t *testing.T) {
+	runGPUFrame(t, func() {
+		s := config.Default(nil)
+		s.Player.Controls = false
+		c := cadenceController(t, 60, "{}")
+		c.options.Settings = &s
+		g := &game{controller: c, ctx: context.Background(), options: Options{Editor: &editorbridge.Peer{Embedded: true}}}
+		defer g.close()
+		pen, err := g.gpu.enablePen(c.renderer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		screen := ebiten.NewImage(480, 360)
+		defer screen.Deallocate()
+		for range 3 {
+			if err := g.advanceController(Input{}); err != nil {
+				t.Fatal(err)
+			}
+			deferredPen{pen}.Pen(vm.PenCommand{Kind: "line", Size: 4, Line: [4]float64{-10, 0, 10, 0}, Color: color.NRGBA{R: 255, A: 255}})
+			g.draw(screen, true)
+			if g.stageCanvas != nil {
+				t.Fatal("composed a scene the browser did not request")
+			}
+			if len(pen.commands) != 0 {
+				t.Fatal("pen work accumulated while preview was idle")
+			}
+		}
+		if pen.image == nil {
+			t.Fatal("pen drawing was discarded")
+		}
+		pixels := make([]byte, 4*pen.image.Bounds().Dx()*pen.image.Bounds().Dy())
+		pen.image.ReadPixels(pixels)
+		if !slices.Contains(pixels, byte(255)) {
+			t.Fatal("pen image lost its stroke")
+		}
+		g.options.Editor.Embedded = false
+		g.draw(screen, true)
+		if g.stageCanvas == nil || g.drawErr != nil {
+			t.Fatalf("native rendering stopped: %v", g.drawErr)
+		}
+	})
+}
+
+func TestEmbeddedLayoutUsesStreamResolution(t *testing.T) {
+	s := config.Default(nil)
+	s.Player.Controls = false
+	c := cadenceController(t, 60, `{}`)
+	c.options.Settings = &s
+	g := &game{controller: c, options: Options{Settings: &s, Editor: &editorbridge.Peer{Embedded: true}}}
+	stageWidth, stageHeight := c.renderer.Size()
+	w, h := g.layoutScale(1920, 1080, 2)
+	if w != 960 || h != 540 || g.outsideWidth != 960 || g.outsideHeight != 540 {
+		t.Fatalf("embedded layout still renders the native window: %gx%g (%dx%d)", w, h, g.outsideWidth, g.outsideHeight)
+	}
+	x, y := g.inputPosition(480, 270)
+	if x != float64(stageWidth)/2 || y != float64(stageHeight)/2+ToolbarHeight {
+		t.Fatalf("browser center no longer maps to stage center: %g, %g", x, y)
+	}
+	if width, height := c.renderer.Size(); width != stageWidth || height != stageHeight || c.vm.FPS() != 60 {
+		t.Fatal("stream resolution changed logical stage size or VM cadence")
+	}
+	iw, ih := g.Layout(1920, 1080)
+	if iw != 960 || ih != 540 {
+		t.Fatalf("integer layout bypassed stream size: %dx%d", iw, ih)
+	}
+	g.options.Editor.Embedded = false
+	w, h = g.layoutScale(1920, 1080, 2)
+	if w != 3840 || h != 2160 {
+		t.Fatalf("native preview resolution changed: %gx%g", w, h)
+	}
+}
 
 func TestDisplayLogsInitialSize(t *testing.T) {
 	s := config.Default(nil)

@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"gowarp/core/extension"
 	"gowarp/core/project"
 	"gowarp/core/vm"
-	{{range $i, $_ := .Sources}}
+	{{range $i, $source := .Sources}}{{if not $source.Ignored}}
 	extension{{$i}} "gowarp/generatedextensions/extension{{$i}}"
-	{{end}}
+	{{end}}{{end}}
 )
 
 func run() error {
@@ -24,8 +25,10 @@ func run() error {
 		return err
 	}
 	factories := extension.Bundle{
-		{{range $i, $_ := .Sources}}extension{{$i}}.New,
-		{{end}}
+		{{range $i, $source := .Sources}}{{if $source.Ignored}}
+		func() extension.Extension { return extension.Extension{ID: {{printf "%q" $source.ID}}} },
+		{{else}}extension{{$i}}.New,
+		{{end}}{{end}}
 	}
 	// Construct once: validation and preparation must see the same definition.
 	defs := make([]*extension.Extension, len(factories))
@@ -60,7 +63,15 @@ func run() error {
 			}
 		}
 	}
+	ignored := map[string]bool{
+		{{range .Sources}}{{if .Ignored}}{{printf "%q" .ID}}: true,
+		{{end}}{{end}}
+	}
 	for _, monitor := range prepared.Monitors {
+		id, _, _ := strings.Cut(monitor.Opcode, "_")
+		if !monitor.Visible && ignored[id] {
+			continue
+		}
 		if monitor.Opcode != "" {
 			opcodes = append(opcodes, monitor.Opcode)
 		}

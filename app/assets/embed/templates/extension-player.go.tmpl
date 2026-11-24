@@ -3,14 +3,16 @@ package main
 import (
 	"gowarp/app/player"
 	"gowarp/core/extension"
-	{{range $i, $_ := .Sources}}
+	{{range $i, $source := .Sources}}{{if not $source.Ignored}}
 	extension{{$i}} "gowarp/generatedextensions/extension{{$i}}"
-	{{end}}
+	{{end}}{{end}}
 )
 
 func main() {
 	player.MainWithExtensions(extension.Bundle{
-		{{range $i, $_ := .Sources}}extension{{$i}}.New,
-		{{end}}
+		{{range $i, $source := .Sources}}{{if $source.Ignored}}
+		func() extension.Extension { return extension.Extension{ID: {{printf "%q" $source.ID}}} },
+		{{else}}extension{{$i}}.New,
+		{{end}}{{end}}
 	})
 }

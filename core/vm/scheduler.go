@@ -79,6 +79,12 @@ func (r *Runtime) stepThreads(ctx context.Context) error {
 				turnStart = time.Now()
 			}
 			err := r.step(ctx, th)
+			if th.editorReport != nil && (th.done || err != nil) {
+				th.editorReport(text(th.inputRequest.value), err)
+				th.editorReport = nil
+				th.done = true
+				err = nil
+			}
 			if r.measureSteps {
 				timing.Elapsed, timing.Steps = time.Since(turnStart), th.sliceExecuted
 				r.stepDiagnostics.record(timing)
