@@ -40,6 +40,8 @@ type Options struct {
 type Input struct {
 	MouseX, MouseY                  float64
 	MouseDown, MousePressed         bool
+	WheelY                          float64
+	Escape, Delete, SelectAll       bool
 	Pressed, Released               []string
 	Text                            string
 	Enter, Backspace, Restart, Stop bool
@@ -74,6 +76,7 @@ type controller struct {
 	graphics        *graphicsPipeline
 	assets          *media.Library
 	options         Options
+	monitors        monitorUI
 	answer          string
 	question        *vm.Question
 	drag            *vm.DisplayTarget
@@ -145,6 +148,8 @@ func (c *controller) advance(ctx context.Context, in Input) error {
 		c.credit = 0
 		c.cadenceTime = time.Time{}
 		c.answerSubmitted = false
+		c.monitors.edit = nil
+		c.monitors.drag = nil
 		c.vm.GreenFlag()
 		c.drag = nil
 		c.answer = ""
@@ -161,6 +166,10 @@ func (c *controller) advance(ctx context.Context, in Input) error {
 		c.drag = nil
 		c.answer = ""
 		c.question = nil
+	}
+	if !c.options.Replay {
+		w, h := c.renderer.Size()
+		c.monitors.update(c.vm, &in, w, h)
 	}
 	if c.vm.Stopped() || c.vm.Paused() {
 		c.credit = 0

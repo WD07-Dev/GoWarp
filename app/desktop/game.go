@@ -210,7 +210,7 @@ func (g *game) update() error {
 		return ebiten.Termination
 	}
 	g.updateFocus(g.sampleWindowFocus())
-	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) && (g.controller == nil || g.controller.monitors.edit == nil) {
 		if err := g.handleEscape(); err != nil {
 			return err
 		}
@@ -239,7 +239,12 @@ func (g *game) update() error {
 	cursorX, cursorY := ebiten.CursorPosition()
 	x, y := g.inputPosition(cursorX, cursorY)
 	pressed := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
+	_, wheelY := ebiten.Wheel()
 	in := Input{
+		WheelY:       wheelY,
+		Escape:       inpututil.IsKeyJustPressed(ebiten.KeyEscape),
+		Delete:       inpututil.IsKeyJustPressed(ebiten.KeyDelete),
+		SelectAll:    ebiten.IsKeyPressed(ebiten.KeyControl) && inpututil.IsKeyJustPressed(ebiten.KeyA),
 		MouseX:       x,
 		MouseY:       y,
 		MouseDown:    ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft),

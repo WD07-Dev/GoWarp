@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -26,6 +27,9 @@ type dataMonitor struct {
 
 // MonitorState contains detached display values in stage pixel coordinates.
 type MonitorState struct {
+	Index, Count, Offset   int
+	SliderMin, SliderMax   float64
+	Discrete               bool
 	ID, Label, Mode, Value string
 	List, Visible          bool
 	X, Y, Width, Height    float64
@@ -58,15 +62,20 @@ func (r *Runtime) InitData(p *project.Project) {
 }
 
 func (r *Runtime) Monitors() []MonitorState {
-	return r.monitors(false)
+	return r.monitors(false, nil, 0)
 }
 
 // VisibleMonitors skips hidden values before copying lists or formatting numbers.
 func (r *Runtime) VisibleMonitors() []MonitorState {
-	return r.monitors(true)
+	return r.monitors(true, nil, 0)
 }
 
-func (r *Runtime) monitors(visibleOnly bool) []MonitorState {
+// MonitorWindow formats only the list rows needed by the player.
+func (r *Runtime) MonitorWindow(offsets map[int]int, rows int) []MonitorState {
+	return r.monitors(true, offsets, max(1, rows))
+}
+
+func (r *Runtime) monitors(visibleOnly bool, offsets map[int]int, rows int) []MonitorState {
 	count := len(r.data.monitors)
 	if visibleOnly {
 		count = 0
@@ -77,11 +86,13 @@ func (r *Runtime) monitors(visibleOnly bool) []MonitorState {
 		}
 	}
 	result := make([]MonitorState, 0, count)
-	for _, m := range r.data.monitors {
+	for index, m := range r.data.monitors {
 		if visibleOnly && !m.source.Visible {
 			continue
 		}
 		s := MonitorState{
+			Index:     index,
+			SliderMin: 0, SliderMax: 100, Discrete: true,
 			ID:      m.source.ID,
 			Mode:    m.source.Mode,
 			Visible: m.source.Visible,
@@ -91,17 +102,39 @@ func (r *Runtime) monitors(visibleOnly bool) []MonitorState {
 			Width:   m.source.Width,
 			Height:  m.source.Height,
 		}
+		if m.source.SliderMin != nil {
+			s.SliderMin = *m.source.SliderMin
+		}
+		if m.source.SliderMax != nil {
+			s.SliderMax = *m.source.SliderMax
+		}
+		if m.source.IsDiscrete != nil {
+			s.Discrete = *m.source.IsDiscrete
+		}
 		if s.List {
 			list := m.owner.state.Lists[s.ID]
-			s.Label = list.Name
-			s.Items = make([]string, len(list.Items))
-			for i, item := range list.Items {
-				s.Items[i] = text(item)
+			s.Label, s.Count = list.Name, len(list.Items)
+			end := s.Count
+			if rows > 0 {
+				height := s.Height
+				if height <= 0 || math.IsNaN(height) {
+					height = 200
+				}
+				page := min(rows, max(1, (int(math.Min(height, 4096))-44)/22))
+				s.Offset = min(max(0, offsets[index]), max(0, s.Count-page))
+				end = min(s.Count, s.Offset+page)
+			}
+			s.Items = make([]string, end-s.Offset)
+			for i := range s.Items {
+				s.Items[i] = text(list.Items[s.Offset+i])
 			}
 		} else {
 			v := m.owner.variables[s.ID]
 			if v != nil {
 				s.Label, s.Value = v.Name, text(v.Value)
+				if value, ok := v.Value.(float64); ok && math.Abs(value) < 1e21 {
+					s.Value = text(math.Round(value*1e6) / 1e6)
+				}
 			} else {
 				s.Label, s.Value = "", text(nil)
 			}
@@ -439,10 +472,28 @@ func (r *Runtime) dataStatement(th *thread, b *project.Block, input func(string)
 		if err != nil {
 			return true, err
 		}
+		visible := strings.HasPrefix(b.Opcode, "data_show")
 		for i := range r.data.monitors {
 			m := &r.data.monitors[i]
 			if m.source.ID == id && (m.source.Opcode == "data_listcontents") == isList && m.owner.source == owner.source {
-				m.source.Visible = strings.HasPrefix(b.Opcode, "data_show")
+				m.source.Visible = visible
+				return true, nil
+			}
+		}
+		if visible {
+			for _, original := range r.targets {
+				if original.source != owner.source || original.state.CloneID != 0 {
+					continue
+				}
+				m := project.Monitor{ID: id, Opcode: "data_variable", Mode: "default", Visible: true,
+					X: 5, Y: float64(5 + (len(r.data.monitors)%10)*28)}
+				if isList {
+					m.Opcode, m.Mode, m.Width, m.Height = "data_listcontents", "list", 120, 200
+				}
+				if !original.state.IsStage {
+					m.SpriteName = original.state.Name
+				}
+				r.data.monitors = append(r.data.monitors, dataMonitor{source: m, owner: original})
 				break
 			}
 		}

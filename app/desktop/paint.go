@@ -127,7 +127,7 @@ func (c *controller) paintOverlays(painter overlayPainter, scene []vm.DisplayTar
 			painter.text(x+8, y+19+i*18, line, color.Black)
 		}
 	}
-	drawMonitorsAt(painter, c.vm.VisibleMonitors(), top, wStage, hStage)
+	drawMonitorPanels(painter, c.vm.MonitorWindow(c.monitors.offsets, max(1, (hStage-44)/22)), top, wStage, hStage, &c.monitors)
 	if q := c.vm.Question(); q != nil {
 		answerTop := top + hStage
 		if c.options.Settings != nil {
