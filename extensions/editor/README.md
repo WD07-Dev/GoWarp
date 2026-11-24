@@ -46,8 +46,9 @@ rendering a larger native-window image and shrinking it for every transfer.
 Resizing the native window does not raise the render resolution beyond the
 browser's request. The logical stage size and mouse coordinates are unchanged.
 Frames use uncompressed RGBA over authenticated loopback WebSockets. The runtime
-reuses two pixel buffers and sends them off the rendering thread. GPU readback
-and browser presentation still add work and latency; use the native window for
+reuses two pixel buffers and sends them off the rendering thread. The relay
+reuses up to three receive buffers instead of growing a new buffer for each
+image. GPU readback and browser presentation still add work and latency; use the native window for
 performance measurements. Audio plays locally in the native runtime, not through
 the stream. The native game window must remain open; this is not a headless player.
 

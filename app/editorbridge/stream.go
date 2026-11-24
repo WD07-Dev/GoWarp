@@ -270,8 +270,10 @@ func (s *relay) serve(ws *websocket.Conn, player bool) {
 	}
 }
 
-// Player packets carry their length so large payloads can be read into reusable
-// storage. The browser still receives the same RGBA frames and JSON replies.
+/*
+Player packets carry their length so large payloads can be read into reusable
+storage. The browser still receives the same RGBA frames and JSON replies.
+*/
 func readPlayerPacket(r io.Reader, storage []byte) ([]byte, error) {
 	if cap(storage) < 4 {
 		storage = make([]byte, 4)
