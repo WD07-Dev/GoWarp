@@ -74,6 +74,9 @@ func drawMonitorPanels(painter overlayPainter, monitors []vm.MonitorState, yOffs
 			if ui == nil {
 				return
 			}
+			if m.ReadOnly && kind == "value" {
+				kind = "drag"
+			}
 			value := ""
 			if m.List && item >= m.Offset && item-m.Offset < len(m.Items) {
 				value = m.Items[item-m.Offset]

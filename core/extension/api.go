@@ -64,6 +64,8 @@ type Result struct {
 type Handler func(*Context) (Result, error)
 
 type Block struct {
+	// Text labels stage monitors; [INPUT] placeholders use the saved monitor parameters.
+	Text    string
 	Opcode  string
 	Kind    string
 	Inputs  []string

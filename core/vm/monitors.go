@@ -1,6 +1,11 @@
 package vm
 
-import "math"
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math"
+)
 
 func (r *Runtime) MonitorValue(index, item int) (string, bool) {
 	m := r.editableMonitor(index, item >= 0)
@@ -38,7 +43,7 @@ func (r *Runtime) editableMonitor(index int, list bool) *dataMonitor {
 		return nil
 	}
 	m := &r.data.monitors[index]
-	if !m.source.Visible || m.owner.dead || (m.source.Opcode == "data_listcontents") != list {
+	if m.reporter != nil || !m.source.Visible || m.owner.dead || (m.source.Opcode == "data_listcontents") != list {
 		return nil
 	}
 	return m
@@ -129,9 +134,20 @@ func (r *Runtime) MoveMonitor(index int, x, y float64) {
 }
 
 func (r *Runtime) NextMonitorMode(index int) bool {
-	m := r.editableMonitor(index, false)
-	if m == nil {
+	if !r.MonitorVisible(index) {
 		return false
+	}
+	m := &r.data.monitors[index]
+	if m.source.Opcode == "data_listcontents" {
+		return false
+	}
+	if m.reporter != nil {
+		if m.source.Mode == "large" {
+			m.source.Mode = "default"
+		} else {
+			m.source.Mode = "large"
+		}
+		return true
 	}
 	switch m.source.Mode {
 	case "large":
@@ -152,4 +168,28 @@ func (r *Runtime) ResizeMonitor(index int, width, height float64) bool {
 	m.source.Width = min(4096, max(100, width))
 	m.source.Height = min(4096, max(60, height))
 	return true
+}
+
+// Read extension reporters during VM execution, never from the drawing thread.
+func (r *Runtime) updateMonitorReporters(ctx context.Context) error {
+	for i := range r.data.monitors {
+		m := &r.data.monitors[i]
+		if m.reporter == nil || !m.source.Visible || m.owner.dead || m.thread.wakeFrame > r.frame {
+			continue
+		}
+		registered := r.extensionBlocks[m.source.Opcode]
+		if registered == nil || (registered.block.Kind != "reporter" && registered.block.Kind != "boolean") {
+			continue
+		}
+		budget := stepsPerFrame
+		result, _, err := r.invokeExtension(ctx, m.thread, m.reporter, func(string) (any, error) { return nil, nil }, true, 0, &budget)
+		if errors.Is(err, errExtensionYield) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("monitor %s: %w", m.source.ID, err)
+		}
+		m.value = result.Value
+	}
+	return nil
 }

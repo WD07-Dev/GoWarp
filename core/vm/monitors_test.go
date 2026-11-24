@@ -1,7 +1,10 @@
 package vm
 
 import (
+	"context"
 	"encoding/json"
+	"gowarp/core/extension"
+	dt "gowarp/test/extensions/dtbyxeroname"
 	"math"
 	"testing"
 
@@ -116,5 +119,169 @@ func TestMonitorModesAndListResize(t *testing.T) {
 	}
 	if r.ResizeMonitor(2, math.NaN(), 80) {
 		t.Fatal("nonfinite list size accepted")
+	}
+}
+
+func TestExtensionMonitorUpdatesOncePerTick(t *testing.T) {
+	var p project.Project
+	if err := json.Unmarshal([]byte(`{"targets":[{"isStage":true,"name":"Stage","variables":{"sample_value":["unrelated",42]}}],"monitors":[{"id":"sample_value","opcode":"sample_value","visible":true,"params":{"CHOICE":"clock"}},{"id":"hidden","opcode":"sample_value","visible":false}]}`), &p); err != nil {
+		t.Fatal(err)
+	}
+	r := New(&p)
+	calls, ticks := 0, 0
+	if err := r.SetExtensions(extension.Bundle{func() extension.Extension {
+		return extension.Extension{ID: "sample", Blocks: []extension.Block{{Opcode: "sample_value", Kind: "reporter", Text: "value [CHOICE]", Handler: func(c *extension.Context) (extension.Result, error) {
+			calls++
+			if c.Field("CHOICE") != "clock" {
+				t.Fatalf("monitor fields = %v", c.Fields)
+			}
+			return extension.Result{Value: float64(ticks)}, nil
+		}}}, Events: map[string]extension.Handler{"before-tick": func(*extension.Context) (extension.Result, error) {
+			ticks++
+			return extension.Result{}, nil
+		}}}
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.advance(context.Background(), 1, 60, false, true); err != nil {
+		t.Fatal(err)
+	}
+	for range 3 {
+		got := r.VisibleMonitors()
+		if len(got) != 1 || got[0].Value != "1" || got[0].Label != "value clock" || !got[0].ReadOnly {
+			t.Fatalf("monitors = %+v", got)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("monitor evaluated %d times", calls)
+	}
+	if r.SetMonitorValue(0, "bad") || r.SetMonitorSlider(0, 4) {
+		t.Fatal("reporter monitor modified a variable")
+	}
+	if _, ok := r.MonitorValue(0, -1); ok {
+		t.Fatal("reporter is editable")
+	}
+	for _, want := range []string{"large", "default"} {
+		if !r.NextMonitorMode(0) || r.Monitors()[0].Mode != want {
+			t.Fatalf("reporter mode = %v", r.Monitors())
+		}
+	}
+	r.MoveMonitor(0, 20, 30)
+	if r.Monitors()[0].X != 20 {
+		t.Fatal("reporter did not move")
+	}
+	if err := r.advance(context.Background(), 1, 60, false, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.VisibleMonitors()[0].Value; got != "2" {
+		t.Fatalf("next value = %s", got)
+	}
+}
+
+func TestBeforeTickRunsBeforeScripts(t *testing.T) {
+	r := fixture(t, `{"flag":{"opcode":"event_whenflagclicked","topLevel":true,"next":"set"},"set":{"opcode":"data_setvariableto","fields":{"VARIABLE":["score","score"]},"inputs":{"VALUE":[2,"value"]}},"value":{"opcode":"sample_value"}}`)
+	count := 0
+	if err := r.SetExtensions(extension.Bundle{func() extension.Extension {
+		return extension.Extension{ID: "sample", Blocks: []extension.Block{{Opcode: "sample_value", Kind: "reporter", Handler: func(*extension.Context) (extension.Result, error) {
+			return extension.Result{Value: float64(count)}, nil
+		}}}, Events: map[string]extension.Handler{"before-tick": func(*extension.Context) (extension.Result, error) {
+			count++
+			return extension.Result{}, nil
+		}}}
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Run(context.Background(), 1, 60, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := number(r.stage.variables["score"].Value); got != 1 {
+		t.Fatalf("script saw %v; want current tick", got)
+	}
+}
+
+func TestDeltaTimeMonitorMatchesScriptValue(t *testing.T) {
+	var p project.Project
+	if err := json.Unmarshal([]byte(`{"targets":[{"isStage":true,"name":"Stage","variables":{"score":["score",0]},"blocks":{"flag":{"opcode":"event_whenflagclicked","topLevel":true,"next":"set"},"set":{"opcode":"data_setvariableto","fields":{"VARIABLE":["score","score"]},"inputs":{"VALUE":[2,"value"]}},"value":{"opcode":"dtbyxeroname_dt"}}}],"extensions":["dtbyxeroname"],"monitors":[{"id":"dt","opcode":"dtbyxeroname_dt","visible":true},{"id":"fps","opcode":"dtbyxeroname_fps","visible":true}]}`), &p); err != nil {
+		t.Fatal(err)
+	}
+	r := New(&p)
+	if err := r.SetExtensions(extension.Bundle{dt.New}); err != nil {
+		t.Fatal(err)
+	}
+	for range 3 {
+		if err := r.Tick(context.Background(), 60, false); err != nil {
+			t.Fatal(err)
+		}
+		m := r.VisibleMonitors()
+		if len(m) != 2 || m[0].Label != "ΔT" || m[0].Value != "0.016667" || m[1].Label != "fps" || m[1].Value != "60" {
+			t.Fatalf("delta monitors = %+v", m)
+		}
+	}
+	if got := number(r.stage.variables["score"].Value); got != 1.0/60 {
+		t.Fatalf("first script delta = %g", got)
+	}
+}
+
+func TestYieldingMonitorRetainsInvocation(t *testing.T) {
+	r := New(&project.Project{Targets: []*project.Target{{IsStage: true}}, Monitors: []project.Monitor{{ID: "m", Opcode: "sample_value", Visible: true}}})
+	calls := 0
+	handler := func(c *extension.Context) (extension.Result, error) {
+		calls++
+		if c.Local["pending"] == nil {
+			c.Local["pending"] = true
+			return extension.Result{Again: true, YieldTick: true}, nil
+		}
+		return extension.Result{Value: "ready"}, nil
+	}
+	factory := func() extension.Extension {
+		return extension.Extension{ID: "sample", Blocks: []extension.Block{
+			{Opcode: "sample_value", Kind: "reporter", Handler: handler},
+		}}
+	}
+	if err := r.SetExtensions(extension.Bundle{factory}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.Tick(context.Background(), 60, false); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || r.VisibleMonitors()[0].Value == "ready" {
+		t.Fatal("yielding reporter completed early")
+	}
+	if err := r.Tick(context.Background(), 60, false); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 || r.VisibleMonitors()[0].Value != "ready" {
+		t.Fatal("monitor lost its continuation")
+	}
+}
+
+func TestRestartCancelsPendingMonitor(t *testing.T) {
+	r := New(&project.Project{Targets: []*project.Target{{IsStage: true}}, Monitors: []project.Monitor{{ID: "m", Opcode: "sample_value", Visible: true}}})
+	completed := 0
+	factory := func() extension.Extension {
+		return extension.Extension{ID: "sample", Blocks: []extension.Block{
+			{Opcode: "sample_value", Kind: "reporter", Handler: func(c *extension.Context) (extension.Result, error) {
+				if c.Local["pending"] != nil {
+					completed++
+					return extension.Result{Value: completed}, nil
+				}
+				c.Local["pending"] = true
+				return extension.Result{Again: true, YieldTick: true}, nil
+			}},
+		}}
+	}
+	if err := r.SetExtensions(extension.Bundle{factory}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Tick(context.Background(), 60, false); err != nil {
+		t.Fatal(err)
+	}
+	r.GreenFlag()
+	if err := r.Tick(context.Background(), 60, false); err != nil {
+		t.Fatal(err)
+	}
+	if completed != 0 {
+		t.Fatal("monitor resumed the invocation from before restart")
 	}
 }

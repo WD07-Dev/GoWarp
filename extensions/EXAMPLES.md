@@ -12,6 +12,7 @@ Original-author credits come from the author headers in the JavaScript sources u
 
 | Extension | Original authors / credited contributors | GoWarp example / implementation |
 | --- | --- | --- |
+| Delta Time (`dtbyxeroname`) | [XeroName](https://scratch.mit.edu/users/plant2014/) | [JavaScript](examples/Deltatime.js) · [Go module](../test/extensions/dtbyxeroname/module.go) |
 | Camera V1 (Buggy) (`DTcameracontrols`) | DT | [JavaScript](examples/DTcameracontrols.js) · [Go module](../test/extensions/DTcameracontrols/module.go) |
 | Shaded (`OACShaded`) | [ObviousAlexC](https://scratch.mit.edu/users/pinksheep2917/) | [JavaScript](examples/OACShaded.js) · [Go module](../test/extensions/OACShaded/module.go) |
 | My Blocks+ (`SPmbpCST`) | SharkPool, [CST1229](https://scratch.mit.edu/users/CST1229/), [0znzw](https://scratch.mit.edu/users/0znzw/) | [JavaScript](examples/SPmbpCST.js) · [Go module](../test/extensions/SPmbpCST/module.go) |

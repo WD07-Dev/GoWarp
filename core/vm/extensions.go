@@ -426,6 +426,12 @@ func (r *Runtime) invokeExtension(ctx context.Context, th *thread, block *projec
 
 func (r *Runtime) extensionEvent(event string, target *target) error {
 	if event == "flag" {
+		for i := range r.data.monitors {
+			m := &r.data.monitors[i]
+			if m.reporter != nil {
+				m.thread = &thread{target: m.owner}
+			}
+		}
 		for _, block := range r.extensionBlocks {
 			block.hatPolls = nil
 		}

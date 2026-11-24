@@ -21,8 +21,11 @@ type dataState struct {
 }
 
 type dataMonitor struct {
-	source project.Monitor
-	owner  *target
+	source   project.Monitor
+	owner    *target
+	reporter *project.Block
+	thread   *thread
+	value    any
 }
 
 // MonitorState contains detached display values in stage pixel coordinates.
@@ -32,6 +35,7 @@ type MonitorState struct {
 	Discrete               bool
 	ID, Label, Mode, Value string
 	List, Visible          bool
+	ReadOnly               bool
 	X, Y, Width, Height    float64
 	Items                  []string
 }
@@ -39,9 +43,6 @@ type MonitorState struct {
 func (r *Runtime) InitData(p *project.Project) {
 	r.data = dataState{saved: map[string]any{}}
 	for _, m := range p.Monitors {
-		if m.Opcode != "data_variable" && m.Opcode != "data_listcontents" {
-			continue
-		}
 		for _, t := range r.targets {
 			if t.state.CloneID != 0 || (m.SpriteName == "" && !t.state.IsStage) || (m.SpriteName != "" && m.SpriteName != t.state.Name) {
 				continue
@@ -50,12 +51,20 @@ func (r *Runtime) InitData(p *project.Project) {
 				if _, ok := t.variables[m.ID]; !ok {
 					break
 				}
-			} else {
+			} else if m.Opcode == "data_listcontents" {
 				if _, ok := t.state.Lists[m.ID]; !ok {
 					break
 				}
 			}
-			r.data.monitors = append(r.data.monitors, dataMonitor{source: m, owner: t})
+			monitor := dataMonitor{source: m, owner: t}
+			if m.Opcode != "data_variable" && m.Opcode != "data_listcontents" {
+				monitor.reporter = &project.Block{Opcode: m.Opcode, Fields: make(map[string][]any, len(m.Params))}
+				for name, value := range m.Params {
+					monitor.reporter.Fields[name] = []any{text(value)}
+				}
+				monitor.thread = &thread{target: t}
+			}
+			r.data.monitors = append(r.data.monitors, monitor)
 			break
 		}
 	}
@@ -87,11 +96,19 @@ func (r *Runtime) monitors(visibleOnly bool, offsets map[int]int, rows int) []Mo
 	}
 	result := make([]MonitorState, 0, count)
 	for index, m := range r.data.monitors {
-		if visibleOnly && !m.source.Visible {
+		if m.owner.dead || (visibleOnly && !m.source.Visible) {
 			continue
+		}
+		var registered *registeredBlock
+		if m.reporter != nil {
+			registered = r.extensionBlocks[m.source.Opcode]
+			if registered == nil || (registered.block.Kind != "reporter" && registered.block.Kind != "boolean") {
+				continue
+			}
 		}
 		s := MonitorState{
 			Index:     index,
+			ReadOnly:  m.reporter != nil,
 			SliderMin: 0, SliderMax: 100, Discrete: true,
 			ID:      m.source.ID,
 			Mode:    m.source.Mode,
@@ -111,7 +128,22 @@ func (r *Runtime) monitors(visibleOnly bool, offsets map[int]int, rows int) []Mo
 		if m.source.IsDiscrete != nil {
 			s.Discrete = *m.source.IsDiscrete
 		}
-		if s.List {
+		if s.ReadOnly {
+			s.Label = registered.block.Text
+			if s.Label == "" {
+				s.Label = m.source.Opcode
+			}
+			for name, value := range m.source.Params {
+				s.Label = strings.ReplaceAll(s.Label, "["+name+"]", text(value))
+			}
+			s.Value = text(m.value)
+			if value, ok := m.value.(float64); ok && math.Abs(value) < 1e21 {
+				s.Value = text(math.Round(value*1e6) / 1e6)
+			}
+			if s.Mode == "slider" {
+				s.Mode = "default"
+			}
+		} else if s.List {
 			list := m.owner.state.Lists[s.ID]
 			s.Label, s.Count = list.Name, len(list.Items)
 			end := s.Count

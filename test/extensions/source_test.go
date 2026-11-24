@@ -60,8 +60,11 @@ func TestExampleCommentsMatchTestModules(t *testing.T) {
 				t.Fatal(err)
 			}
 			moduleName := name
-			if name == "cubesterRichPresence" {
+			switch name {
+			case "cubesterRichPresence":
 				moduleName = "discord"
+			case "Deltatime":
+				moduleName = "dtbyxeroname"
 			}
 			path, err := filepath.Abs(filepath.Join(moduleName, "module.go"))
 			if err != nil {

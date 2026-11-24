@@ -90,6 +90,22 @@ Declare evaluated inputs in `Inputs`, in their intended evaluation order. Regist
 
 Return a fresh instance from each `New()` call. Allocate mutable maps and slices there rather than in package globals. Validation calls `New()` but does not run block handlers or lifecycle handlers; keep constructors limited to registration and state initialization.
 
+## Stage reporter monitors
+
+Visible reporter and boolean monitors saved in the SB3 are evaluated once per VM
+tick, after scripts run. Rendering only reads the cached result. Hidden monitors
+are not evaluated. Saved `params` are provided as `c.Fields`, matching Scratch's
+monitor blocks; they are not reporter inputs in `c.Args`.
+
+An optional `Text` field on `e.Block` supplies the monitor label,
+for example `Text: "FPS"` or `Text: "timer [TIMER]"`.
+Placeholders use saved parameters. Without `Text`, GoWarp displays the opcode.
+
+Reporter monitors can be moved and double-clicked to switch between normal and
+large display. Their values cannot be edited, and they have no slider.
+The handler and extension state are shared with ordinary block calls; yielding
+reporters keep their pending invocation until it completes.
+
 ## Handler context
 
 A handler has the signature `func(*e.Context) (e.Result, error)`.
@@ -348,6 +364,7 @@ requests should also bound concurrency.
 | --- | --- |
 | `load` | During extension registration. |
 | `flag` | Initial extension startup and green-flag restarts. |
+| `before-tick` | Once per VM tick, after input/time synchronization and before scripts run (the equivalent of `BEFORE_EXECUTE`). |
 | `tick` | Once per VM tick, after the frame and VM time advance. |
 | `cancel` | When all running scripts are canceled. |
 | `stop` | When the runtime's player-stop operation is called. |

@@ -30,18 +30,19 @@ type Project struct {
 }
 
 type Monitor struct {
-	SliderMin  *float64 `json:"sliderMin,omitempty"`
-	SliderMax  *float64 `json:"sliderMax,omitempty"`
-	IsDiscrete *bool    `json:"isDiscrete,omitempty"`
-	ID         string   `json:"id"`
-	Opcode     string   `json:"opcode"`
-	Mode       string   `json:"mode"`
-	SpriteName string   `json:"spriteName"`
-	Visible    bool     `json:"visible"`
-	X          float64  `json:"x"`
-	Y          float64  `json:"y"`
-	Width      float64  `json:"width"`
-	Height     float64  `json:"height"`
+	Params     map[string]any `json:"params,omitempty"`
+	SliderMin  *float64       `json:"sliderMin,omitempty"`
+	SliderMax  *float64       `json:"sliderMax,omitempty"`
+	IsDiscrete *bool          `json:"isDiscrete,omitempty"`
+	ID         string         `json:"id"`
+	Opcode     string         `json:"opcode"`
+	Mode       string         `json:"mode"`
+	SpriteName string         `json:"spriteName"`
+	Visible    bool           `json:"visible"`
+	X          float64        `json:"x"`
+	Y          float64        `json:"y"`
+	Width      float64        `json:"width"`
+	Height     float64        `json:"height"`
 }
 
 type Costume struct {

@@ -331,6 +331,9 @@ func (r *Runtime) advance(ctx context.Context, frames int, fps float64, turbo, k
 			r.events = r.events[1:]
 			r.applyInput(event)
 		}
+		if err := r.extensionEvent("before-tick", r.stage); err != nil {
+			return err
+		}
 		if err := r.pollEdgeHats(ctx); err != nil {
 			return err
 		}
@@ -339,6 +342,9 @@ func (r *Runtime) advance(ctx context.Context, frames int, fps float64, turbo, k
 		}
 		if r.Paused() {
 			break
+		}
+		if err := r.updateMonitorReporters(ctx); err != nil {
+			return err
 		}
 		r.advanceTime()
 		r.frame++

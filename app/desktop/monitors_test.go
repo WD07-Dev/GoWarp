@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/image/font/basicfont"
 
+	"gowarp/core/extension"
 	"gowarp/core/media"
 	"gowarp/core/project"
 	"gowarp/core/vm"
@@ -255,5 +256,45 @@ func TestMonitorTextBoundsZeroWidthCharacters(t *testing.T) {
 	got := monitorText(strings.Repeat("\u0301", 2000))
 	if utf8.RuneCountInString(got) != 1025 || !strings.HasSuffix(got, "…") {
 		t.Fatal("monitor text is unbounded")
+	}
+}
+
+func TestReporterMonitorDragsWithoutEditing(t *testing.T) {
+	var p project.Project
+	if err := json.Unmarshal([]byte(`{"targets":[{"isStage":true}],"monitors":[{"id":"m","opcode":"sample_value","visible":true,"mode":"large","x":10,"y":10}]}`), &p); err != nil {
+		t.Fatal(err)
+	}
+	c := newController(&p, &media.Library{}, Options{FPS: 60})
+	factory := func() extension.Extension {
+		return extension.Extension{ID: "sample", Blocks: []extension.Block{
+			{Opcode: "sample_value", Kind: "reporter", Handler: func(*extension.Context) (extension.Result, error) {
+				return extension.Result{Value: 60.0}, nil
+			}},
+		}}
+	}
+	if err := c.vm.SetExtensions(extension.Bundle{factory}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.vm.Tick(context.Background(), 60, false); err != nil {
+		t.Fatal(err)
+	}
+	c.paint(basicfont.Face7x13)
+	c.monitors.update(c.vm, &Input{MouseX: 20, MouseY: ToolbarHeight + 20, MousePressed: true, MouseDown: true}, 480, 360)
+	if c.monitors.edit != nil || c.monitors.drag == nil {
+		t.Fatal("reporter should drag without a value editor")
+	}
+	c.monitors.update(c.vm, &Input{MouseX: 40, MouseY: ToolbarHeight + 40, MouseDown: true}, 480, 360)
+	if c.vm.Monitors()[0].X != 30 {
+		t.Fatal("reporter did not move")
+	}
+	c.monitors.update(c.vm, &Input{MouseX: 40, MouseY: ToolbarHeight + 40}, 480, 360)
+	c.paint(basicfont.Face7x13)
+	c.monitors.update(c.vm, &Input{MouseX: 40, MouseY: ToolbarHeight + 40, MousePressed: true, MouseDown: true}, 480, 360)
+	c.monitors.update(c.vm, &Input{MouseX: 40, MouseY: ToolbarHeight + 40}, 480, 360)
+	c.monitors.clickAt = time.Now()
+	c.monitors.update(c.vm, &Input{MouseX: 40, MouseY: ToolbarHeight + 40, MousePressed: true, MouseDown: true}, 480, 360)
+	if c.vm.Monitors()[0].Mode != "default" || c.monitors.edit != nil {
+		t.Fatal("reporter double-click did not change display mode")
 	}
 }
