@@ -13,15 +13,22 @@ import (
 	"gowarp/app/i18n"
 	"gowarp/app/ui"
 	"gowarp/core/project"
+
+	webbrowser "github.com/pkg/browser"
 )
 
 func (a *application) connectEditor() {
+	if a.startEditorBridge() {
+		a.copyEditorAddress()
+	}
+}
+
+func (a *application) startEditorBridge() bool {
 	if a.busy {
-		return
+		return false
 	}
 	if a.editorBridge != nil {
-		a.copyEditorAddress()
-		return
+		return true
 	}
 	for _, template := range a.templates {
 		if template.OS != runtime.GOOS || template.Arch != runtime.GOARCH {
@@ -42,14 +49,28 @@ func (a *application) connectEditor() {
 		if err != nil {
 			a.errorText = err.Error()
 			a.dirty = true
-			return
+			return false
 		}
 		a.editorBridge = server
-		a.copyEditorAddress()
-		return
+		return true
 	}
 	a.status = i18n.Tr("status.no_preview_runtime")
 	a.dirty = true
+	return false
+}
+
+func (a *application) openTurboWarp() {
+	if !a.startEditorBridge() {
+		return
+	}
+	server := a.editorBridge
+	a.job(i18n.Tr("editor.opening"), func(context.Context) result {
+		address, err := server.TurboWarpURL()
+		if err == nil {
+			err = webbrowser.OpenURL(address)
+		}
+		return result{err: err, status: i18n.Tr("editor.opened")}
+	})
 }
 
 func editorPreviewSettings(path string, p *project.Project, options editorbridge.Options) config.Settings {

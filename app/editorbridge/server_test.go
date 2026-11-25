@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"gowarp/app/assets"
 )
 
 func request(t testing.TB, s *Server, method, path, origin, token string, body io.Reader) *http.Response {
@@ -62,6 +64,95 @@ func TestBrowserAccessRequiresConnectionToken(t *testing.T) {
 	res := request(t, s, "OPTIONS", "/run", "https://turbowarp.org", "", nil)
 	if res.StatusCode != 204 || res.Header.Get("Access-Control-Allow-Origin") != "https://turbowarp.org" || res.Header.Get("Access-Control-Allow-Private-Network") != "true" {
 		t.Fatalf("preflight: %v", res)
+	}
+}
+
+func TestExtensionManagerCanLoadWithoutConnectionToken(t *testing.T) {
+	s, err := Start(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Close)
+	res := request(t, s, "GET", "/extension-manager.js", "https://turbowarp.org", "", nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("extension script: status %d", res.StatusCode)
+	}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(body, assets.ExtensionManager) || bytes.Contains(body, []byte(s.token)) {
+		t.Fatal("expected extension manager source without connection credentials")
+	}
+	if res.Header.Get("Content-Type") != "text/javascript; charset=utf-8" {
+		t.Fatalf("script content type: %q", res.Header.Get("Content-Type"))
+	}
+	for _, tc := range []struct {
+		path, origin string
+		status       int
+	}{
+		{"/status", "https://turbowarp.org", http.StatusUnauthorized},
+		{"/extension-manager.js", "https://example.com", http.StatusForbidden},
+	} {
+		res := request(t, s, "GET", tc.path, tc.origin, "", nil)
+		if res.StatusCode != tc.status {
+			t.Fatalf("%s from %s: status %d", tc.path, tc.origin, res.StatusCode)
+		}
+	}
+}
+
+func TestTurboWarpURLLoadsLocalExtensionManager(t *testing.T) {
+	s, err := Start(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Close)
+	address, err := s.TurboWarpURL()
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scriptURL := u.Query().Get("extension")
+	if u.Scheme != "https" || u.Host != "turbowarp.org" || u.Path != "/editor" || scriptURL != "http://localhost:8000/extension-manager.js" || strings.Contains(address, s.token) {
+		t.Fatalf("unexpected editor URL: %s", address)
+	}
+	repeated, err := s.TurboWarpURL()
+	if err != nil || repeated != address {
+		t.Fatalf("reopen editor: %q, %v", repeated, err)
+	}
+	client := http.Client{Timeout: 3 * time.Second}
+	for _, tc := range []struct {
+		method, path string
+		status       int
+	}{
+		{"GET", "/extension-manager.js", http.StatusOK},
+		{"OPTIONS", "/extension-manager.js", http.StatusNoContent},
+		{"GET", "/status", http.StatusForbidden},
+	} {
+		req, err := http.NewRequest(tc.method, "http://localhost:8000"+tc.path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Origin", "https://turbowarp.org")
+		res, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := io.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil || res.StatusCode != tc.status {
+			t.Fatalf("%s %s: status %d, %v", tc.method, tc.path, res.StatusCode, err)
+		}
+		if tc.method == "GET" && tc.status == http.StatusOK && !bytes.Equal(body, assets.ExtensionManager) {
+			t.Fatal("browser received a different extension script")
+		}
+	}
+	s.Close()
+	if _, err := s.TurboWarpURL(); err == nil {
+		t.Fatal("closed connection must not restart the script server")
 	}
 }
 

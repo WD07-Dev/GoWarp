@@ -19,6 +19,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"gowarp/app/assets"
 )
 
 const maxProjectSize = 512 << 20
@@ -58,6 +60,7 @@ type Server struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
 	http           *http.Server
+	extensions     *http.Server
 	address, token string
 	launch         func(context.Context, string, Options) (<-chan error, error)
 	status         Status
@@ -97,6 +100,24 @@ func Start(parent context.Context, launch func(context.Context, string, Options)
 
 func (s *Server) URL() string { return "http://" + s.address + "/#" + s.token }
 
+func (s *Server) TurboWarpURL() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return "", errors.New("editor connection is closed")
+	}
+	if s.extensions == nil {
+		listener, err := net.Listen("tcp4", "127.0.0.1:8000")
+		if err != nil {
+			return "", fmt.Errorf("serve Extension Manager on localhost:8000: %w", err)
+		}
+		s.extensions = &http.Server{Handler: s, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
+		go s.extensions.Serve(listener)
+	}
+	query := url.Values{"extension": {"http://localhost:8000/extension-manager.js"}}
+	return "https://turbowarp.org/editor?" + query.Encode(), nil
+}
+
 func (s *Server) Status() Status {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -123,9 +144,13 @@ func (s *Server) Close() {
 	s.mu.Lock()
 	s.closed = true
 	active := s.active
+	extensions := s.extensions
 	s.mu.Unlock()
 	s.cancel()
 	s.http.Close()
+	if extensions != nil {
+		extensions.Close()
+	}
 	if active != nil {
 		<-active.done
 	}
@@ -147,13 +172,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	origin := r.Header.Get("Origin")
-	if r.Host != s.address || !allowedOrigin(origin) {
+	extensionPath := r.URL.Path == "/extension-manager.js" && (r.Method == http.MethodGet || r.Method == http.MethodOptions)
+	if (r.Host != s.address && !(extensionPath && r.Host == "localhost:8000")) || !allowedOrigin(origin) {
 		http.Error(w, "Untrusted editor origin or host", http.StatusForbidden)
 		return
 	}
 	if origin != "" {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Vary", "Origin")
+	}
+	if extensionPath && r.Method == http.MethodGet {
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+		w.Write(assets.ExtensionManager)
+		return
 	}
 	if r.Method == http.MethodOptions {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")

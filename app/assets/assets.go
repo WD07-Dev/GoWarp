@@ -15,6 +15,9 @@ var FontLicense string
 //go:embed embed/translations.csv
 var Translations []byte
 
+//go:embed embed/extension-manager.js
+var ExtensionManager []byte
+
 //go:embed embed/templates/extension.go.tmpl
 var ExtensionGoTemplate string
 

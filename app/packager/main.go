@@ -992,18 +992,11 @@ func (a *application) renderPackager() {
 		status = status[:len(status)-n]
 	}
 	a.label(24, a.height-82, status, ui.Muted)
-	a.button(24, a.height-56, 146, i18n.Tr("action.connect_turbowarp"), func() {
+	a.button(24, a.height-56, 146, i18n.Tr("action.open_turbowarp"), a.openTurboWarp)
+	a.button(180, a.height-56, 146, i18n.Tr("action.connect_turbowarp"), func() {
 		a.editorScreen = true
 		a.editor = nil
 		a.keyboardFocus = -1
-	})
-	a.button(180, a.height-56, 116, i18n.Tr("action.stop"), func() {
-		if a.preview != nil {
-			a.preview.cancel()
-		}
-		if a.editorBridge != nil {
-			a.editorBridge.Stop()
-		}
 	})
 	a.button(a.width-190, a.height-56, 166, i18n.Tr("action.export"), func() {
 		a.choose("export")

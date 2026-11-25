@@ -16,7 +16,7 @@
     if(previous) previous.dispose();
     
     const vm = Scratch.vm;
-    const korean = (document.documentElement.lang || navigator.language || "").startsWith("ko");
+    const korean = (Scratch.translate.language || 'en').toLowerCase().startsWith('ko');
     const tr = (en, ko) => korean ? ko : en;
     const messages = {
         ready: tr("Ready", "실행 대기 중"),
