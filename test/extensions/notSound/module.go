@@ -21,7 +21,30 @@ func menu(op, key string) e.Block {
 	})
 }
 func New() e.Extension {
-	return e.Extension{ID: "notSound", Blocks: []e.Block{cmd("notSound_play", []string{"path"}, func(c *e.Context) (e.Result, error) {
+	x := e.Extension{ID: "notSound", Blocks: []e.Block{cmd("notSound_play", []string{"path"}, func(c *e.Context) (e.Result, error) {
 		return call(c, "audio.url", c.String("path"))
+	}), cmd("notSound_playUntilDone", []string{"path"}, func(c *e.Context) (e.Result, error) {
+		voice, started := c.Local["voice"]
+		if !started {
+			var err error
+			voice, err = c.Call("audio.url", c.String("path"))
+			if err != nil {
+				return e.Result{}, err
+			}
+			if c.Local == nil {
+				c.Local = map[string]any{}
+			}
+			c.Local["voice"] = voice
+		}
+		pending, err := c.Call("audio.voice.get", voice, "pending")
+		return e.Result{Yield: e.Bool(pending), Again: e.Bool(pending)}, err
 	})}}
+	labels := map[string]string{
+		"notSound_play":          "start sound from url: [path]",
+		"notSound_playUntilDone": "play sound from url: [path] until done",
+	}
+	for i := range x.Blocks {
+		x.Blocks[i].Text = labels[x.Blocks[i].Opcode]
+	}
+	return x
 }

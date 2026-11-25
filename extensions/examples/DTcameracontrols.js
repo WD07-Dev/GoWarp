@@ -7,6 +7,7 @@ package extension
 
 import (
 	e "gowarp/core/extension"
+	"math"
 )
 
 func call(c *e.Context, op string, args ...any) (e.Result, error) {
@@ -17,7 +18,8 @@ func cmd(op string, inputs []string, fn e.Handler) e.Block {
 	return e.Block{Opcode: op, Kind: "command", Inputs: inputs, Handler: fn}
 }
 func rep(op string, inputs []string, fn e.Handler) e.Block {
-	return e.Block{Opcode: op, Kind: "reporter", Inputs: inputs, Handler: fn}
+	labels := map[string]string{"DTcameracontrols_getX": "camera x", "DTcameracontrols_getY": "camera y", "DTcameracontrols_getZoom": "camera zoom", "DTcameracontrols_getDirection": "camera direction", "DTcameracontrols_getCol": "background color", "DTcameracontrols_blocktx": "stage to world x: [x]", "DTcameracontrols_blockty": "stage to world y: [y]"}
+	return e.Block{Opcode: op, Text: labels[op], Kind: "reporter", Inputs: inputs, Handler: fn}
 }
 func menu(op, key string) e.Block {
 	return rep(op, nil, func(c *e.Context) (e.Result, error) {
@@ -69,8 +71,81 @@ func New() e.Extension {
 			return call(c, "camera.set", "direction", e.Number(v)+n)
 		}))
 	}
+
+	for _, axis := range []string{"x", "y"} {
+		axis := axis
+		x.Blocks = append(x.Blocks, rep("DTcameracontrols_blockt"+axis, []string{axis}, func(c *e.Context) (e.Result, error) {
+			pos, err := c.Call("camera.get", axis)
+			if err != nil {
+				return e.Result{}, err
+			}
+			zoom, err := c.Call("camera.get", "zoom")
+			return e.Result{Value: c.Number(axis)/(e.Number(zoom)/100) + e.Number(pos)}, err
+		}))
+	}
+	x.Blocks = append(x.Blocks, menu("DTcameracontrols_menu_sprites", "sprites"))
+	for _, op := range []string{"moveSteps", "goTo", "pointTowards"} {
+		op := op
+		inputs := []string{"sprite"}
+		if op == "moveSteps" {
+			inputs = []string{"val"}
+		}
+		x.Blocks = append(x.Blocks, cmd("DTcameracontrols_"+op, inputs, func(c *e.Context) (e.Result, error) {
+			px, err := c.Call("camera.get", "x")
+			if err != nil {
+				return e.Result{}, err
+			}
+			py, err := c.Call("camera.get", "y")
+			if err != nil {
+				return e.Result{}, err
+			}
+			cx, cy := e.Number(px), e.Number(py)
+			if op == "moveSteps" {
+				d, err := c.Call("camera.get", "direction")
+				if err != nil {
+					return e.Result{}, err
+				}
+				a := (90 - e.Number(d)) * math.Pi / 180
+				cx += c.Number("val") * math.Cos(a)
+				cy += c.Number("val") * math.Sin(a)
+			} else {
+				records, err := c.Call("target.list")
+				if err != nil {
+					return e.Result{}, err
+				}
+				ref := ""
+				for _, v := range records.([]any) {
+					t := v.(map[string]any)
+					if e.String(t["name"]) == c.String("sprite") && e.Number(t["cloneId"]) == 0 && !e.Bool(t["isStage"]) {
+						ref = e.String(t["id"])
+						break
+					}
+				}
+				if ref == "" {
+					return e.Result{}, nil
+				}
+				tx, err := c.Call("target.get", "x", ref)
+				if err != nil {
+					return e.Result{}, err
+				}
+				ty, err := c.Call("target.get", "y", ref)
+				if err != nil {
+					return e.Result{}, err
+				}
+				if op == "pointTowards" {
+					return call(c, "camera.set", "direction", 90-math.Atan2(e.Number(ty)-cy, e.Number(tx)-cx)*180/math.Pi)
+				}
+				cx, cy = math.Floor(e.Number(tx)+.5), math.Floor(e.Number(ty)+.5)
+			}
+			if _, err := c.Call("camera.set", "x", cx); err != nil {
+				return e.Result{}, err
+			}
+			return call(c, "camera.set", "y", cy)
+		}))
+	}
 	return x
 }
+
 }
 */
 // Name: Camera V1 (Buggy)

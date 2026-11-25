@@ -21,8 +21,16 @@ func (c *extensionContext) audioCall(operation string, args []any) (any, error) 
 		r.pauseAudioContext(extension.Bool(a.get(0)))
 		return nil, nil
 	case "audio.stopTarget":
+		family := a.string(0) == "_myfamily_"
+		if !family && len(args) > 0 {
+			var err error
+			t, err = c.logicTarget(t, a.get(0))
+			if err != nil {
+				return nil, nil
+			}
+		}
 		for _, v := range r.voices[t.source] {
-			if v.player == t {
+			if family || v.player == t {
 				r.stopExtensionVoice(v)
 			}
 		}
@@ -66,8 +74,23 @@ func (c *extensionContext) audioCall(operation string, args []any) (any, error) 
 			return asset.target.source.Name, nil
 		}
 		return nil, fmt.Errorf("unknown asset property %q", a.string(1))
+	case "audio.effect":
+		target, err := c.logicTarget(t, a.get(1))
+		if err != nil {
+			return float64(0), nil
+		}
+		switch a.string(0) {
+		case "pitch":
+			return target.state.Pitch, nil
+		case "pan":
+			return target.state.Pan, nil
+		}
+		return float64(0), nil
 	case "audio.projectVolume":
 		state := r.extensionAudio()
+		if len(args) == 0 {
+			return state.volume, nil
+		}
 		state.volume = a.number(0)
 		for _, voices := range r.voices {
 			for _, v := range voices {
@@ -151,7 +174,7 @@ func (c *extensionContext) audioCall(operation string, args []any) (any, error) 
 			sound:         -1,
 			player:        t,
 			url:           a.string(0),
-			active:        true,
+			active:        r.audioEnabled,
 			outputPending: r.audioEnabled,
 			rate:          1,
 			end:           math.Inf(1),

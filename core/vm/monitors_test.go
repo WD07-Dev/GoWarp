@@ -3,6 +3,7 @@ package vm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"gowarp/core/extension"
 	dt "gowarp/test/extensions/dtbyxeroname"
 	"math"
@@ -175,6 +176,40 @@ func TestExtensionMonitorUpdatesOncePerTick(t *testing.T) {
 	}
 	if got := r.VisibleMonitors()[0].Value; got != "2" {
 		t.Fatalf("next value = %s", got)
+	}
+}
+
+func TestExtensionMonitorPassesSavedInputs(t *testing.T) {
+	for _, borrow := range []bool{false, true} {
+		t.Run(fmt.Sprint(borrow), func(t *testing.T) {
+			r := New(&project.Project{
+				Targets: []*project.Target{{IsStage: true}},
+				Monitors: []project.Monitor{{
+					ID: "sample", Opcode: "sample_value", Visible: true,
+					Params: map[string]any{"NUMBER": 7.5, "NAME": "timer", "CHOICE": "elapsed"},
+				}},
+			})
+			factory := func() extension.Extension {
+				return extension.Extension{ID: "sample", Blocks: []extension.Block{{
+					Opcode: "sample_value", Kind: "reporter", Inputs: []string{"NUMBER", "NAME"}, BorrowContext: borrow,
+					Handler: func(c *extension.Context) (extension.Result, error) {
+						if c.Number("NUMBER") != 7.5 || c.String("NAME") != "timer" || c.Field("CHOICE") != "elapsed" {
+							t.Fatalf("monitor lost parameters: args=%v fields=%v", c.Args, c.Fields)
+						}
+						return extension.Result{Value: c.Number("NUMBER")}, nil
+					},
+				}}}
+			}
+			if err := r.SetExtensions(extension.Bundle{factory}); err != nil {
+				t.Fatal(err)
+			}
+			if err := r.Tick(context.Background(), 60, false); err != nil {
+				t.Fatal(err)
+			}
+			if got := r.VisibleMonitors()[0].Value; got != "7.5" {
+				t.Fatalf("monitor value = %q", got)
+			}
+		})
 	}
 }
 

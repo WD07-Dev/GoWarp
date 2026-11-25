@@ -8,8 +8,8 @@ package extension
 import e "gowarp/core/extension"
 
 func New() e.Extension {
-	return e.Extension{ID: "cubesterWindowControls", Blocks: []e.Block{
-		{Opcode: "cubesterWindowControls_isFullscreen", Kind: "reporter", Handler: func(c *e.Context) (e.Result, error) {
+	x := e.Extension{ID: "cubesterWindowControls", Blocks: []e.Block{
+		{Opcode: "cubesterWindowControls_isFullscreen", Text: "is window fullscreen?", Kind: "boolean", Handler: func(c *e.Context) (e.Result, error) {
 			value, err := c.Call("host.projectFullscreen")
 			return e.Result{Value: value}, err
 		}},
@@ -31,7 +31,21 @@ func New() e.Extension {
 			return e.Result{}, err
 		}},
 	}}
+	for _, entry := range []struct{ op, key, text, kind string }{
+		{"screenW", "screenWidth", "screen width", "reporter"},
+		{"screenH", "screenHeight", "screen height", "reporter"},
+		{"isFocused", "focused", "is window focused?", "boolean"},
+		{"windowTitle", "title", "window title", "reporter"},
+	} {
+		entry := entry
+		x.Blocks = append(x.Blocks, e.Block{Opcode: "cubesterWindowControls_" + entry.op, Text: entry.text, Kind: entry.kind, Handler: func(c *e.Context) (e.Result, error) {
+			v, err := c.Call("host.window", entry.key)
+			return e.Result{Value: v}, err
+		}})
+	}
+	return x
 }
+
 }
 */
 // Name: Window Controls

@@ -7,7 +7,7 @@ import (
 
 func New() e.Extension {
 	return e.Extension{ID: "f11detector", State: map[string]any{}, Blocks: []e.Block{
-		{Opcode: "f11detector_isBrowserFullscreen", Kind: "reporter", Inputs: []string{}, Handler: func(c *e.Context) (e.Result, error) {
+		{Opcode: "f11detector_isBrowserFullscreen", Kind: "boolean", Text: "F11 전체화면인가요?", Inputs: []string{}, Handler: func(c *e.Context) (e.Result, error) {
 			v, err := c.Call("host.fullscreen")
 			return e.Result{Value: v}, err
 		}},

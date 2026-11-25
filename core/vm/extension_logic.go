@@ -69,6 +69,18 @@ func (c *extensionContext) logicCall(operation string, args []any) (any, error) 
 		return float64(r.frame), nil
 	case "runtime.fps":
 		return r.FPS(), nil
+	case "runtime.extensions":
+		ids := make([]string, 0, len(r.extensions)+1)
+		for _, id := range r.project.Extensions {
+			if id == "pen" {
+				ids = append(ids, id)
+				break
+			}
+		}
+		for _, registered := range r.extensions {
+			ids = append(ids, registered.ID)
+		}
+		return ids, nil
 	case "runtime.timer":
 		return r.elapsed - r.timerSeconds, nil
 	case "runtime.resetTimer":
@@ -78,6 +90,8 @@ func (c *extensionContext) logicCall(operation string, args []any) (any, error) 
 		return r.host.fullscreen, nil
 	case "host.projectFullscreen":
 		return r.host.projectFullscreen, nil
+	case "host.window":
+		return r.hostWindowProperty(a.string(0))
 	case "host.frameMilliseconds":
 		dt := r.host.frameMilliseconds
 		if dt <= 0 {
@@ -88,6 +102,9 @@ func (c *extensionContext) logicCall(operation string, args []any) (any, error) 
 		kind := a.string(0)
 		switch kind {
 		case "title", "close", "open-url", "fullscreen":
+			if kind == "title" {
+				r.host.windowTitle, r.host.windowTitleSet = a.string(1), true
+			}
 			if kind == "fullscreen" {
 				r.host.projectFullscreen = extension.Bool(a.get(1))
 			}
@@ -248,6 +265,16 @@ func (c *extensionContext) logicCall(operation string, args []any) (any, error) 
 			return float64(-1), nil
 		}
 		return float64(index), nil
+	case "target.sounds":
+		t, err := resolve(0)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]string, len(t.source.Sounds))
+		for i, sound := range t.source.Sounds {
+			out[i] = sound.Name
+		}
+		return out, nil
 	case "target.costumes":
 		t, err := resolve(0)
 		if err != nil {

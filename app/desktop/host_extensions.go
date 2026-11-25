@@ -2,8 +2,11 @@ package desktop
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"gowarp/core/vm"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/pkg/browser"
@@ -24,6 +27,20 @@ func (g *game) sampleHostFrame() {
 	g.updateBudgetUntil = now.Add(g.updateBudget)
 	g.lastHostFrame = now
 	g.controller.vm.SetHostFrame(g.sampleFullscreen(), elapsed)
+	g.controller.vm.SetHostWindowProvider(g.sampleHostWindow)
+}
+
+func (g *game) sampleHostWindow() (vm.HostWindow, error) {
+	monitor := ebiten.Monitor()
+	if monitor == nil {
+		return vm.HostWindow{}, fmt.Errorf("window monitor is unavailable")
+	}
+	w, h := monitor.Size()
+	title := "GoWarp — " + filepath.Base(g.path)
+	if s := g.options.Settings; s != nil {
+		title = s.Player.Title
+	}
+	return vm.HostWindow{ScreenWidth: w, ScreenHeight: h, Focused: ebiten.IsFocused(), Title: title}, nil
 }
 
 func (g *game) applyHostCommands() error {

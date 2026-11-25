@@ -6,6 +6,7 @@ import (
 	"fmt"
 	e "gowarp/core/extension"
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -116,7 +117,8 @@ func epsilon(n float64) float64 {
 func New() e.Extension {
 	x := e.Extension{ID: "SPcamera", State: map[string]any{}, Events: map[string]e.Handler{"load": load, "clone-created": cloneCreated}}
 	add := func(op, kind string, inputs ...string) {
-		x.Blocks = append(x.Blocks, e.Block{Opcode: "SPcamera_" + op, Kind: kind, Inputs: inputs, Handler: func(c *e.Context) (e.Result, error) { v, err := run(c, op); return e.Result{Value: v}, err }})
+		labels := map[string]string{"getX": "[CAMERA] camera x", "getY": "[CAMERA] camera y", "getZoom": "[CAMERA] camera zoom", "getDirection": "[CAMERA] camera direction", "getDirectionNew": "[CAMERA] camera direction", "targetCamera": "camera of [TARGET]", "renderedX": "rendered x position of [TARGET]", "renderedY": "rendered y position of [TARGET]", "spaceColor": "background color", "fixedMouseX": "mouse x in camera [CAMERA]", "fixedMouseY": "mouse y in camera [CAMERA]"}
+		x.Blocks = append(x.Blocks, e.Block{Opcode: "SPcamera_" + op, Text: labels[op], Kind: kind, Inputs: inputs, Handler: func(c *e.Context) (e.Result, error) { v, err := run(c, op); return e.Result{Value: v}, err }})
 	}
 	for _, menu := range []string{"OBJECTS", "EXACT_OBJECTS", "TARGETS", "BINDS"} {
 		add("menu_"+menu, "reporter")
@@ -132,13 +134,91 @@ func New() e.Extension {
 	for _, op := range []string{"getX", "getY", "getZoom", "getDirection", "getDirectionNew", "fixedMouseX", "fixedMouseY"} {
 		add(op, "reporter")
 	}
+	add("setSpaceColor", "command", "COLOR")
+	add("spaceColor", "reporter")
+	add("renderedX", "reporter", "TARGET")
+	add("renderedY", "reporter", "TARGET")
 	return x
 }
 func run(c *e.Context, op string) (any, error) {
 	if strings.HasPrefix(op, "menu_") {
 		return c.Field(strings.TrimPrefix(op, "menu_")), nil
 	}
+
+	if op == "setSpaceColor" || op == "spaceColor" {
+		if op == "spaceColor" {
+			v, err := c.Call("camera.get", "color")
+			if err != nil {
+				return nil, err
+			}
+			rgb, alpha := colorParts(v, true)
+			suffix := ""
+			if alpha < 255 {
+				suffix = fmt.Sprintf("%02x", alpha)
+			}
+			return fmt.Sprintf("#%06x%s", rgb, suffix), nil
+		}
+		rgb, alpha := colorParts(c.Args["COLOR"], false)
+		if alpha == 0 {
+			return nil, fmt.Errorf("fully transparent camera backgrounds are not supported by the renderer")
+		}
+		color := fmt.Sprintf("#%06x", rgb)
+		if alpha < 255 {
+			color = strconv.FormatUint(uint64(alpha)<<24|uint64(rgb), 10)
+		}
+		return c.Call("camera.set", "color", color)
+	}
 	cams := cameras(c)
+	if op == "renderedX" || op == "renderedY" {
+		pen := c.String("TARGET") == "_pen_"
+		if pen {
+			exists, err := c.Call("graphics.layer.exists", "Scratch Stage")
+			if err != nil {
+				return nil, err
+			}
+			if !e.Bool(exists) {
+				return "", nil
+			}
+		}
+		ref, ok, err := targetRef(c, c.String("TARGET"))
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return "", nil
+		}
+		var px, py any = float64(0), float64(0)
+		if !pen {
+			px, err = c.Call("target.get", "x", ref)
+			if err != nil {
+				return nil, err
+			}
+			py, err = c.Call("target.get", "y", ref)
+			if err != nil {
+				return nil, err
+			}
+		}
+		binding, err := c.Call("camera.binding", ref)
+		if err != nil {
+			return nil, err
+		}
+		name := e.String(binding)
+		if name == "" {
+			name = "default"
+		}
+		cam := cams[name]
+		x, y := e.Number(px), e.Number(py)
+		if cam != nil {
+			x -= cam.x
+			y -= cam.y
+			sin, cos := math.Sincos(cam.direction * math.Pi / 180)
+			x, y = epsilon(cam.zoom*(x*cos-y*sin)), epsilon(cam.zoom*(x*sin+y*cos))
+		}
+		if op == "renderedX" {
+			return x, nil
+		}
+		return y, nil
+	}
 	name := c.Field("CAMERA")
 	cam := cams[name]
 	if op == "bindTarget" || op == "unbindTarget" || op == "targetCamera" {
@@ -265,4 +345,40 @@ func run(c *e.Context, op string) (any, error) {
 		*cam = next
 	}
 	return nil, nil
+}
+
+// Numeric renderer colors carry ARGB; Scratch color inputs ignore numeric alpha.
+func colorParts(value any, renderer bool) (uint32, uint8) {
+	if s, ok := value.(string); ok && strings.HasPrefix(s, "#") {
+		s = s[1:]
+		alpha := uint8(255)
+		if len(s) > 6 {
+			n, err := strconv.ParseUint(s[6:], 16, 8)
+			if err == nil {
+				alpha = uint8(n)
+			}
+			s = s[:6]
+		}
+		if len(s) == 3 {
+			s = string([]byte{s[0], s[0], s[1], s[1], s[2], s[2]})
+		}
+		if len(s) != 6 {
+			return 0, alpha
+		}
+		n, err := strconv.ParseUint(s, 16, 24)
+		if err != nil {
+			return 0, alpha
+		}
+		return uint32(n), alpha
+	}
+	n := e.Number(value)
+	bits := uint32(0)
+	if !math.IsInf(n, 0) && !math.IsNaN(n) {
+		bits = uint32(int64(math.Mod(n, 4294967296)))
+	}
+	alpha := uint8(255)
+	if renderer && bits>>24 != 0 {
+		alpha = uint8(bits >> 24)
+	}
+	return bits & 0xffffff, alpha
 }

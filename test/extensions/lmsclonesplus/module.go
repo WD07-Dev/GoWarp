@@ -11,6 +11,19 @@ func New() e.Extension {
 		_, err := c.Call("events.pollHats", "lmsclonesplus_whenCloneStartsWithVar", "edge")
 		return e.Result{}, err
 	}}, Blocks: []e.Block{
+		{Opcode: "lmsclonesplus_cloneCount", Kind: "reporter", Text: "clone count", Handler: func(c *e.Context) (e.Result, error) {
+			value, err := c.Call("target.list")
+			if err != nil {
+				return e.Result{}, err
+			}
+			count := 0.0
+			for _, item := range value.([]any) {
+				if e.Number(item.(map[string]any)["cloneId"]) != 0 {
+					count++
+				}
+			}
+			return e.Result{Value: count}, nil
+		}},
 		{Opcode: "lmsclonesplus_whenCloneStartsWithVar", Kind: "hat", Inputs: []string{"INPUTB"}, Handler: func(c *e.Context) (e.Result, error) {
 			id, err := c.Call("target.get", "cloneId")
 			if err != nil || e.Number(id) == 0 {
@@ -49,7 +62,7 @@ func New() e.Extension {
 			}
 			return e.Result{}, nil
 		}},
-		{Opcode: "lmsclonesplus_isClone", Kind: "reporter", Inputs: []string{}, Handler: func(c *e.Context) (e.Result, error) {
+		{Opcode: "lmsclonesplus_isClone", Kind: "boolean", Text: "is clone?", Inputs: []string{}, Handler: func(c *e.Context) (e.Result, error) {
 			v, err := c.Call("target.get", "cloneId")
 			return e.Result{Value: e.Number(v) != 0}, err
 		}},

@@ -18,6 +18,14 @@ type cameraHost struct {
 
 func (h *cameraHost) Call(op string, args ...any) (any, error) {
 	switch op {
+	case "camera.get":
+		if value, ok := h.options["background"]; ok {
+			return value, nil
+		}
+		return "#ffffff", nil
+	case "camera.set":
+		h.options["background"] = args[1]
+		return nil, nil
 	case "project.storage":
 		return h.storage, nil
 	case "options.set":
@@ -38,6 +46,8 @@ func (h *cameraHost) Call(op string, args ...any) (any, error) {
 		}
 		h.penLayer = true
 		return args[0], nil
+	case "graphics.layer.exists":
+		return h.penLayer, nil
 	case "camera.binding":
 		return h.bindings[e.String(args[0])], nil
 	case "input.mouse":
@@ -57,6 +67,48 @@ func (h *cameraHost) Call(op string, args ...any) (any, error) {
 		}
 	}
 	return nil, fmt.Errorf("unexpected %s %v", op, args)
+}
+
+func TestRenderedPositionAndSpaceColor(t *testing.T) {
+	h, c := cameraFixture(t)
+	if got := invoke(t, c, "renderedX", "", map[string]any{"TARGET": "_pen_"}); got != "" || h.penLayer {
+		t.Fatal("reporter created missing pen layer", got)
+	}
+	h.penLayer = true
+	invoke(t, c, "bindTarget", "world", map[string]any{"TARGET": "_pen_"})
+	h.bindings["1:0"] = "world"
+	invoke(t, c, "setXY", "world", map[string]any{"X": 10.0, "Y": 20.0})
+	invoke(t, c, "setZoom", "world", map[string]any{"NUM": 200.0})
+	invoke(t, c, "setDirectionNew", "world", map[string]any{"NUM": 0.0})
+	if got := invoke(t, c, "renderedX", "", map[string]any{"TARGET": "_pen_"}); math.Abs(e.Number(got)-40) > 1e-10 {
+		t.Fatal("pen coordinate", got)
+	}
+	if got := invoke(t, c, "renderedX", "", map[string]any{"TARGET": "actor"}); math.Abs(e.Number(got)-80) > 1e-10 {
+		t.Fatal(got)
+	}
+	if got := invoke(t, c, "renderedY", "", map[string]any{"TARGET": "actor"}); math.Abs(e.Number(got)-80) > 1e-10 {
+		t.Fatal(got)
+	}
+	if got := invoke(t, c, "renderedX", "", map[string]any{"TARGET": "missing"}); got != "" {
+		t.Fatal(got)
+	}
+	if got := invoke(t, c, "spaceColor", "", nil); got != "#ffffff" {
+		t.Fatal(got)
+	}
+	for _, tc := range []struct {
+		value any
+		want  string
+	}{{"#AbC", "#aabbcc"}, {"#11223380", "#11223380"}, {16711680.0, "#ff0000"}, {"#112233ff", "#112233"}} {
+		invoke(t, c, "setSpaceColor", "", map[string]any{"COLOR": tc.value})
+		if got := invoke(t, c, "spaceColor", "", nil); got != tc.want {
+			t.Fatal(tc.value, got, tc.want)
+		}
+	}
+	for _, b := range New().Blocks {
+		if (b.Opcode == "SPcamera_spaceColor" || b.Opcode == "SPcamera_renderedX" || b.Opcode == "SPcamera_getX") && b.Text == "" {
+			t.Error("monitor text", b.Opcode)
+		}
+	}
 }
 func cameraFixture(t *testing.T) (*cameraHost, *e.Context) {
 	t.Helper()

@@ -2,27 +2,54 @@
 package extension
 
 import (
-	e "gowarp/core/extension"
 	"math"
+
+	e "gowarp/core/extension"
 )
 
 func New() e.Extension {
-	return e.Extension{ID: "framedropdetector", State: map[string]any{}, Blocks: []e.Block{
-		{Opcode: "framedropdetector_getFps", Kind: "reporter", Inputs: []string{}, Handler: func(c *e.Context) (e.Result, error) {
-			v, err := c.Call("host.frameMilliseconds")
-			return e.Result{Value: math.Round(1000 / e.Number(v))}, err
-		}},
-		{Opcode: "framedropdetector_isDropped", Kind: "reporter", Inputs: []string{}, Handler: func(c *e.Context) (e.Result, error) {
-			v, err := c.Call("host.frameMilliseconds")
-			threshold := 33.33
-			if v, ok := c.State["threshold"]; ok {
-				threshold = e.Number(v)
-			}
-			return e.Result{Value: e.Number(v) > threshold}, err
-		}},
-		{Opcode: "framedropdetector_setThreshold", Kind: "command", Inputs: []string{"MS"}, Handler: func(c *e.Context) (e.Result, error) {
-			c.State["threshold"] = c.Number("MS")
-			return e.Result{}, nil
-		}},
-	}}
+	threshold := 33.33
+	lastDt := 0.0
+	return e.Extension{
+		ID: "framedropdetector",
+		Blocks: []e.Block{
+			{Opcode: "framedropdetector_getFps", Kind: "reporter", Text: "현재 FPS", Handler: func(c *e.Context) (e.Result, error) {
+				value, err := c.Call("host.frameMilliseconds")
+				if err != nil {
+					return e.Result{}, err
+				}
+				fps := 0.0
+				if dt := e.Number(value); dt > 0 {
+					fps = math.Round(1000 / dt)
+				}
+				return e.Result{Value: fps}, nil
+			}},
+			{Opcode: "framedropdetector_isDropped", Kind: "boolean", Text: "프레임 드랍이 감지되었는가?", Handler: func(c *e.Context) (e.Result, error) {
+				value, err := c.Call("host.frameMilliseconds")
+				return e.Result{Value: e.Number(value) > threshold}, err
+			}},
+			{Opcode: "framedropdetector_setThreshold", Kind: "command", Inputs: []string{"MS"}, Handler: func(c *e.Context) (e.Result, error) {
+				threshold = c.Number("MS")
+				return e.Result{}, nil
+			}},
+			{Opcode: "framedropdetector_getThreshold", Kind: "reporter", Text: "현재 감지 기준 (ms)", Handler: func(*e.Context) (e.Result, error) {
+				return e.Result{Value: threshold}, nil
+			}},
+			{Opcode: "framedropdetector_getLastDt", Kind: "reporter", Text: "마지막 프레임 지연 시간 (ms)", Handler: func(*e.Context) (e.Result, error) {
+				return e.Result{Value: math.Round(lastDt*10) / 10}, nil
+			}},
+		},
+		Events: map[string]e.Handler{
+			"before-tick": func(c *e.Context) (e.Result, error) {
+				value, err := c.Call("host.frameMilliseconds")
+				if err != nil {
+					return e.Result{}, err
+				}
+				if dt := e.Number(value); dt > threshold {
+					lastDt = dt
+				}
+				return e.Result{}, nil
+			},
+		},
+	}
 }

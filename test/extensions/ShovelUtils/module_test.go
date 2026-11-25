@@ -20,7 +20,17 @@ func TestRollingFPS(t *testing.T) {
 	}
 	h := &clockHost{}
 	c := &e.Context{State: x.State, Host: h}
-	r, err := x.Blocks[0].Handler(c)
+	var fps e.Handler
+	for _, block := range x.Blocks {
+		if block.Opcode == "ShovelUtils_getfps" {
+			fps = block.Handler
+			break
+		}
+	}
+	if fps == nil {
+		t.Fatal("missing FPS reporter")
+	}
+	r, err := fps(c)
 	if err != nil || r.Value != 60.0 {
 		t.Fatal(r, err)
 	}
@@ -30,7 +40,7 @@ func TestRollingFPS(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	r, err = x.Blocks[0].Handler(c)
+	r, err = fps(c)
 	if err != nil || r.Value != 2.0 {
 		t.Fatal(r, err)
 	}

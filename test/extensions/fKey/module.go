@@ -1,3 +1,4 @@
+// Code generated from the extension Go comment for regression tests. DO NOT EDIT.
 package extension
 
 import (
@@ -7,7 +8,7 @@ import (
 
 func New() e.Extension {
 	return e.Extension{ID: "fKey", Blocks: []e.Block{
-		{Opcode: "fKey_isFKeyPressed", Kind: "reporter", Inputs: []string{"KEY"}, Handler: func(c *e.Context) (e.Result, error) {
+		{Opcode: "fKey_isFKeyPressed", Kind: "boolean", Text: "[KEY] key pressed?", Inputs: []string{"KEY"}, Handler: func(c *e.Context) (e.Result, error) {
 			v, err := c.Call("input.key", strings.ToUpper(c.String("KEY")))
 			return e.Result{Value: v}, err
 		}},

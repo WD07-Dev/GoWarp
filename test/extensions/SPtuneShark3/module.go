@@ -2,9 +2,12 @@
 package extension
 
 import (
+	"encoding/json"
 	"fmt"
 	e "gowarp/core/extension"
 	"math"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -25,6 +28,7 @@ func menu(op, key string) e.Block {
 }
 
 type channel struct {
+	Order                           uint64
 	Asset, Voice                    any
 	Volume                          float64
 	Loop                            bool
@@ -179,7 +183,9 @@ func New() e.Extension {
 					return e.Result{}, err
 				}
 			}
-			m[name] = &channel{Asset: asset, Volume: 100, Pitch: 1, Speed: 1, Gain: 1}
+			order, _ := c.State["channelOrder"].(uint64)
+			c.State["channelOrder"] = order + 1
+			m[name] = &channel{Order: order, Asset: asset, Volume: 100, Pitch: 1, Speed: 1, Gain: 1}
 			return e.Result{}, nil
 		}),
 		cmd("SPtuneShark3_deleteAllSounds", nil, func(c *e.Context) (e.Result, error) {
@@ -406,6 +412,53 @@ func New() e.Extension {
 				}
 			}
 			return e.Result{}, fmt.Errorf("unsupported Tune Shark property %q", prop)
+		}})
+	}
+
+	for _, op := range []string{"allSounds", "allPlaySounds"} {
+		op := op
+		label := "all sounds"
+		if op == "allPlaySounds" {
+			label = "all playing sounds"
+		}
+		x.Blocks = append(x.Blocks, e.Block{Opcode: "SPtuneShark3_" + op, Text: label, Kind: "reporter", Handler: func(c *e.Context) (e.Result, error) {
+			bank := channels(c)
+			names := make([]string, 0, len(bank))
+			for name := range bank {
+				names = append(names, name)
+			}
+			arrayIndex := func(name string) (uint64, bool) {
+				n, err := strconv.ParseUint(name, 10, 32)
+				return n, err == nil && n < 4294967295 && strconv.FormatUint(n, 10) == name
+			}
+			sort.Slice(names, func(i, j int) bool {
+				a, ai := arrayIndex(names[i])
+				b, bi := arrayIndex(names[j])
+				if ai || bi {
+					return ai && (!bi || a < b)
+				}
+				return bank[names[i]].Order < bank[names[j]].Order
+			})
+			if op == "allPlaySounds" {
+				playing := names[:0]
+				for _, name := range names {
+					voice := bank[name].Voice
+					active, err := c.Call("audio.voice.get", voice, "active")
+					if err != nil {
+						return e.Result{}, err
+					}
+					paused, err := c.Call("audio.voice.get", voice, "paused")
+					if err != nil {
+						return e.Result{}, err
+					}
+					if e.Bool(active) && !e.Bool(paused) {
+						playing = append(playing, name)
+					}
+				}
+				names = playing
+			}
+			data, err := json.Marshal(names)
+			return e.Result{Value: string(data)}, err
 		}})
 	}
 	return x

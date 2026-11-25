@@ -7,7 +7,7 @@ import (
 
 func New() e.Extension {
 	return e.Extension{ID: "koreandetector", State: map[string]any{}, Blocks: []e.Block{
-		{Opcode: "koreandetector_isKorean", Kind: "reporter", Inputs: []string{"TEXT"}, Handler: func(c *e.Context) (e.Result, error) {
+		{Opcode: "koreandetector_isKorean", Kind: "boolean", Text: "한글이 포함되어 있습니까?", Inputs: []string{"TEXT"}, Handler: func(c *e.Context) (e.Result, error) {
 			for _, ch := range c.String("TEXT") {
 				if ch >= 'ㄱ' && ch <= 'ㅣ' || ch >= '가' && ch <= '힣' {
 					return e.Result{Value: true}, nil

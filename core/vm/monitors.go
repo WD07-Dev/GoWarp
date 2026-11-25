@@ -182,7 +182,9 @@ func (r *Runtime) updateMonitorReporters(ctx context.Context) error {
 			continue
 		}
 		budget := stepsPerFrame
-		result, _, err := r.invokeExtension(ctx, m.thread, m.reporter, func(string) (any, error) { return nil, nil }, true, 0, &budget)
+		result, _, err := r.invokeExtension(ctx, m.thread, m.reporter, func(name string) (any, error) {
+			return m.source.Params[name], nil
+		}, true, 0, &budget)
 		if errors.Is(err, errExtensionYield) {
 			continue
 		}

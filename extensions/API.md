@@ -94,8 +94,8 @@ Return a fresh instance from each `New()` call. Allocate mutable maps and slices
 
 Visible reporter and boolean monitors saved in the SB3 are evaluated once per VM
 tick, after scripts run. Rendering only reads the cached result. Hidden monitors
-are not evaluated. Saved `params` are provided as `c.Fields`, matching Scratch's
-monitor blocks; they are not reporter inputs in `c.Args`.
+are not evaluated. Saved `params` are provided as `c.Fields`. Parameters named in
+the block's `Inputs` are also passed to `c.Args` with their saved value types.
 
 An optional `Text` field on `e.Block` supplies the monitor label,
 for example `Text: "FPS"` or `Text: "timer [TIMER]"`.
@@ -392,6 +392,7 @@ In the tables below, `ref?` means an optional target reference. Omit it or use `
 | `runtime.time()` | VM step time in seconds. Stable within a step. |
 | `runtime.monotonicTime()` | Current monotonic time in seconds; uses deterministic VM time outside realtime execution. |
 | `runtime.frame()`, `runtime.fps()` | Frame count or configured VM FPS. |
+| `runtime.extensions()` | Loaded extension IDs, including pen when the project uses it. |
 | `runtime.timer()`, `runtime.resetTimer()` | Read or reset the Scratch timer. |
 | `runtime.greenFlag()` | Restart the project. |
 | `project.storage(id)` | The extension's serialized `extensionStorage` JSON. |
@@ -414,6 +415,7 @@ Use VM time for ordinary animation and waits. Use monotonic time only when match
 | `target.clone(ref?)` | Create a clone and return its ID, or nil when creation is refused. |
 | `target.delete(ref?)` | Delete a clone. |
 | `target.costumes(ref?)` | Costume metadata records. |
+| `target.sounds(ref?)` | Sound names belonging to the selected target, in sound-editor order. |
 | `target.costumeIndex(name, ref?)` | Exact costume name lookup; returns a zero-based index or -1. |
 | `target.costumeSize(index, ref?)` | Width and height in Scratch costume metadata units; index starts at zero. |
 | `variable.get(id, ref?)` | Read a variable. |
@@ -557,7 +559,8 @@ an extension needs that side effect.
 | --- | --- |
 | `audio.asset(selector, exactName)` | Opaque sound asset handle, or nil. |
 | `audio.asset.get(handle, property)` | `duration`, `rate`, `name`, `format`, or `target`. |
-| `audio.projectVolume(value)` | Set project volume as a percentage. |
+| `audio.projectVolume(value?)` | Read project volume as a percentage, or set it when a value is supplied. |
+| `audio.effect(effect, ref?)` | Read the selected target's `pitch` or `pan` sound effect. |
 | `audio.targetVoice(selector)` | Current target's voice for the selected sound, or nil. |
 | `audio.targetPlay(selector, start, loop)` | Play the selected sound from the current target. |
 | `audio.play(asset, start, end, volume, loop, rate?, pan?)` | Play an asset segment; return a voice handle. |
@@ -579,6 +582,7 @@ Times and positions are in seconds. Treat asset and voice handles as opaque valu
 | `assets.deleteCostume(name)` | Remove a costume by name while retaining at least one costume. |
 | `host.fullscreen()`, `host.projectFullscreen()` | Actual fullscreen state or the project's fullscreen request state. |
 | `host.frameMilliseconds()` | Host frame duration in milliseconds. |
+| `host.window(property)` | Read `screenWidth`, `screenHeight`, `focused`, or `title`. Requires a desktop window; screen dimensions use device-independent pixels. |
 | `host.command(kind, value)` | Queue a `title`, `close`, `open-url`, or `fullscreen` request. |
 
 Poll file-picker channels without blocking, using `Local` and `Again`/`YieldTick`. Cancellation or a read failure produces an empty string. Project fullscreen requests are tracked separately from the player's F11 mode.
@@ -667,7 +671,8 @@ the existing whole-stage `camera.get`/`camera.set` view API.
 during suspension wait too, and playback position does not advance.
 
 - `audio.stopTarget(target?)` stops only voices owned by that exact sprite or
-clone and releases scripts waiting for those voices.
+clone and releases scripts waiting for those voices. Use `"_myfamily_"` to stop
+voices from the current sprite and all its clones.
 
 - `events.pollHats(opcode, mode)` evaluates a registered hat predicate on each
 eligible target. `edge` starts on a false-to-true transition; `level` starts

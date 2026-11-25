@@ -5,9 +5,11 @@
 @gowarp-go {
 package extension
 
-import e "gowarp/core/extension"
+import (
+	"encoding/json"
+	e "gowarp/core/extension"
+)
 
-// Only the FPS reporter used by the project is ported; browser asset import and editor operations remain JavaScript-only.
 func New() e.Extension {
 	return e.Extension{ID: "ShovelUtils", State: map[string]any{}, Events: map[string]e.Handler{"tick": func(c *e.Context) (e.Result, error) {
 		v, err := c.Call("runtime.time")
@@ -24,13 +26,29 @@ func New() e.Extension {
 		c.State["times"] = times
 		c.State["fps"] = float64(len(times))
 		return e.Result{}, nil
-	}}, Blocks: []e.Block{{Opcode: "ShovelUtils_getfps", Kind: "reporter", Handler: func(c *e.Context) (e.Result, error) {
-		if v, ok := c.State["fps"]; ok {
-			return e.Result{Value: v}, nil
-		}
-		v, err := c.Call("runtime.fps")
-		return e.Result{Value: v}, err
-	}}}}
+	}}, Blocks: []e.Block{
+		{Opcode: "ShovelUtils_getAllSprites", Kind: "reporter", Text: "all sprites", Handler: func(c *e.Context) (e.Result, error) {
+			value, err := c.Call("target.list")
+			if err != nil {
+				return e.Result{}, err
+			}
+			names := []string{}
+			for _, item := range value.([]any) {
+				target := item.(map[string]any)
+				if e.Number(target["cloneId"]) == 0 {
+					names = append(names, e.String(target["name"]))
+				}
+			}
+			data, err := json.Marshal(names)
+			return e.Result{Value: string(data)}, err
+		}},
+		{Opcode: "ShovelUtils_getfps", Kind: "reporter", Text: "fps", Handler: func(c *e.Context) (e.Result, error) {
+			if v, ok := c.State["fps"]; ok {
+				return e.Result{Value: v}, nil
+			}
+			v, err := c.Call("runtime.fps")
+			return e.Result{Value: v}, err
+		}}}}
 }
 
 }

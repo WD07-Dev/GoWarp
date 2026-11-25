@@ -1,8 +1,10 @@
+// Code generated from the extension Go comment for regression tests. DO NOT EDIT.
 package extension
 
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	e "gowarp/core/extension"
 	"math"
 	"sort"
@@ -12,10 +14,8 @@ import (
 	"unicode/utf16"
 )
 
-/*
-Port of the JSON operations used by Dusttrust. Object property order and
-string-valued numbers are retained, as in the original JavaScript extension.
-*/
+// Port of the JSON operations used by Dusttrust. Object property order and
+// string-valued numbers are retained, as in the original JavaScript extension.
 type property struct {
 	key   string
 	value any
@@ -107,10 +107,8 @@ func parse(s string) (any, bool) {
 	return v, err == nil
 }
 
-/*
-Only read operations share parsed values. Setters and list transfers still
-parse their own mutable copy. Bound both entry count and source text size.
-*/
+// Only read operations share parsed values. Setters and list transfers still
+// parse their own mutable copy. Bound both entry count and source text size.
 type readEntry struct {
 	value       any
 	results     map[string]any
@@ -149,10 +147,8 @@ func (c *readCache) parse(source string) (any, bool) {
 	return value, true
 }
 
-/*
-Cached parse trees are read-only. Keep serialized children with their
-source entry, bounded by the source length and released on its eviction.
-*/
+// Cached parse trees are read-only. Keep serialized children with their
+// source entry, bounded by the source length and released on its eviction.
 func (c *readCache) result(source, key string, value any) any {
 	switch value.(type) {
 	case *object, []any:
@@ -284,8 +280,42 @@ func concatText(value any) string {
 func New() e.Extension {
 	x := e.Extension{ID: "skyhigh173JSON"}
 	var reads readCache
+	labels := map[string]string{
+		"skyhigh173JSON_json_is_valid":         "is JSON [json] valid?",
+		"skyhigh173JSON_json_is":               "is [json] [types]?",
+		"skyhigh173JSON_json_get_all":          "all [Stype] of [json]",
+		"skyhigh173JSON_json_new":              "new [json]",
+		"skyhigh173JSON_json_has_key":          "[json] contains key [key]?",
+		"skyhigh173JSON_json_has_value":        "[json] contains value [value]?",
+		"skyhigh173JSON_json_equal":            "[json1] [equal] [json2]",
+		"skyhigh173JSON_json_jlength":          "length of json [json]",
+		"skyhigh173JSON_json_get":              "value of [item] in [json]",
+		"skyhigh173JSON_json_set":              "set [item] in [json] to [value]",
+		"skyhigh173JSON_json_delete":           "delete [item] in [json]",
+		"skyhigh173JSON_json_length":           "length of array [json]",
+		"skyhigh173JSON_json_array_get":        "item [item] of array [json]",
+		"skyhigh173JSON_json_array_push":       "add [item] to array [json]",
+		"skyhigh173JSON_json_array_set":        "replace item [pos] of [json] with [item]",
+		"skyhigh173JSON_json_array_insert":     "insert [item] at [pos] of array [json]",
+		"skyhigh173JSON_json_array_delete":     "delete item [item] of array [json]",
+		"skyhigh173JSON_json_array_remove_all": "delete all [item] in array [json]",
+		"skyhigh173JSON_json_array_itemH":      "item # of [item] in array [json]",
+		"skyhigh173JSON_json_array_from":       "array from text [json]",
+		"skyhigh173JSON_json_array_fromto":     "items [item] to [item2] of array [json]",
+		"skyhigh173JSON_json_array_reverse":    "reverse array [json]",
+		"skyhigh173JSON_json_array_flat":       "flat array [json] by depth [depth]",
+		"skyhigh173JSON_json_array_concat":     "array concat [json] [json2]",
+		"skyhigh173JSON_json_array_filter":     "get all values with key [key] in array [json]",
+		"skyhigh173JSON_json_array_setlen":     "set length of array [json] to [len]",
+		"skyhigh173JSON_json_array_create":     "create array by [text] with delimiter [d]",
+		"skyhigh173JSON_json_array_join":       "join string by array [json] with delimiter [d]",
+		"skyhigh173JSON_json_array_sort":       "sort array [list] in [order] order",
+		"skyhigh173JSON_json_array_analysis":   "[analysis] of array [list]",
+		"skyhigh173JSON_json_vm_getlist":       "get list [list] as array",
+		"skyhigh173JSON_json_vm_setlist":       "set list [list] to [json]",
+	}
 	add := func(op, kind string, inputs []string, h e.Handler) {
-		x.Blocks = append(x.Blocks, e.Block{Opcode: "skyhigh173JSON_" + op, Kind: kind, Inputs: inputs, Handler: h})
+		x.Blocks = append(x.Blocks, e.Block{Text: labels["skyhigh173JSON_"+op], Opcode: "skyhigh173JSON_" + op, Kind: kind, Inputs: inputs, Handler: h})
 	}
 
 	add("json_is_valid", "boolean", []string{"json"}, func(c *e.Context) (e.Result, error) {
@@ -326,7 +356,7 @@ func New() e.Extension {
 		}
 		return e.Result{Value: ""}, nil
 	})
-	for _, name := range []string{"types", "get_list"} {
+	for _, name := range []string{"types", "get_list", "get_all", "equal", "sort_order", "analysis"} {
 		name := name
 		add("menu_"+name, "reporter", nil, func(c *e.Context) (e.Result, error) { return e.Result{Value: c.Field(name)}, nil })
 	}
@@ -357,7 +387,11 @@ func New() e.Extension {
 		{"json_has_value", []string{"json", "value"}}, {"json_length", []string{"json"}}, {"json_jlength", []string{"json"}},
 	} {
 		op := spec.op
-		add(op, "reporter", spec.inputs, func(c *e.Context) (e.Result, error) {
+		kind := "reporter"
+		if op == "json_has_value" {
+			kind = "boolean"
+		}
+		add(op, kind, spec.inputs, func(c *e.Context) (e.Result, error) {
 			var v any
 			var valid bool
 			switch op {
@@ -470,5 +504,357 @@ func New() e.Extension {
 		}
 		return e.Result{Value: ""}, nil
 	})
+	addJSONOperations(add)
 	return x
+}
+
+func ownKeys(v any) ([]string, bool) {
+	keys := []string{}
+	switch x := v.(type) {
+	case nil:
+		return nil, false
+	case *object:
+		props := append(object(nil), (*x)...)
+		sort.SliceStable(props, func(i, j int) bool {
+			a, ai := index(props[i].key)
+			b, bi := index(props[j].key)
+			return ai && (!bi || a < b)
+		})
+		for _, p := range props {
+			keys = append(keys, p.key)
+		}
+	case []any:
+		for i := range x {
+			keys = append(keys, strconv.Itoa(i))
+		}
+	case string:
+		for i := range utf16.Encode([]rune(x)) {
+			keys = append(keys, strconv.Itoa(i))
+		}
+	}
+	return keys, true
+}
+func owns(v any, key string) bool {
+	if key == "length" {
+		switch v.(type) {
+		case []any, string:
+			return true
+		}
+	}
+	keys, _ := ownKeys(v)
+	for _, k := range keys {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}
+func sliceIndex(n float64, length int) int {
+	if math.IsNaN(n) {
+		return 0
+	}
+	n = math.Trunc(n)
+	if n < 0 {
+		n += float64(length)
+	}
+	return int(math.Max(0, math.Min(float64(length), n)))
+}
+func flatten(a []any, depth float64) []any {
+	out := []any{}
+	for _, v := range a {
+		if nested, ok := v.([]any); ok && depth >= 1 {
+			out = append(out, flatten(nested, depth-1)...)
+		} else {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+func addJSONOperations(add func(string, string, []string, e.Handler)) {
+	for _, spec := range []struct {
+		op, kind string
+		inputs   []string
+	}{
+		{"json_get_all", "reporter", []string{"Stype", "json"}},
+		{"json_has_key", "boolean", []string{"json", "key"}},
+		{"json_equal", "boolean", []string{"json1", "equal", "json2"}},
+		{"json_delete", "reporter", []string{"item", "json"}},
+		{"json_array_insert", "reporter", []string{"item", "pos", "json"}},
+		{"json_array_delete", "reporter", []string{"item", "json"}},
+		{"json_array_remove_all", "reporter", []string{"item", "json"}},
+		{"json_array_fromto", "reporter", []string{"json", "item", "item2"}},
+		{"json_array_reverse", "reporter", []string{"json"}},
+		{"json_array_flat", "reporter", []string{"json", "depth"}},
+		{"json_array_create", "reporter", []string{"text", "d"}},
+		{"json_array_join", "reporter", []string{"json", "d"}},
+		{"json_array_filter", "reporter", []string{"key", "json"}},
+		{"json_array_setlen", "reporter", []string{"json", "len"}},
+		{"json_array_sort", "reporter", []string{"list", "order"}},
+		{"json_array_analysis", "reporter", []string{"list", "analysis"}},
+	} {
+		op := spec.op
+		add(op, spec.kind, spec.inputs, func(c *e.Context) (e.Result, error) {
+			out := any("")
+			if op == "json_has_key" || op == "json_equal" {
+				out = false
+			}
+			if op == "json_array_analysis" {
+				out = float64(0)
+			}
+			done := func() (e.Result, error) { return e.Result{Value: out}, nil }
+			if op == "json_array_create" {
+				out = encode(strings.Split(c.String("text"), c.String("d")))
+				return done()
+			}
+			source := c.String("json")
+			if op == "json_array_sort" || op == "json_array_analysis" {
+				source = c.String("list")
+			}
+			if op == "json_equal" {
+				source = c.String("json1")
+			}
+			v, valid := parse(source)
+			if !valid {
+				return done()
+			}
+			a, isArray := v.([]any)
+			switch op {
+			case "json_get_all":
+				keys, ok := ownKeys(v)
+				if !ok {
+					return done()
+				}
+				values := []any{}
+				mode := c.Field("Stype")
+				if mode == "" {
+					mode = c.String("Stype")
+				}
+				for _, key := range keys {
+					value := get(v, key)
+					if value == nil {
+						value = ""
+					}
+					switch mode {
+					case "keys":
+						values = append(values, key)
+					case "values":
+						values = append(values, value)
+					case "datas":
+						values = append(values, []any{key, value})
+					default:
+						return done()
+					}
+				}
+				if mode == "keys" || mode == "values" || mode == "datas" {
+					out = encode(values)
+				}
+			case "json_has_key":
+				switch v.(type) {
+				case *object, []any:
+					key := concatText(itemValue(c.Args["key"]))
+					out = owns(v, key)
+					if key == "constructor" || key == "toString" || key == "valueOf" || key == "hasOwnProperty" || key == "__proto__" {
+						out = true
+					}
+				}
+			case "json_equal":
+				other, ok := parse(c.String("json2"))
+				keys, ok1 := ownKeys(v)
+				keys2, ok2 := ownKeys(other)
+				if !ok || !ok1 || !ok2 {
+					return done()
+				}
+				equal := len(keys) == len(keys2)
+				for _, k := range keys {
+					if !owns(other, k) || !strictEqual(get(v, k), get(other, k)) {
+						equal = false
+						break
+					}
+				}
+				if c.String("equal") == "=" {
+					out = equal
+				}
+				if c.String("equal") == "≠" {
+					out = !equal
+				}
+			case "json_delete":
+				key := c.String("item")
+				switch x := v.(type) {
+				case *object:
+					for i, p := range *x {
+						if p.key == key {
+							*x = append((*x)[:i], (*x)[i+1:]...)
+							break
+						}
+					}
+				case []any:
+					if i, ok := index(key); ok && i < len(x) {
+						x[i] = nil
+					}
+				case nil:
+					return done()
+				case string:
+					if owns(x, key) {
+						return done()
+					}
+				}
+				out = encode(v)
+			case "json_array_fromto":
+				if s, ok := v.(string); ok {
+					chars := utf16.Encode([]rune(s))
+					from, to := sliceIndex(c.Number("item")-1, len(chars)), sliceIndex(c.Number("item2"), len(chars))
+					if to < from {
+						to = from
+					}
+					out = encode(string(utf16.Decode(chars[from:to])))
+					return done()
+				}
+				if !isArray {
+					return done()
+				}
+				from, to := sliceIndex(c.Number("item")-1, len(a)), sliceIndex(c.Number("item2"), len(a))
+				if to < from {
+					to = from
+				}
+				out = encode(a[from:to])
+			case "json_array_setlen":
+				if obj, ok := v.(*object); ok {
+					obj.set("length", c.Args["len"])
+					out = encode(obj)
+					return done()
+				}
+				if !isArray {
+					return done()
+				}
+				n := c.Number("len")
+				if math.IsNaN(n) || math.IsInf(n, 0) || n < 0 || n != math.Trunc(n) || n >= 4294967296 {
+					return done()
+				}
+				if n <= float64(len(a)) {
+					a = a[:int(n)]
+				} else {
+					// Unlike JavaScript's sparse arrays, []any allocates every entry.
+					if n > 1_000_000 {
+						return e.Result{}, fmt.Errorf("JSON array growth exceeds 1,000,000 entries")
+					}
+					a = append(a, make([]any, int(n)-len(a))...)
+				}
+				out = encode(a)
+			default:
+				if !isArray {
+					return done()
+				}
+				switch op {
+				case "json_array_insert":
+					i := sliceIndex(c.Number("pos")-1, len(a))
+					a = append(a, nil)
+					copy(a[i+1:], a[i:])
+					a[i] = itemValue(c.Args["item"])
+				case "json_array_delete":
+					i := sliceIndex(c.Number("item")-1, len(a))
+					if i < len(a) {
+						a = append(a[:i], a[i+1:]...)
+					}
+				case "json_array_remove_all":
+					value := itemValue(c.Args["item"])
+					outArray := []any{}
+					for _, v := range a {
+						if !strictEqual(v, value) {
+							outArray = append(outArray, v)
+						}
+					}
+					a = outArray
+				case "json_array_reverse":
+					for i, j := 0, len(a)-1; i < j; i, j = i+1, j-1 {
+						a[i], a[j] = a[j], a[i]
+					}
+				case "json_array_flat":
+					a = flatten(a, math.Trunc(c.Number("depth")))
+				case "json_array_join":
+					parts := make([]string, len(a))
+					for i, v := range a {
+						if v != nil {
+							parts[i] = concatText(v)
+						}
+					}
+					out = strings.Join(parts, c.String("d"))
+					return done()
+				case "json_array_filter":
+					for i, v := range a {
+						if v == nil {
+							return done()
+						}
+						a[i] = get(v, c.String("key"))
+					}
+				case "json_array_sort":
+					sort.SliceStable(a, func(i, j int) bool { return e.Compare(itemCompare(a[i]), itemCompare(a[j])) < 0 })
+					if c.String("order") == "descending" {
+						for i, j := 0, len(a)-1; i < j; i, j = i+1, j-1 {
+							a[i], a[j] = a[j], a[i]
+						}
+					}
+				case "json_array_analysis":
+					nums := make([]float64, len(a))
+					sum := 0.0
+					for i, v := range a {
+						nums[i] = e.Number(itemCompare(v))
+						sum += nums[i]
+					}
+					n := float64(len(nums))
+					average := sum / n
+					switch c.String("analysis") {
+					case "sum":
+						out = sum
+					case "average":
+						out = average
+					case "maximum":
+						out = math.Inf(-1)
+						for _, v := range nums {
+							out = math.Max(out.(float64), v)
+						}
+					case "minimum":
+						out = math.Inf(1)
+						for _, v := range nums {
+							out = math.Min(out.(float64), v)
+						}
+					case "median":
+						sort.Float64s(nums)
+						if len(nums) == 0 {
+							out = math.NaN()
+						} else if len(nums)%2 == 0 {
+							out = (nums[len(nums)/2-1] + nums[len(nums)/2]) / 2
+						} else {
+							out = nums[len(nums)/2]
+						}
+					case "mode":
+						freq := map[float64]int{}
+						max := 0
+						for _, v := range nums {
+							freq[v]++
+							if freq[v] > max {
+								out = v
+								max = freq[v]
+							}
+						}
+					case "variance":
+						total := 0.0
+						for _, v := range nums {
+							total += (v - average) * (v - average)
+						}
+						out = total / n
+					}
+					return done()
+				}
+				out = encode(a)
+			}
+			return done()
+		})
+	}
+}
+func itemCompare(v any) any {
+	switch v.(type) {
+	case *object, []any:
+		return concatText(v)
+	}
+	return v
 }

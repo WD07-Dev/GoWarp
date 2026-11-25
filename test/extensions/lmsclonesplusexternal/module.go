@@ -207,9 +207,10 @@ func New() e.Extension {
 	add("selectClonesByListItem", "reporter", []string{"SPRITE", "MATCH_INDEX", "MATCH_VALUE"})
 	add("selectClonesByListContaining", "reporter", []string{"SPRITE", "ITEM"})
 	add("intersectTargetSets", "reporter", []string{"TARGETS_A", "TARGETS_B"})
-	for _, op := range []string{"targetSetCount", "targetSetHasAny", "getVariableOfFirstInTargetSet", "getLengthOfListOfFirstInTargetSet", "getThingOfFirstInTargetSet"} {
+	for _, op := range []string{"targetSetCount", "getVariableOfFirstInTargetSet", "getLengthOfListOfFirstInTargetSet", "getThingOfFirstInTargetSet"} {
 		add(op, "reporter", []string{"TARGETS"})
 	}
+	add("targetSetHasAny", "boolean", []string{"TARGETS"})
 	add("getItemOfListOfFirstInTargetSet", "reporter", []string{"TARGETS", "INDEX"})
 	add("setVariableOfTargetSet", "command", []string{"TARGETS", "VALUE"})
 	add("replaceInListOfTargetSet", "command", []string{"TARGETS", "INDEX", "ITEM"})

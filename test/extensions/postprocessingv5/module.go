@@ -76,12 +76,20 @@ func defaults(name string) map[string]any {
 }
 func New() e.Extension {
 	x := e.Extension{ID: "postprocessingv5", Blocks: []e.Block{
+		{Opcode: "postprocessingv5_opcodeGetPostProcess", Kind: "reporter", Text: "post-process mode", Handler: func(c *e.Context) (e.Result, error) {
+			mode := "none"
+			if value, ok := c.State["mode"].(string); ok {
+				mode = value
+			}
+			return e.Result{Value: mode}, nil
+		}},
 		{Opcode: "postprocessingv5_menu_PostProcess", Kind: "reporter", Handler: func(c *e.Context) (e.Result, error) { return e.Result{Value: c.Field("PostProcess")}, nil }},
 		cmd("opcodePipelineClear", nil, func(c *e.Context) (e.Result, error) {
 			c.State["passes"] = []pass{}
 			return apply(c)
 		}),
 		cmd("opcodePipelineAdd", []string{"Menu"}, func(c *e.Context) (e.Result, error) {
+			c.State["mode"] = "pipeline"
 			n := c.String("Menu")
 			if n == "画中画边框" {
 				n = "frameborder"
@@ -99,11 +107,12 @@ func New() e.Extension {
 			if math.IsInf(i, 0) || math.IsNaN(i) || i > 65535 {
 				return e.Result{}, fmt.Errorf("invalid pipeline index")
 			}
+			c.State["mode"] = "pipeline"
 			c.State["index"] = i
 			ensure(c)
 			return apply(c)
 		}),
-		{Opcode: "postprocessingv5_opcodeGetPipeline", Kind: "reporter", Handler: func(c *e.Context) (e.Result, error) {
+		{Opcode: "postprocessingv5_opcodeGetPipeline", Kind: "reporter", Text: "pipeline", Handler: func(c *e.Context) (e.Result, error) {
 			n := []string{}
 			for _, p := range passes(c) {
 				n = append(n, p.Name)
@@ -130,6 +139,7 @@ func New() e.Extension {
 			if spec.name == "screensplit" {
 				u["split"] = []float64{c.Number("split_x"), c.Number("split_y")}
 			}
+			c.State["mode"] = "pipeline"
 			p[i] = pass{Name: spec.name, Params: u}
 			c.State["passes"] = p
 			return apply(c)

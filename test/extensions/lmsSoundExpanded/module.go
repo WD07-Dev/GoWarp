@@ -23,7 +23,7 @@ func menu(op, key string) e.Block {
 	})
 }
 func New() e.Extension {
-	return e.Extension{ID: "lmsSoundExpanded", Blocks: []e.Block{
+	x := e.Extension{ID: "lmsSoundExpanded", Blocks: []e.Block{
 		cmd("lmsSoundExpanded_pauseSounds", nil, func(c *e.Context) (e.Result, error) {
 			return call(c, "audio.contextPaused", true)
 		}),
@@ -84,4 +84,84 @@ func New() e.Extension {
 			}
 			return e.Result{}, fmt.Errorf("unsupported sound attribute %q", c.Field("ATTRIBUTE"))
 		})}}
+	x.Blocks = append(x.Blocks,
+		rep("lmsSoundExpanded_getProjectVolume", nil, func(c *e.Context) (e.Result, error) {
+			value, err := c.Call("audio.projectVolume")
+			return e.Result{Value: math.Round(e.Number(value)*100) / 100}, err
+		}),
+		cmd("lmsSoundExpanded_changeProjectVolume", []string{"VALUE"}, func(c *e.Context) (e.Result, error) {
+			value, err := c.Call("audio.projectVolume")
+			if err != nil {
+				return e.Result{}, err
+			}
+			return call(c, "audio.projectVolume", math.Max(0, math.Min(100, e.Number(value)+c.Number("VALUE"))))
+		}),
+		rep("lmsSoundExpanded_getSoundEffect", []string{"TARGET"}, func(c *e.Context) (e.Result, error) {
+			return call(c, "audio.effect", c.Field("EFFECT"), c.String("TARGET"))
+		}),
+		cmd("lmsSoundExpanded_stopAllSpriteSounds", []string{"TARGET"}, func(c *e.Context) (e.Result, error) {
+			return call(c, "audio.stopTarget", c.String("TARGET"))
+		}),
+		cmd("lmsSoundExpanded_stopLooping", []string{"SOUND"}, func(c *e.Context) (e.Result, error) {
+			voice, err := c.Call("audio.targetVoice", c.Args["SOUND"])
+			if err != nil {
+				return e.Result{}, err
+			}
+			return call(c, "audio.voice.set", voice, "loop", false)
+		}),
+		cmd("lmsSoundExpanded_playSoundAtAndWait", []string{"SOUND", "START"}, func(c *e.Context) (e.Result, error) {
+			voice, started := c.Local["voice"]
+			if !started {
+				var err error
+				voice, err = c.Call("audio.targetPlay", c.Args["SOUND"], c.Number("START"), false)
+				if err != nil {
+					return e.Result{}, err
+				}
+				if c.Local == nil {
+					c.Local = map[string]any{}
+				}
+				c.Local["voice"] = voice
+			}
+			pending, err := c.Call("audio.voice.get", voice, "pending")
+			return e.Result{Yield: e.Bool(pending), Again: e.Bool(pending)}, err
+		}),
+	)
+	for _, spec := range []struct{ op, key string }{{"isSoundPlaying", "active"}, {"isLooping", "loop"}} {
+		op, key := spec.op, spec.key
+		x.Blocks = append(x.Blocks, e.Block{Opcode: "lmsSoundExpanded_" + op, Kind: "boolean", Inputs: []string{"SOUND"}, Handler: func(c *e.Context) (e.Result, error) {
+			voice, err := c.Call("audio.targetVoice", c.Args["SOUND"])
+			if err != nil {
+				return e.Result{}, err
+			}
+			return call(c, "audio.voice.get", voice, key)
+		}})
+	}
+	for _, name := range []string{"targets", "preciseTargets"} {
+		x.Blocks = append(x.Blocks, menu("lmsSoundExpanded_menu_"+name, name))
+	}
+	labels := map[string]string{
+		"lmsSoundExpanded_startLooping":         "start looping [SOUND]",
+		"lmsSoundExpanded_startLoopingBegin":    "start looping [SOUND] loop start [START] seconds",
+		"lmsSoundExpanded_startLoopingBeginEnd": "start looping [SOUND] loop region [START] to [END] seconds",
+		"lmsSoundExpanded_stopLooping":          "end looping [SOUND]",
+		"lmsSoundExpanded_isLooping":            "[SOUND] is looping?",
+		"lmsSoundExpanded_playSoundAtAndWait":   "play sound [SOUND] from [START] seconds until done",
+		"lmsSoundExpanded_playSoundAt":          "start sound [SOUND] from [START] seconds",
+		"lmsSoundExpanded_playSoundToAndWait":   "play sound [SOUND] from [START] to [END] seconds until done",
+		"lmsSoundExpanded_playSoundTo":          "start sound [SOUND] from [START] to [END] seconds",
+		"lmsSoundExpanded_stopSound":            "stop sound [SOUND]",
+		"lmsSoundExpanded_stopAllSpriteSounds":  "stop all sounds in [TARGET]",
+		"lmsSoundExpanded_pauseSounds":          "pause all sounds",
+		"lmsSoundExpanded_resumeSounds":         "resume all sounds",
+		"lmsSoundExpanded_isSoundPlaying":       "sound [SOUND] is playing?",
+		"lmsSoundExpanded_attributeOfSound":     "[ATTRIBUTE] of [SOUND]",
+		"lmsSoundExpanded_getSoundEffect":       "effect [EFFECT] of [TARGET]",
+		"lmsSoundExpanded_setProjectVolume":     "set project volume to [VALUE]%",
+		"lmsSoundExpanded_changeProjectVolume":  "change project volume by [VALUE]",
+		"lmsSoundExpanded_getProjectVolume":     "project volume",
+	}
+	for i := range x.Blocks {
+		x.Blocks[i].Text = labels[x.Blocks[i].Opcode]
+	}
+	return x
 }

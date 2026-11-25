@@ -4,6 +4,7 @@ package extension
 import (
 	"encoding/json"
 	e "gowarp/core/extension"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -11,15 +12,18 @@ import (
 
 func New() e.Extension {
 	return e.Extension{ID: "enderKeysPlusV2", State: map[string]any{}, Events: map[string]e.Handler{"tick": func(c *e.Context) (e.Result, error) {
+		if _, _, err := keySnapshot(c); err != nil {
+			return e.Result{}, err
+		}
 		_, err := c.Call("events.pollHats", "enderKeysPlusV2_eventKeysPressed", "level")
 		return e.Result{}, err
 	}}, Blocks: []e.Block{
 		{Opcode: "enderKeysPlusV2_menu_keys", Kind: "reporter", Handler: func(c *e.Context) (e.Result, error) { return e.Result{Value: c.Field("keys")}, nil }},
-		{Opcode: "enderKeysPlusV2_isKeyPressed", Kind: "boolean", Inputs: []string{"key"}, Handler: func(c *e.Context) (e.Result, error) {
+		{Opcode: "enderKeysPlusV2_isKeyPressed", Kind: "boolean", Text: "is [key] key pressed?", Inputs: []string{"key"}, Handler: func(c *e.Context) (e.Result, error) {
 			keys, err := heldKeys(c)
 			return e.Result{Value: keyPressed(keys, c.String("key"))}, err
 		}},
-		{Opcode: "enderKeysPlusV2_eventKeysPressed", Kind: "hat", Inputs: []string{"keys"}, Handler: func(c *e.Context) (e.Result, error) {
+		{Opcode: "enderKeysPlusV2_eventKeysPressed", Kind: "hat", Text: "[trigger] ［[keys]］ keys is pressed [ordered]", Inputs: []string{"keys"}, Handler: func(c *e.Context) (e.Result, error) {
 			keys, err := heldKeys(c)
 			if err != nil {
 				return e.Result{}, err
@@ -49,16 +53,79 @@ func New() e.Extension {
 			}
 			return e.Result{Value: trigger}, nil
 		}},
-		{Opcode: "enderKeysPlusV2_currentKeyPressed", Kind: "reporter", Inputs: []string{}, Handler: func(c *e.Context) (e.Result, error) {
-			v, err := c.Call("input.keys")
+		{Opcode: "enderKeysPlusV2_currentKeyPressed", Kind: "reporter", Text: "current key pressed", Inputs: []string{}, Handler: func(c *e.Context) (e.Result, error) {
+			keys, err := heldKeys(c)
 			if err != nil {
 				return e.Result{}, err
 			}
-			keys := v.([]string)
 			if len(keys) == 0 {
 				return e.Result{Value: "None"}, nil
 			}
 			return e.Result{Value: keys[len(keys)-1]}, nil
+		}},
+		{Opcode: "enderKeysPlusV2_isKeysPressed", Kind: "boolean", Text: "are ［[keys]］ keys pressed [ordered]?", Inputs: []string{"keys"}, Handler: func(c *e.Context) (e.Result, error) {
+			keys, err := heldKeys(c)
+			return e.Result{Value: keysPressed(keys, parseKeys(c.Args["keys"]), c.Field("ordered") == "together & in order")}, err
+		}},
+		{Opcode: "enderKeysPlusV2_currentKeysPressed", Kind: "reporter", Text: "current keys pressed", Inputs: []string{}, Handler: func(c *e.Context) (e.Result, error) {
+			keys, err := heldKeys(c)
+			if err != nil {
+				return e.Result{}, err
+			}
+			var text strings.Builder
+			encoder := json.NewEncoder(&text)
+			encoder.SetEscapeHTML(false)
+			if err := encoder.Encode(keys); err != nil {
+				return e.Result{}, err
+			}
+			return e.Result{Value: strings.TrimSuffix(text.String(), "\n")}, nil
+		}},
+		{Opcode: "enderKeysPlusV2_lastKeyPressed", Kind: "reporter", Text: "last key pressed", Inputs: []string{}, Handler: func(c *e.Context) (e.Result, error) {
+			history, _, err := keySnapshot(c)
+			if err != nil {
+				return e.Result{}, err
+			}
+			return e.Result{Value: history.last}, nil
+		}},
+		{Opcode: "enderKeysPlusV2_timeKeyPressed", Kind: "reporter", Text: "time [key] key pressed", Inputs: []string{"key"}, Handler: func(c *e.Context) (e.Result, error) {
+			history, now, err := keySnapshot(c)
+			if err != nil {
+				return e.Result{}, err
+			}
+			return e.Result{Value: history.duration(c.String("key"), now)}, nil
+		}},
+		{Opcode: "enderKeysPlusV2_timeKeysPressed", Kind: "reporter", Text: "time ［[keys]］ keys pressed [mode]", Inputs: []string{"keys"}, Handler: func(c *e.Context) (e.Result, error) {
+			history, now, err := keySnapshot(c)
+			if err != nil {
+				return e.Result{}, err
+			}
+			keys := parseKeys(c.Args["keys"])
+			if len(keys) > 0 && c.Field("mode") == "individually" {
+				times := make([]float64, len(keys))
+				for i, key := range keys {
+					times[i] = history.duration(key, now)
+				}
+				value, err := json.Marshal(times)
+				return e.Result{Value: string(value)}, err
+			}
+			return e.Result{Value: history.chordDuration(keys, c.Field("mode") == "together & in order", now)}, nil
+		}},
+		{Opcode: "enderKeysPlusV2_isKeyHit", Kind: "boolean", Text: "is [key] key hit?", Inputs: []string{"key"}, Handler: func(c *e.Context) (e.Result, error) {
+			history, now, err := keySnapshot(c)
+			if err != nil {
+				return e.Result{}, err
+			}
+			elapsed := history.duration(c.String("key"), now)
+			return e.Result{Value: elapsed != 0 && elapsed <= 0.075}, nil
+		}},
+		{Opcode: "enderKeysPlusV2_isKeysHit", Kind: "boolean", Text: "are ［[keys]］ keys hit [ordered]?", Inputs: []string{"keys"}, Handler: func(c *e.Context) (e.Result, error) {
+			history, now, err := keySnapshot(c)
+			if err != nil {
+				return e.Result{}, err
+			}
+			// The original calls timeKeysPressed without a mode, so the hit window ignores order.
+			elapsed := history.chordDuration(parseKeys(c.Args["keys"]), false, now)
+			return e.Result{Value: elapsed != 0 && elapsed <= 0.075}, nil
 		}},
 	}}
 }
@@ -189,4 +256,75 @@ var tags = map[string][]string{
 	"#functionKeys":      {"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"},
 	"#navigationKeys":    {"up arrow", "down arrow", "right arrow", "left arrow", "home", "end", "page up", "page down", "insert", "delete"},
 	"#numpad":            {"numpad: divide", "numpad: multiply", "numpad: subtract", "numpad: add", "numpad: 0", "numpad: 1", "numpad: 2", "numpad: 3", "numpad: 4", "numpad: 5", "numpad: 6", "numpad: 7", "numpad: 8", "numpad: 9", "numpad: decimal", "numpad: enter"},
+}
+
+// Sample transitions on every tick, so timing begins when a key arrives rather
+// than when a timing reporter first runs. Reporter reads also catch new input.
+type keyHistory struct {
+	keys    []string
+	started map[string]float64
+	last    string
+}
+
+func keySnapshot(c *e.Context) (*keyHistory, float64, error) {
+	keys, err := heldKeys(c)
+	if err != nil {
+		return nil, 0, err
+	}
+	value, err := c.Call("runtime.monotonicTime")
+	if err != nil {
+		return nil, 0, err
+	}
+	now := e.Number(value)
+	if c.State == nil {
+		c.State = map[string]any{}
+	}
+	history, _ := c.State["keyHistory"].(*keyHistory)
+	if history == nil {
+		history = &keyHistory{started: map[string]float64{}}
+		c.State["keyHistory"] = history
+	}
+	for key := range history.started {
+		if !slices.Contains(keys, key) {
+			delete(history.started, key)
+		}
+	}
+	for _, key := range keys {
+		if _, held := history.started[key]; !held {
+			history.started[key] = now
+			history.last = key
+		}
+	}
+	history.keys = keys
+	return history, now, nil
+}
+func (history *keyHistory) duration(key string, now float64) float64 {
+	if strings.HasPrefix(key, "#") {
+		source := ""
+		for _, member := range tags[key] {
+			if _, held := history.started[member]; held {
+				source = member
+				break
+			}
+		}
+		key = source
+	}
+	if start, held := history.started[key]; held {
+		return math.Max(0, now-start)
+	}
+	return 0
+}
+func (history *keyHistory) chordDuration(wanted []string, ordered bool, now float64) float64 {
+	if !keysPressed(history.keys, wanted, ordered) {
+		return 0
+	}
+	if ordered {
+		return history.duration(wanted[len(wanted)-1], now)
+	}
+	for i := len(history.keys) - 1; i >= 0; i-- {
+		if slices.Contains(wanted, history.keys[i]) {
+			return history.duration(history.keys[i], now)
+		}
+	}
+	return 0
 }
