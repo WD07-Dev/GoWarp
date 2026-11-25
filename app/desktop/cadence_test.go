@@ -13,6 +13,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 
 	"gowarp/app/config"
+	"gowarp/app/editorbridge"
 	"gowarp/core/extension"
 	"gowarp/core/media"
 	"gowarp/core/project"
@@ -1142,5 +1143,37 @@ func TestRealtimePlayerBackgroundBudgetRenewsWithoutDraw(t *testing.T) {
 	}
 	if c.vm.Frames() != 4 || c.credit != 0 {
 		t.Fatalf("background stopped without Draw: frames=%d pending=%g", c.vm.Frames(), c.credit)
+	}
+}
+
+func TestEmbeddedCadenceContinuesWithoutNativeDraw(t *testing.T) {
+	for _, callbacks := range []int{30, 60} {
+		t.Run(fmt.Sprint(callbacks), func(t *testing.T) {
+			c := cadenceController(t, 60, "{}")
+			settings := config.Default(nil)
+			c.options.Settings = &settings
+			base := time.Unix(100, 0)
+			now := base
+			c.cadenceNow = func() time.Time { return now }
+			g := &game{
+				controller: c, ctx: context.Background(),
+				options: Options{Editor: &editorbridge.Peer{Embedded: true}},
+			}
+			for update := 0; update <= 10*callbacks; update++ {
+				now = base.Add(time.Duration(update) * time.Second / time.Duration(callbacks))
+				// The native window may stop drawing while the browser remains active.
+				g.updateBudgetUntil = time.Now().Add(-time.Millisecond)
+				if err := g.advanceController(Input{}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			want := 1 + int(math.Round(float64(10*time.Second)/float64(c.vm.TickInterval())))
+			if c.vm.Frames() != want {
+				t.Fatalf("embedded logic waited for native Draw: frames=%d want=%d", c.vm.Frames(), want)
+			}
+			if c.vm.TickInterval() != 16*time.Millisecond || c.vm.FPS() != 60 {
+				t.Fatal("embedded preview changed TurboWarp's timer interval")
+			}
+		})
 	}
 }

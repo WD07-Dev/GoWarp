@@ -380,6 +380,7 @@ func (g *game) updateTPS() int {
 func (g *game) advanceController(in Input) error {
 	c := g.controller
 	realtime := c.cadenceNow != nil && !c.options.Replay
+	embedded := g.options.Editor != nil && g.options.Editor.Embedded
 	if c.flushAudio == nil && g.audio != nil {
 		c.flushAudio = g.flushAudio
 	}
@@ -390,7 +391,7 @@ func (g *game) advanceController(in Input) error {
 		now := time.Now()
 		// Background updates can continue without Draw, so renew the budget by time too.
 		if !g.updateBudgetUntil.IsZero() && !now.Before(g.updateBudgetUntil) &&
-			(!realtime || g.unfocused || g.windowMinimized) {
+			(!realtime || g.unfocused || g.windowMinimized || embedded) {
 			g.updateTime = 0
 			g.frameTicks = 0
 			/*
@@ -402,6 +403,11 @@ func (g *game) advanceController(in Input) error {
 			}
 		}
 		budget = max(budget, g.updateBudget)
+		if realtime && embedded && !c.cadenceTime.IsZero() {
+			// Browser presentation must not be required to renew the VM allowance.
+			interval := c.cadenceNow().Sub(c.cadenceTime)
+			budget = max(budget, min(time.Second/30, interval))
+		}
 		if g.updateBudgetUntil.IsZero() || !now.Before(g.updateBudgetUntil) {
 			g.updateBudgetUntil = now.Add(budget)
 		}
