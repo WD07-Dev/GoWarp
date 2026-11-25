@@ -45,7 +45,6 @@ type stageTexture struct {
 
 // stageGPU owns native display resources. CPU collision pixels stay in Renderer.
 type stageGPU struct {
-	transparent     bool
 	measureUploads  bool
 	protectTextures bool
 	cacheScene      []vm.DisplayTarget
@@ -1052,7 +1051,7 @@ func (g *stageGPU) drawScene(dst *ebiten.Image, r *render.Renderer, scene []vm.D
 	if err := g.initShader(); err != nil {
 		return err
 	}
-	if g.transparent {
+	if r.DisplayView().Color == "transparent" {
 		dst.Clear()
 	} else {
 		dst.Fill(vm.ParseColor(r.DisplayView().Color))

@@ -28,6 +28,7 @@ const renderer = {
 };
 let extension;
 const Scratch = {
+    translate: {language: "en"},
     vm: {
         runtime,
         renderer
@@ -48,7 +49,7 @@ const Scratch = {
 };
 let focused = true;
 vm.runInNewContext(fs.readFileSync(process.argv[2], "utf8"), {
-    Scratch, document: {hasFocus: () => focused, createElementNS(namespace, tag) { return new Element(tag); }}
+    Scratch, screen: {left: -1280, top: 0, width: 1280, height: 720, availLeft: -1280, availTop: 30, availWidth: 1280, availHeight: 690}, devicePixelRatio: 1.5, document: {hasFocus: () => focused, createElementNS(namespace, tag) { return new Element(tag); }}
 });
 const stateBlock = extension.getInfo().blocks.find(block => block.opcode === "state");
 assert.equal(stateBlock?.blockType, Scratch.BlockType.BOOLEAN);
@@ -104,6 +105,41 @@ extension.remove({ID: "second"});
 assert.equal(extension.state({ID: "second", STATE: "open"}), false);
 runtime.emit("PROJECT_LOADED");
 assert.equal(extension.list(), '["main"]');
+assert.equal(extension.monitor({ID: "main", PROPERTY: "workWidth"}), 1920);
+assert.equal(extension.monitor({ID: "main", PROPERTY: "workX"}), -1920);
+assert.equal(extension.monitor({ID: "main", PROPERTY: "workY"}), 45);
+extension.set({ID:"main", JSON:'{"width":400,"height":300,"x":60,"y":60}'});
+extension.create({ID:"second", X:480, Y:60, W:400, H:300, BORDER:"true"});
+extension.center({ID:"main", SCOPE:"all"});
+assert.equal(JSON.parse(extension.get({ID:"main"})).x,-1370);
+assert.equal(JSON.parse(extension.get({ID:"main"})).y,412);
+assert.equal(JSON.parse(extension.get({ID:"second"})).x,-950);
+extension.center({ID:"second", SCOPE:"window"});
+assert.equal(JSON.parse(extension.get({ID:"second"})).x,-1160);
+assert.equal(JSON.parse(extension.get({ID:"main"})).x,-1370);
+assert.throws(() => extension.monitor({ID:"missing",PROPERTY:"width"}));
+assert.throws(() => extension.monitor({ID:"main",PROPERTY:"bad"}));
+assert.throws(() => extension.center({ID:"main",SCOPE:"bad"}));
+// Translation changes labels, never opcodes, placeholders or saved menu values.
+const englishInfo = JSON.parse(JSON.stringify(extension.getInfo()));
+Scratch.translate.language = "ko-KR";
+const koreanInfo = JSON.parse(JSON.stringify(extension.getInfo()));
+assert.equal(koreanInfo.name, "창 API");
+for (let i = 0; i < englishInfo.blocks.length; i++) {
+    const en = englishInfo.blocks[i], ko = koreanInfo.blocks[i];
+    assert.notEqual(ko.text, en.text);
+    assert.deepEqual([...ko.text.matchAll(/\[[A-Z]+\]/g)].map(m => m[0]).sort(), [...en.text.matchAll(/\[[A-Z]+\]/g)].map(m => m[0]).sort());
+    assert.deepEqual({...ko, text: en.text}, en);
+}
+for (const [name, menu] of Object.entries(englishInfo.menus)) {
+    assert.deepEqual(koreanInfo.menus[name].items.map(item => item.value), menu.items.map(item => item.value));
+    for (let i = 0; i < menu.items.length; i++) assert.notEqual(koreanInfo.menus[name].items[i].text, menu.items[i].text);
+}
+assert.equal(extension.monitor({ID: "main", PROPERTY: "workWidth"}), 1920);
+assert.throws(() => extension.view("missing"), /알 수 없는 창/);
+Scratch.translate.language = "fr";
+assert.equal(extension.getInfo().name, "Window API");
+
 extension.quit();
 assert.equal(extension.state({ID: "main", STATE: "open"}), false);
 runtime.emit("RUNTIME_DISPOSED");

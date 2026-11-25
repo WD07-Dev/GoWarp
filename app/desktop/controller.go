@@ -108,10 +108,14 @@ func newController(p *project.Project, lib *media.Library, options Options) *con
 			c.initErr = err
 			return c
 		}
+		background := c.vm.View().Color
+		if settings.Platform.MultiWindow {
+			background = "transparent"
+		}
 		c.initErr = c.vm.Configure(
 			settings.FPS, settings.Turbo, settings.Interpolation,
 			settings.Width, settings.Height,
-			settings.Player.Username, c.vm.View().Color,
+			settings.Player.Username, background,
 		)
 		highQualityPen := c.vm.Options().HighQualityPen
 		if settings.HighQualityPen != nil {

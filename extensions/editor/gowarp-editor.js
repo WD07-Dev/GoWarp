@@ -8,8 +8,11 @@
 (function (Scratch) {
     "use strict";
 
+    const korean = (Scratch.translate.language || 'en').toLowerCase().startsWith('ko');
+    const tr = (en, ko) => korean ? ko : en;
+
     if(!Scratch.extensions.unsandboxed) {
-        throw new Error("GoWarp Editor must run without sandboxing.");
+        throw new Error(tr("GoWarp Editor must run without sandboxing.", "GoWarp 편집기 연결은 샌드박스 없이 실행해야 합니다."));
     }
     
     const previous = window.__gowarpEditor;
@@ -23,8 +26,6 @@
     } catch {}
 
     const vm = Scratch.vm;
-    const korean = (Scratch.translate.language || 'en').toLowerCase().startsWith('ko');
-    const tr = (en, ko) => korean ? ko : en;
     const messages = {
         ready: tr("Ready", "실행 대기 중"),
         preparing: tr("Preparing project...", "프로젝트 준비 중..."),
@@ -171,7 +172,7 @@
         displayMode.disabled = busy || active;
         disconnectButton.disabled = !connection || busy;
         const button = document.getElementById("gowarp-editor-button");
-        if(button) button.title = active ? `GoWarp Run · ${messages[phase]}` : tr("Run this project in GoWarp", "현재 프로젝트를 GoWarp에서 실행");
+        if(button) button.title = active ? `${tr("GoWarp Run", "GoWarp 실행")} · ${messages[phase]}` : tr("Run this project in GoWarp", "현재 프로젝트를 GoWarp에서 실행");
         const parent = runtime.renderer?.canvas?.parentElement;
         if(parent && ["preparing", "receiving", "building", "stopping"].includes(phase)) {
             if (!loading) {
@@ -720,7 +721,7 @@
         const bar = document.querySelector('[class*="menu-bar_main-menu"]') ||
         document.querySelector('[class*="menu-bar_menu-bar_"]');
         if (!bar) return;
-        const button = element("button", "GoWarp Run", bar);
+        const button = element("button", tr("GoWarp Run", "GoWarp 실행"), bar);
         button.id = "gowarp-editor-button";
         button.className = "gowarp-editor-control";
         button.type = "button";
@@ -746,7 +747,7 @@
             if (dialog.open) dialog.close();
             await run();
         };
-        const menuStop = element("button", "GoWarp Stop", bar);
+        const menuStop = element("button", tr("GoWarp Stop", "GoWarp 중지"), bar);
         menuStop.id = "gowarp-editor-stop";
         menuStop.className = "gowarp-editor-control";
         menuStop.type = "button";

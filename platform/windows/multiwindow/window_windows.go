@@ -4,6 +4,7 @@ package multiwindow
 
 import (
 	"fmt"
+	"image"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -26,6 +27,7 @@ type nativeWindow struct {
 
 type windowManager struct {
 	centerMain    bool
+	positioning   bool
 	stop          chan struct{}
 	done          chan struct{}
 	tasks         chan func()
@@ -209,7 +211,7 @@ func (m *windowManager) wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr
 			m.updateSnapshot()
 		}
 	case win.WM_DPICHANGED:
-		if current != nil && !current.view.Fullscreen {
+		if current != nil && !current.view.Fullscreen && !m.positioning {
 			v := current.view
 			b, err := windowBounds(v, uint32(wparam&0xffff))
 			if err == nil {
@@ -320,8 +322,8 @@ func windowBounds(v window.View, dpi uint32) (win.RECT, error) {
 	return bounds, nil
 }
 
-// monitorBounds uses physical pixels on the per-monitor DPI-aware window thread.
-func monitorBounds(v window.View, w *nativeWindow, workArea bool) (win.RECT, error) {
+// monitorInfo uses physical pixels on the per-monitor DPI-aware window thread.
+func monitorInfo(v window.View, w *nativeWindow) (win.MONITORINFO, error) {
 	var monitor uintptr
 	if w != nil {
 		monitor = uintptr(win.MonitorFromWindow(win.HWND(w.handle), win.MONITOR_DEFAULTTONEAREST))
@@ -332,12 +334,97 @@ func monitorBounds(v window.View, w *nativeWindow, workArea bool) (win.RECT, err
 	info := win.MONITORINFO{CbSize: uint32(unsafe.Sizeof(win.MONITORINFO{}))}
 	ok, _, err := user32.NewProc("GetMonitorInfoW").Call(monitor, uintptr(unsafe.Pointer(&info)))
 	if ok == 0 {
-		return win.RECT{}, fmt.Errorf("GetMonitorInfoW: %w", err)
+		return info, fmt.Errorf("GetMonitorInfoW: %w", err)
+	}
+	return info, nil
+}
+
+func monitorBounds(v window.View, w *nativeWindow, workArea bool) (win.RECT, error) {
+	info, err := monitorInfo(v, w)
+	if err != nil {
+		return win.RECT{}, err
 	}
 	if workArea {
 		return info.RcWork, nil
 	}
 	return info.RcMonitor, nil
+}
+
+func (m *windowManager) monitor(id string) (window.Monitor, error) {
+	var result window.Monitor
+	var err error
+	m.do(func() {
+		w := m.items[id]
+		if w == nil {
+			err = fmt.Errorf("unknown native window %q", id)
+			return
+		}
+		info, e := monitorInfo(w.view, w)
+		if e != nil {
+			err = e
+			return
+		}
+		b, a := info.RcMonitor, info.RcWork
+		result = window.Monitor{X: int(b.Left), Y: int(b.Top), Width: int(b.Right - b.Left), Height: int(b.Bottom - b.Top), WorkX: int(a.Left), WorkY: int(a.Top), WorkWidth: int(a.Right - a.Left), WorkHeight: int(a.Bottom - a.Top)}
+	})
+	return result, err
+}
+
+func (m *windowManager) center(views []window.View, id string, all bool) ([]window.View, error) {
+	actual := append([]window.View(nil), views...)
+	var result error
+	m.do(func() {
+		anchor := m.items[id]
+		if anchor == nil {
+			result = fmt.Errorf("unknown native window %q", id)
+			return
+		}
+		work, err := monitorBounds(anchor.view, anchor, true)
+		if err != nil {
+			result = err
+			return
+		}
+		dpi := win.GetDpiForWindow(win.HWND(anchor.handle))
+		outer := make([]image.Rectangle, len(actual))
+		for i, v := range actual {
+			w := m.items[v.ID]
+			if w == nil {
+				result = fmt.Errorf("unknown native window %q", v.ID)
+				return
+			}
+			m.updateGeometry(w)
+			actual[i] = w.view
+			actual[i].State = window.State{Minimized: win.IsIconic(win.HWND(w.handle)), Maximized: win.IsZoomed(win.HWND(w.handle)), Focused: uintptr(win.GetForegroundWindow()) == w.handle}
+			rect, e := windowBounds(actual[i], dpi)
+			if e != nil {
+				result = e
+				return
+			}
+			outer[i] = image.Rect(actual[i].X, actual[i].Y, actual[i].X+int(rect.Right-rect.Left), actual[i].Y+int(rect.Bottom-rect.Top))
+		}
+		moved, err := window.Center(actual, outer, image.Rect(int(work.Left), int(work.Top), int(work.Right), int(work.Bottom)), id, all)
+		if err != nil {
+			result = err
+			return
+		}
+		// Apply target-monitor DPI bounds ourselves; ignore suggested DPI-change positions.
+		m.positioning = true
+		defer func() { m.positioning = false }()
+		for i, v := range moved {
+			if v.X == actual[i].X && v.Y == actual[i].Y {
+				continue
+			}
+			w := m.items[v.ID]
+			if !win.SetWindowPos(win.HWND(w.handle), 0, int32(v.X), int32(v.Y), int32(outer[i].Dx()), int32(outer[i].Dy()), win.SWP_NOZORDER|win.SWP_NOACTIVATE) {
+				result = fmt.Errorf("cannot center window %q", v.ID)
+				return
+			}
+			m.updateGeometry(w)
+			actual[i].X, actual[i].Y = w.view.X, w.view.Y
+			actual[i].Width, actual[i].Height = w.view.Width, w.view.Height
+		}
+	})
+	return actual, result
 }
 
 func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View, error) {

@@ -163,7 +163,11 @@ func (r *Renderer) Draw(scene []vm.DisplayTarget) *image.RGBA {
 }
 
 func (r *Renderer) draw(scene []vm.DisplayTarget, display bool) *image.RGBA {
-	draw.Draw(r.frame, r.frame.Bounds(), image.NewUniform(vm.ParseColor(r.view.Color)), image.Point{}, draw.Src)
+	if r.view.Color == "transparent" {
+		clear(r.frame.Pix)
+	} else {
+		draw.Draw(r.frame, r.frame.Bounds(), image.NewUniform(vm.ParseColor(r.view.Color)), image.Point{}, draw.Src)
+	}
 	camera := r.screenToWorld()
 	penDrawn := false
 	for _, t := range scene {

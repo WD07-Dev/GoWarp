@@ -3,6 +3,7 @@
 package multiwindow
 
 import (
+	"image"
 	"testing"
 	"unsafe"
 
@@ -144,5 +145,54 @@ func TestPollUpdatesWindowStateWithoutRepacking(t *testing.T) {
 		if b.Views()[0].State != state || b.frame != old || old.layout.Views[0].State != (window.State{}) {
 			t.Fatal("state poll lost state or mutated the published frame")
 		}
+	}
+}
+
+func TestNativeGroupCenterUsesBordersAndWorkArea(t *testing.T) {
+	m, err := startWindows()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.close()
+	views := []window.View{
+		{ID: "main", X: 60, Y: 60, Width: 100, Height: 100, StageWidth: 100, StageHeight: 100, Border: true},
+		{ID: "other", X: 200, Y: 60, Width: 100, Height: 100, StageWidth: 100, StageHeight: 100, Border: true},
+	}
+	_, views, err = m.setViews(views)
+	if err != nil {
+		t.Fatal(err)
+	}
+	monitor, err := m.monitor("main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if monitor.Width < 1 || monitor.WorkWidth < 1 || monitor.WorkHeight < 1 {
+		t.Fatal(monitor)
+	}
+	gap := views[1].X - views[0].X
+	moved, err := m.center(views, "main", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved[1].X-moved[0].X != gap {
+		t.Fatal("group spacing changed")
+	}
+	m.do(func() {
+		var group image.Rectangle
+		for _, id := range []string{"main", "other"} {
+			w := m.items[id]
+			var b win.RECT
+			if !win.GetWindowRect(win.HWND(w.handle), &b) {
+				t.Error("window rect unavailable")
+				return
+			}
+			group = group.Union(image.Rect(int(b.Left), int(b.Top), int(b.Right), int(b.Bottom)))
+		}
+		if group.Min.X != monitor.WorkX+max(0, (monitor.WorkWidth-group.Dx())/2) || group.Min.Y != monitor.WorkY+max(0, (monitor.WorkHeight-group.Dy())/2) {
+			t.Errorf("group %v not centered on %+v", group, monitor)
+		}
+	})
+	if _, err := m.monitor("missing"); err == nil {
+		t.Fatal("unknown monitor window accepted")
 	}
 }

@@ -102,6 +102,26 @@ func (b *Backend) Publish(ready bool) {
 	}
 }
 
+func (b *Backend) Monitor(id string) (window.Monitor, error) {
+	return b.manager.monitor(id)
+}
+
+func (b *Backend) Center(id string, all bool) error {
+	views, err := b.manager.center(b.views, id, all)
+	if err != nil {
+		return err
+	}
+	layout, err := window.Pack(views)
+	if err != nil {
+		return err
+	}
+	b.views = layout.Views
+	if b.frame != nil && !slices.Equal(b.frame.layout.Tiles, layout.Tiles) {
+		b.frame = &frame{layout: layout, handles: slices.Clone(b.frame.handles)}
+	}
+	return nil
+}
+
 func (b *Backend) Views() []window.View { return slices.Clone(b.views) }
 
 func (b *Backend) Poll() (window.Input, error) {

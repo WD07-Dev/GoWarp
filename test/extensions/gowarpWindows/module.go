@@ -3,6 +3,7 @@ package extension
 
 import (
 	"encoding/json"
+	"fmt"
 	e "gowarp/core/extension"
 )
 
@@ -38,6 +39,29 @@ func New() e.Extension {
 				return e.Result{}, err
 			}
 			_, err = c.Call("window.create", string(data))
+			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_monitor", Text: "monitor [PROPERTY] of window [ID]", Kind: "reporter", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			v, err := c.Call("window.monitor", c.String("ID"))
+			if err != nil {
+				return e.Result{}, err
+			}
+			var monitor map[string]float64
+			if err := json.Unmarshal([]byte(e.String(v)), &monitor); err != nil {
+				return e.Result{}, err
+			}
+			value, ok := monitor[c.Field("PROPERTY")]
+			if !ok {
+				return e.Result{}, fmt.Errorf("unknown monitor property %q", c.Field("PROPERTY"))
+			}
+			return e.Result{Value: value}, nil
+		}},
+		{Opcode: "gowarpWindows_center", Kind: "command", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			scope := c.Field("SCOPE")
+			if scope != "window" && scope != "all" {
+				return e.Result{}, fmt.Errorf("unknown centering scope %q", scope)
+			}
+			_, err := c.Call("window.center", c.String("ID"), scope == "all")
 			return e.Result{}, err
 		}},
 		{Opcode: "gowarpWindows_move", Kind: "command", Inputs: []string{"ID", "X", "Y"}, Handler: func(c *e.Context) (e.Result, error) {

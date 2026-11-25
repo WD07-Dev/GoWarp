@@ -133,3 +133,28 @@ func TestWindowStateReporter(t *testing.T) {
 		t.Fatal("lost host error", err)
 	}
 }
+
+func TestMonitorAndCenterBlocks(t *testing.T) {
+	host := &recordingHost{value: `{"x":-1920,"y":0,"width":1920,"height":1080,"workX":-1920,"workY":40,"workWidth":1920,"workHeight":1040}`}
+	c := &e.Context{Host: host, Args: map[string]any{"ID": "main", "PROPERTY": "wrong", "SCOPE": "wrong"}, Fields: map[string]string{"PROPERTY": "workWidth", "SCOPE": "all"}}
+	got, err := runBlock(t, "monitor", c)
+	if err != nil || got.Value != float64(1920) || host.operation != "window.monitor" || len(host.args) != 1 || host.args[0] != "main" {
+		t.Fatalf("monitor=%+v call=%+v err=%v", got, host, err)
+	}
+	for _, scope := range []string{"all", "window"} {
+		c.Fields["SCOPE"] = scope
+		if _, err := runBlock(t, "center", c); err != nil {
+			t.Fatal(err)
+		}
+		if host.operation != "window.center" || len(host.args) != 2 || host.args[0] != "main" || host.args[1] != (scope == "all") {
+			t.Fatalf("center: %+v", host)
+		}
+	}
+	host.err = errors.New("no monitor")
+	if _, err := runBlock(t, "monitor", c); !errors.Is(err, host.err) {
+		t.Fatal(err)
+	}
+	if _, err := runBlock(t, "center", c); !errors.Is(err, host.err) {
+		t.Fatal(err)
+	}
+}

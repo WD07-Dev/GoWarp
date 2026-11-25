@@ -15,6 +15,7 @@ import (
 	"gowarp/app/config"
 	"gowarp/app/host"
 	"gowarp/core/extension"
+	"gowarp/core/render"
 	"gowarp/core/window"
 )
 
@@ -175,6 +176,35 @@ func (g *game) syncNativeViews() error {
 
 func (g *game) nativeWindowCall(op string, args []any) (any, error) {
 	n := g.native
+	if op == "monitor" || op == "center" {
+		if (op == "monitor" && len(args) != 1) || (op == "center" && len(args) != 2) {
+			return nil, fmt.Errorf("invalid %s arguments", op)
+		}
+		id := extension.String(args[0])
+		if !slices.ContainsFunc(n.layout.Views, func(v window.View) bool { return v.ID == id }) {
+			return nil, fmt.Errorf("unknown native window %q", id)
+		}
+		if err := g.syncNativeViews(); err != nil {
+			return nil, err
+		}
+		if op == "monitor" {
+			monitor, err := n.backend.Monitor(id)
+			if err != nil {
+				return nil, err
+			}
+			data, err := json.Marshal(monitor)
+			return string(data), err
+		}
+		if err := n.backend.Center(id, extension.Bool(args[1])); err != nil {
+			return nil, err
+		}
+		layout, err := window.Pack(n.backend.Views())
+		if err != nil {
+			return nil, err
+		}
+		n.layout = layout
+		return nil, nil
+	}
 	views, value, err := editWindows(n.layout.Views, op, args)
 	if err != nil || op == "get" || op == "list" || op == "state" {
 		return value, err
@@ -314,6 +344,23 @@ func (g *game) nativeInput(in *Input) {
 		Escape: slices.Contains(v.Keys, "escape"), Delete: slices.Contains(v.Keys, "delete"), Restart: slices.Contains(v.Keys, "f5")}
 }
 
+// Render once at the density needed by the visible windows, without changing stage coordinates.
+func nativeCanvasSize(w, h int, views []window.View) (int, int) {
+	sx, sy := 0.0, 0.0
+	for _, v := range views {
+		if v.Hidden || v.State.Minimized {
+			continue
+		}
+		sx = math.Max(sx, float64(v.Width)/v.StageWidth)
+		sy = math.Max(sy, float64(v.Height)/v.StageHeight)
+	}
+	if sx == 0 || sy == 0 {
+		return render.DisplaySize(w, h)
+	}
+	// Clamp before converting: a viewport can be a tiny fraction of a stage unit.
+	return render.DisplaySize(int(math.Ceil(math.Min(8192, float64(w)*sx))), int(math.Ceil(math.Min(8192, float64(h)*sy))))
+}
+
 func (g *game) drawNativeViews(dst *ebiten.Image) {
 	n := g.native
 	n.drawn = false
@@ -348,33 +395,36 @@ func (g *game) drawNativeViews(dst *ebiten.Image) {
 	}
 	c := g.controller
 	w, h := c.renderer.Size()
-	if g.stageCanvas == nil || g.stageCanvas.Bounds().Size() != image.Pt(w, h) {
+	width, height := nativeCanvasSize(w, h, n.layout.Views)
+	if g.stageCanvas == nil || g.stageCanvas.Bounds().Size() != image.Pt(width, height) {
 		if g.stageCanvas != nil {
 			g.stageCanvas.Deallocate()
 		}
-		g.stageCanvas = ebiten.NewImage(w, h)
+		g.stageCanvas = ebiten.NewImage(width, height)
 	}
 	scene := c.displayScene()
-	g.gpu.transparent = true
 	if err := g.gpu.Draw(g.stageCanvas, c.renderer, scene); err != nil {
 		g.drawErr = err
 		return
 	}
-	painter := newGPUOverlayPainter(g.stageCanvas, g.scaledFace(1, true), w, h, &g.texts)
+	scale := math.Min(float64(width)/float64(w), float64(height)/float64(h))
+	painter := newGPUOverlayPainter(g.stageCanvas, g.scaledFace(scale, true), w, h, &g.texts)
 	c.paintOverlays(painter, scene, 0, h)
 	if g.waitingStart {
 		g.drawStartOverlay(g.stageCanvas, g.stageCanvas.Bounds())
 	}
 	dst.Clear()
+	view := c.renderer.DisplayView()
 	for i, v := range n.layout.Views {
 		if v.Hidden {
 			continue
 		}
 		tile := n.layout.Tiles[i]
 		op := ebiten.DrawImageOptions{Blend: ebiten.BlendCopy}
-		if g.options.Settings.Canvas.Antialias {
+		if !view.NoAntialias && !view.Canvas.Nearest {
 			op.Filter = ebiten.FilterLinear
 		}
+		op.GeoM.Scale(float64(w)/float64(width), float64(h)/float64(height))
 		op.GeoM.Translate(-v.StageX, -v.StageY)
 		op.GeoM.Scale(float64(v.Width)/v.StageWidth, float64(v.Height)/v.StageHeight)
 		op.GeoM.Translate(float64(tile.Min.X), float64(tile.Min.Y))

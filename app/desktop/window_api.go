@@ -46,6 +46,9 @@ func (g *game) windowCall(op string, args []any) (any, error) {
 	if g.native != nil {
 		return g.nativeWindowCall(op, args)
 	}
+	if op == "monitor" || op == "center" {
+		return nil, fmt.Errorf("%s requires Windows multiwindow mode", op)
+	}
 	if op == "create" {
 		return nil, fmt.Errorf("creating additional windows requires Windows multiwindow mode")
 	}

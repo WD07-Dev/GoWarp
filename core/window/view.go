@@ -115,6 +115,8 @@ type Input struct {
 
 type Backend interface {
 	Prepare() error
+	Monitor(string) (Monitor, error)
+	Center(string, bool) error
 	SetViews([]View) error
 	Publish(bool)
 	Poll() (Input, error)

@@ -589,10 +589,16 @@ Times and positions are in seconds. Treat asset and voice handles as opaque valu
 | `window.get(id)` | Return JSON window properties. |
 | `window.state(id, state)` | Return a boolean for `open`, `minimized`, `maximized` or `focused`. Reads actual OS state; missing or closed IDs return `false`. Hidden windows remain open. Maximized is distinct from fullscreen. |
 | `window.create(json)` | Create an additional window; requires native multiwindow on Windows. |
+| `window.monitor(id)` | Return JSON monitor bounds (`x`, `y`, `width`, `height`) and usable work area (`workX`, `workY`, `workWidth`, `workHeight`) in physical desktop pixels. Uses the monitor nearest the named native window. Requires Windows multiwindow mode. |
+| `window.center(id, all)` | Center one native window (`all=false`) or the visible window group (`all=true`) in that monitor's work area. Includes borders, preserves client sizes and group spacing. Requires Windows multiwindow mode. |
 | `window.move(id, x, y)` | Move the outer window in desktop pixels. |
 | `window.viewport(id, x, y, width?, height?)` | Move a native window’s displayed stage region (top-left origin, Y downward). Supply both dimensions to resize it, or neither to preserve its size. Requires native multiwindow. |
 | `window.set(id, json)` | Change only the supplied properties, including border, buttons, fullscreen and opacity. |
 | `window.remove(id)` | Explicitly remove a window, even when `disableClose` is enabled. |
+
+The centering block uses `window.center("main", true)` to center a split-stage layout together; it does not stack each window in the same spot. Group centering skips hidden, minimized, maximized and fullscreen windows. Centering a minimized, maximized or fullscreen window individually returns an error: restore it first. If a group does not fit, its top-left is aligned with the work area rather than shrinking the game. Coordinates can be negative on secondary monitors. Do not mix these physical pixels with `host.window` screen dimensions, which use device-independent pixels.
+
+The browser version simulates window positions. Its monitor block describes the browser's current screen, converts CSS pixels using `devicePixelRatio`, and uses the available screen area. It cannot query a simulated window's actual monitor or native border thickness, so exported Windows placement is authoritative.
 
 The `gowarpWindows` example exposes `window.state` through its “window [ID] is [STATE]?” boolean block. In the browser, `open` reflects the simulated window list, `focused` reflects browser focus for the visible `main` view, and `minimized`/`maximized` return `false` because no native windows are created. Closing the last native window exits the player, so scripts cannot run afterward.
 

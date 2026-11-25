@@ -247,7 +247,7 @@ func (g *stageGPU) Draw(dst *ebiten.Image, r *render.Renderer, scene []vm.Displa
 	direct := c.RenderWidth <= 0 && c.RenderHeight <= 0
 	if !direct && w == dst.Bounds().Dx() && h == dst.Bounds().Dy() {
 		// Transparent stages still need background composition, even at matching dimensions.
-		direct = vm.ParseColor(v.Color).A == 255
+		direct = v.Color != "transparent" && vm.ParseColor(v.Color).A == 255
 	}
 	if v.Shader == nil && !filtered && direct && v.Split == nil {
 		if err := g.drawScene(dst, r, scene); err != nil {

@@ -6,7 +6,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 // Exercise the actual editor extension without starting a browser or Go compiler.
-function editor(t) {
+function editor(t, language = "en") {
     const nodes = [];
     const listeners = new Map();
     let displayed = 0;
@@ -135,7 +135,7 @@ function editor(t) {
         setTimeout, clearTimeout, requestAnimationFrame: () => 0, cancelAnimationFrame() {},
         MutationObserver: class { observe() {} disconnect() {} },
         WebSocket: Socket,
-        Scratch: {vm: scratchVM, translate: {language: "en"}, BlockType: {BUTTON: "button", REPORTER: "reporter"},
+        Scratch: {vm: scratchVM, translate: {language}, BlockType: {BUTTON: "button", REPORTER: "reporter"},
         extensions: {unsandboxed: true, register() {}}},
         fetch: async (url, options) => {
             if (url.endsWith("/run")) {
@@ -169,6 +169,7 @@ function editor(t) {
         finishZip: () => finishZip(),
         generated: () => generated,
         zipOptions: () => zipOptions,
+        runButton: () => document.getElementById("gowarp-editor-button"),
         stopButton: () => document.getElementById("gowarp-editor-stop"),
         stops: () => stops, displayed: () => displayed,
         embedded: () => { nodes.find(node => node.tagName === "select").value = "embedded"; },
