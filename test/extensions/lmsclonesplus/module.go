@@ -11,6 +11,8 @@ func New() e.Extension {
 		_, err := c.Call("events.pollHats", "lmsclonesplus_whenCloneStartsWithVar", "edge")
 		return e.Result{}, err
 	}}, Blocks: []e.Block{
+		{Opcode: "lmsclonesplus_getVariableOfClone", Kind: "reporter", Inputs: []string{"INPUTC"}, Handler: getVariableOfClone},
+		{Opcode: "lmsclonesplus_touchingCloneWithVar", Kind: "boolean", Inputs: []string{"INPUTB"}, Handler: touchingCloneWithVar},
 		{Opcode: "lmsclonesplus_cloneCount", Kind: "reporter", Text: "clone count", Handler: func(c *e.Context) (e.Result, error) {
 			value, err := c.Call("target.list")
 			if err != nil {
@@ -94,6 +96,74 @@ func New() e.Extension {
 			return e.Result{Value: c.Field("spriteMenu")}, nil
 		}},
 	}}
+}
+
+func touchingCloneWithVar(c *e.Context) (e.Result, error) {
+	source, err := c.Call("target.get", "source")
+	if err != nil {
+		return e.Result{}, err
+	}
+	records, err := c.Call("target.list")
+	if err != nil {
+		return e.Result{}, err
+	}
+	// Unlike getVariableOfClone, the original touching block includes the
+	// original sprite in its candidates. The host excludes the caller itself.
+	for _, record := range records.([]any) {
+		target := record.(map[string]any)
+		if e.Number(target["source"]) != e.Number(source) {
+			continue
+		}
+		ref := e.String(target["id"])
+		value, found, err := variableValue(c, c.Field("INPUTA"), ref)
+		if err != nil {
+			return e.Result{}, err
+		}
+		if !found || e.Compare(value, c.Args["INPUTB"]) != 0 {
+			continue
+		}
+		value, err = c.Call("target.touchingTarget", ref)
+		if err != nil || e.Bool(value) {
+			return e.Result{Value: e.Bool(value)}, err
+		}
+	}
+	return e.Result{Value: false}, nil
+}
+
+func getVariableOfClone(c *e.Context) (e.Result, error) {
+	source, err := c.Call("target.get", "source")
+	if err != nil {
+		return e.Result{}, err
+	}
+	records, err := c.Call("target.list")
+	if err != nil {
+		return e.Result{}, err
+	}
+	targets := records.([]any)
+	// sprite.clones is in creation order, independently of the draw order.
+	sort.SliceStable(targets, func(i, j int) bool {
+		return e.Number(targets[i].(map[string]any)["cloneId"]) < e.Number(targets[j].(map[string]any)["cloneId"])
+	})
+	for _, record := range targets {
+		target := record.(map[string]any)
+		if e.Number(target["source"]) != e.Number(source) || e.Number(target["cloneId"]) == 0 {
+			continue
+		}
+		ref := e.String(target["id"])
+		value, found, err := variableValue(c, c.Field("INPUTB"), ref)
+		if err != nil {
+			return e.Result{}, err
+		}
+		if !found || e.Compare(value, c.Args["INPUTC"]) != 0 {
+			continue
+		}
+		value, found, err = variableValue(c, c.Field("INPUTA"), ref)
+		if !found {
+			value = ""
+		}
+		return e.Result{Value: value}, err
+	}
+	return e.Result{Value: ""}, nil
 }
 
 func variableValue(c *e.Context, id, ref string) (any, bool, error) {

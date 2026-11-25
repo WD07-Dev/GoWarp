@@ -26,6 +26,7 @@ func TestAdditionalSoundCommands(t *testing.T) {
 		{"pauseSounds", "audio.contextPaused", nil, []any{true}},
 		{"resumeSounds", "audio.contextPaused", nil, []any{false}},
 		{"stopOwnSounds", "audio.stopTarget", nil, nil},
+		{"playSoundTo", "audio.targetPlay", map[string]any{"SOUND": "music", "START": 1.25, "END": 2.5}, []any{"music", 1.25, false, 2.5}},
 		{"startSoundFromAndLoop", "audio.targetPlay", map[string]any{"SOUND": "music", "START": 1.25}, []any{"music", 1.25, true}},
 		{"startSoundFromAndLoop", "audio.targetPlay", map[string]any{"SOUND": "music", "START": math.Inf(1)}, []any{"music", float64(0), true}},
 	} {

@@ -30,7 +30,7 @@ func TestLoadingSettingsRoundTripAndLegacyDefaults(t *testing.T) {
 	if err := png.Encode(&encoded, image.NewRGBA(image.Rect(0, 0, 12, 6))); err != nil {
 		t.Fatal(err)
 	}
-	s.Loading = LoadingSettings{Background: "#123456", Progress: "#abcdef", Text: "", Logo: encoded.Bytes(), Image: encoded.Bytes()}
+	s.Loading = LoadingSettings{Width: 640, Height: 360, Background: "#123456", Progress: "#abcdef", Text: "", Logo: encoded.Bytes(), Image: encoded.Bytes()}
 	if err := Save(path, s); err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestLoadingSettingsRoundTripAndLegacyDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Loading.Background != s.Loading.Background || got.Loading.Progress != s.Loading.Progress || got.Loading.Text != "" || got.Loading.ShowProgress || !bytes.Equal(got.Loading.Logo, s.Loading.Logo) || !bytes.Equal(got.Loading.Image, s.Loading.Image) {
+	if got.Loading.Width != 640 || got.Loading.Height != 360 || got.Loading.Background != s.Loading.Background || got.Loading.Progress != s.Loading.Progress || got.Loading.Text != "" || got.Loading.ShowProgress || !bytes.Equal(got.Loading.Logo, s.Loading.Logo) || !bytes.Equal(got.Loading.Image, s.Loading.Image) {
 		t.Fatalf("loading settings changed: %+v", got.Loading)
 	}
 }
@@ -94,5 +94,30 @@ func TestLoadingImageSettingsExceedLegacyLimit(t *testing.T) {
 	}
 	if !bytes.Equal(got.Loading.Image, s.Loading.Image) {
 		t.Fatal("large loading background changed")
+	}
+}
+
+func TestLoadingWindowSize(t *testing.T) {
+	s := DefaultLoadingSettings()
+	if w, h := s.WindowSize(800, 600); w != 800 || h != 600 {
+		t.Fatalf("default: %dx%d", w, h)
+	}
+	s.Width, s.Height = 640, 360
+	if w, h := s.WindowSize(800, 600); w != 640 || h != 360 {
+		t.Fatalf("custom: %dx%d", w, h)
+	}
+	s.Height = 0
+	if w, h := s.WindowSize(800, 600); w != 640 || h != 600 {
+		t.Fatalf("partial: %dx%d", w, h)
+	}
+	for _, size := range []int{-1, 4097} {
+		s.Width, s.Height = size, 0
+		if err := s.Validate(); err == nil {
+			t.Fatalf("invalid width %d", size)
+		}
+		s.Width, s.Height = 0, size
+		if err := s.Validate(); err == nil {
+			t.Fatalf("invalid height %d", size)
+		}
 	}
 }

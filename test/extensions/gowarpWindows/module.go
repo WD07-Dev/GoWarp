@@ -1,0 +1,81 @@
+// Code generated from the extension Go comment for regression tests. DO NOT EDIT.
+package extension
+
+import (
+	"encoding/json"
+	e "gowarp/core/extension"
+)
+
+func New() e.Extension {
+	return e.Extension{ID: "gowarpWindows", Blocks: []e.Block{
+		{Opcode: "gowarpWindows_viewport", Kind: "command", Inputs: []string{"ID", "X", "Y", "W", "H"}, Handler: func(c *e.Context) (e.Result, error) {
+			_, err := c.Call("window.viewport", c.String("ID"), c.Number("X"), c.Number("Y"), c.Number("W"), c.Number("H"))
+			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_moveViewport", Kind: "command", Inputs: []string{"ID", "X", "Y"}, Handler: func(c *e.Context) (e.Result, error) {
+			_, err := c.Call("window.viewport", c.String("ID"), c.Number("X"), c.Number("Y"))
+			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_stageSize", Text: "stage [DIMENSION]", Kind: "reporter", Handler: func(c *e.Context) (e.Result, error) {
+			v, err := c.Call("camera.get", c.Field("DIMENSION"))
+			return e.Result{Value: v}, err
+		}},
+		{Opcode: "gowarpWindows_boundary", Kind: "command", Inputs: []string{"ID", "COLOR"}, Handler: func(c *e.Context) (e.Result, error) {
+			// Boundary guides belong to the browser editor, not the exported game.
+			return e.Result{}, nil
+		}},
+		{Opcode: "gowarpWindows_create", Kind: "command", Inputs: []string{"ID", "X", "Y", "W", "H"}, Handler: func(c *e.Context) (e.Result, error) {
+			data, err := json.Marshal(map[string]any{"id": c.String("ID"), "title": c.String("ID"), "x": c.Number("X"), "y": c.Number("Y"),
+				"width": c.Number("W"), "height": c.Number("H"), "stageWidth": c.Number("W"), "stageHeight": c.Number("H"), "border": e.Bool(c.Field("BORDER")), "resizable": true, "opacity": 1})
+			if err != nil {
+				return e.Result{}, err
+			}
+			_, err = c.Call("window.create", string(data))
+			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_move", Kind: "command", Inputs: []string{"ID", "X", "Y"}, Handler: func(c *e.Context) (e.Result, error) {
+			_, err := c.Call("window.move", c.String("ID"), c.Number("X"), c.Number("Y"))
+			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_set", Kind: "command", Inputs: []string{"ID", "JSON"}, Handler: func(c *e.Context) (e.Result, error) {
+			_, err := c.Call("window.set", c.String("ID"), c.String("JSON"))
+			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_setBoolean", Kind: "command", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			data, err := json.Marshal(map[string]any{c.Field("PROPERTY"): e.Bool(c.Field("VALUE"))})
+			if err != nil {
+				return e.Result{}, err
+			}
+			_, err = c.Call("window.set", c.String("ID"), string(data))
+			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_opacity", Kind: "command", Inputs: []string{"ID", "PERCENT"}, Handler: func(c *e.Context) (e.Result, error) {
+			data, err := json.Marshal(map[string]any{"opacity": c.Number("PERCENT") / 100})
+			if err != nil {
+				return e.Result{}, err
+			}
+			_, err = c.Call("window.set", c.String("ID"), string(data))
+			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_list", Text: "window IDs", Kind: "reporter", Handler: func(c *e.Context) (e.Result, error) {
+			v, err := c.Call("window.list")
+			if err != nil {
+				return e.Result{}, err
+			}
+			data, err := json.Marshal(v)
+			return e.Result{Value: string(data)}, err
+		}},
+		{Opcode: "gowarpWindows_quit", Kind: "command", Handler: func(c *e.Context) (e.Result, error) {
+			_, err := c.Call("host.command", "close")
+			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_remove", Kind: "command", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			_, err := c.Call("window.remove", c.String("ID"))
+			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_get", Text: "window [ID] properties", Kind: "reporter", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			v, err := c.Call("window.get", c.String("ID"))
+			return e.Result{Value: v}, err
+		}},
+	}}
+}

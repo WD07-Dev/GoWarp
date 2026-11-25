@@ -18,7 +18,7 @@ var sectionHints = []string{
 	"hint.player",
 	"hint.cloud",
 	"hint.loading",
-	"hint.export",
+	"hint.platform",
 	"hint.extensions",
 }
 
@@ -71,9 +71,13 @@ func (a *application) renderSettings() {
 	var fields []positionedField
 	var connection image.Rectangle
 	inConnection, customProvider := false, false
-	y, column := 146, 0
+	fieldTop := 146
+	if a.section == 6 {
+		fieldTop = 256
+	}
+	y, column := fieldTop, 0
 	half := (right - left - 12) / 2
-	for _, i := range a.form.visibleFields(a.section) {
+	for _, i := range a.form.visibleFields(a.section, a.targetOS()) {
 		f := a.form.fields[i]
 		connectionField := a.section == 4 && f.kind != "variable" && f.key != "cloud.mode"
 		if connectionField && !inConnection {
@@ -85,8 +89,8 @@ func (a *application) renderSettings() {
 		if f.key == "cloud.provider" {
 			customProvider = f.value == "custom"
 		}
-		compact := f.kind == "bool" || f.kind == "number" || f.key == "loading.progress"
-		if !compact && column == 1 {
+		compact := f.kind == "bool" || f.kind == "number" || f.key == "loading.progress" || f.key == "platform.position"
+		if (!compact || f.key == "loading.width") && column == 1 {
 			y += 96
 			column = 0
 		}
@@ -111,7 +115,10 @@ func (a *application) renderSettings() {
 				connection.Max.Y = y + height + 12
 			}
 		}
-		if compact && column == 0 {
+		if f.key == "platform.fullscreen" && f.value == "true" {
+			column = 0
+			y += height + 12
+		} else if compact && column == 0 {
 			column = 1
 		} else {
 			column = 0
@@ -122,12 +129,12 @@ func (a *application) renderSettings() {
 		y += 96
 	}
 	bottom := a.height - 128
-	contentHeight := y - 146
-	viewportHeight := bottom - 146
+	contentHeight := y - fieldTop
+	viewportHeight := bottom - fieldTop
 	maxScroll := max(0, contentHeight-viewportHeight)
 	a.scroll = min(a.scroll, maxScroll)
 	canvas := a.pixels
-	a.pixels = canvas.SubImage(a.pixelRect(image.Rect(left, 146, right, bottom))).(*image.RGBA)
+	a.pixels = canvas.SubImage(a.pixelRect(image.Rect(left, fieldTop, right, bottom))).(*image.RGBA)
 	if !connection.Empty() {
 		r := connection.Sub(image.Pt(0, a.scroll))
 		a.fill(r, color.RGBA{75, 75, 75, 255})
@@ -137,7 +144,7 @@ func (a *application) renderSettings() {
 	for _, position := range fields {
 		f := &a.form.fields[position.index]
 		r := position.rect.Sub(image.Pt(0, a.scroll))
-		if r.Max.Y <= 146 || r.Min.Y >= bottom {
+		if r.Max.Y <= fieldTop || r.Min.Y >= bottom {
 			continue
 		}
 		a.fill(r, panel)
@@ -165,9 +172,9 @@ func (a *application) renderSettings() {
 				}
 			}
 			a.choice(input.Min.X, input.Min.Y, input.Dx(), f.choices, selected, func(i int) {
-				previous := a.form.visibleFields(a.section)
+				previous := a.form.visibleFields(a.section, a.targetOS())
 				f.value = f.choices[i]
-				if !slices.Equal(previous, a.form.visibleFields(a.section)) {
+				if !slices.Equal(previous, a.form.visibleFields(a.section, a.targetOS())) {
 					a.scroll = 0
 					a.keyboardFocus = -1
 				}
@@ -176,15 +183,15 @@ func (a *application) renderSettings() {
 			a.input(input.Min.X, input.Min.Y, input.Dx(), &f.value)
 		}
 		// Do not expose clipped fields to keyboard focus or pointer input.
-		if input.Min.Y < 146 || input.Max.Y > bottom {
+		if input.Min.Y < fieldTop || input.Max.Y > bottom {
 			a.hits = a.hits[:start]
 		}
 	}
 	a.pixels = canvas
 	if maxScroll > 0 {
 		height := max(24, viewportHeight*viewportHeight/contentHeight)
-		y := 146 + a.scroll*(viewportHeight-height)/maxScroll
-		a.fill(image.Rect(right+8, 146, right+11, bottom), ui.Field)
+		y := fieldTop + a.scroll*(viewportHeight-height)/maxScroll
+		a.fill(image.Rect(right+8, fieldTop, right+11, bottom), ui.Field)
 		a.fill(image.Rect(right+8, y, right+11, y+height), ui.Muted)
 	}
 	if a.section == 0 && a.form.base.Project != "" {
@@ -199,8 +206,9 @@ func (a *application) renderSettings() {
 		}
 		a.choice(left+12, 184, right-left-24, choices, a.target, func(i int) {
 			a.target = i
+			a.scroll = 0
+			a.editor = nil
+			a.keyboardFocus = -1
 		})
-		a.label(left, 282, a.fitText(i18n.Tr("hint.single_executable"), right-left), ui.Text)
-		a.label(left, 310, a.fitText(i18n.Tr("hint.no_install"), right-left), ui.Muted)
 	}
 }

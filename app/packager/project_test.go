@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"gowarp/app/config"
+	"gowarp/app/i18n"
 )
 
 func TestOpenProjectAutofillsJSONAndSB3(t *testing.T) {
@@ -80,5 +83,25 @@ func TestOpenProjectAutofillsJSONAndSB3(t *testing.T) {
 				t.Fatal("project open timed out")
 			}
 		})
+	}
+}
+
+func TestExportRequiresProject(t *testing.T) {
+	for _, path := range []string{"", "   "} {
+		a := &application{form: newForm(config.Default(nil), nil)}
+		for i := range a.form.fields {
+			if a.form.fields[i].key == "project" {
+				a.form.fields[i].value = path
+			}
+		}
+		a.save(filepath.Join(t.TempDir(), "game.exe"), true)
+		if a.errorText != i18n.Tr("error.project_required") || !a.dirty || a.busy {
+			t.Fatalf("missing project must show a message before exporting: error=%q busy=%t dirty=%t", a.errorText, a.busy, a.dirty)
+		}
+		a.errorText, a.dirty = "", false
+		a.choose("export")
+		if a.errorText != i18n.Tr("error.project_required") || !a.dirty || a.busy {
+			t.Fatal("missing project must show a message before opening the file picker")
+		}
 	}
 }

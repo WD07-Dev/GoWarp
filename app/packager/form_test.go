@@ -48,7 +48,7 @@ func TestNewFormKeepsUnselectedProjectEmpty(t *testing.T) {
 func TestFormDisplayFPS(t *testing.T) {
 	f := newForm(config.Default(nil), nil)
 	found := 0
-	for _, i := range f.visibleFields(2) {
+	for _, i := range f.visibleFields(2, "") {
 		field := &f.fields[i]
 		if field.key == "player.renderFPS" {
 			found++

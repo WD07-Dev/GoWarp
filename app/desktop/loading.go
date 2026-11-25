@@ -13,6 +13,7 @@ import (
 	"gowarp/core/media"
 	"gowarp/core/project"
 	"gowarp/core/vm"
+	"gowarp/core/window"
 )
 
 type loadingResult struct {
@@ -201,6 +202,7 @@ func (g *game) updateLoading() error {
 			return result.err
 		}
 		g.controller = result.controller
+		g.controller.vm.SetWindowHandler(g.windowCall)
 		g.audio = newAudioOutput(g.controller.assets, g.options.Mute)
 		if s := g.options.Settings; s != nil {
 			graphics, err := g.gpu.enablePen(g.controller.renderer)
@@ -228,6 +230,9 @@ func (g *game) updateLoading() error {
 			g.controller.graphics = newGraphicsPipeline(deferredPen{graphics}, graphics.replayCommands)
 			g.controller.vm.SetGraphics(g.controller.graphics)
 			g.waitingStart = !s.Player.AutoStart && g.options.Editor == nil
+			if err := g.restoreGameWindowSize(); err != nil {
+				return err
+			}
 		} else if w, h := g.controller.renderer.Size(); w != 480 || h != 360 {
 			scale := g.options.Scale
 			if scale <= 0 {
@@ -239,6 +244,45 @@ func (g *game) updateLoading() error {
 		g.releaseLoadingImages()
 	default:
 	}
+	return nil
+}
+
+func (g *game) restoreGameWindowSize() error {
+	s := g.options.Settings
+	if s == nil || s.Platform.Fullscreen || g.options.Editor != nil || s.Loading.Width == 0 && s.Loading.Height == 0 {
+		return nil
+	}
+	if n := g.native; n != nil {
+		if n.gameWindowSize.X == 0 {
+			return nil
+		}
+		views := n.backend.Views()
+		for i := range views {
+			v := &views[i]
+			if v.ID != "main" {
+				continue
+			}
+			if s.Platform.Position == "auto" {
+				v.X += (v.Width - n.gameWindowSize.X) / 2
+				v.Y += (v.Height - n.gameWindowSize.Y) / 2
+			}
+			v.Width, v.Height = n.gameWindowSize.X, n.gameWindowSize.Y
+		}
+		layout, err := window.Pack(views)
+		if err != nil {
+			return err
+		}
+		n.layout, n.dirty = layout, true
+		return g.syncNativeViews()
+	}
+	width, height := playerWindowSize(s)
+	oldWidth, oldHeight := ebiten.WindowSize()
+	x, y := ebiten.WindowPosition()
+	ebiten.SetWindowSize(width, height)
+	if s.Platform.Position == "auto" {
+		ebiten.SetWindowPosition(x+(oldWidth-width)/2, y+(oldHeight-height)/2)
+	}
+	g.initMainWindow()
 	return nil
 }
 

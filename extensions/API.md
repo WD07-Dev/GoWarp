@@ -412,6 +412,7 @@ Use VM time for ordinary animation and waits. Use monotonic time only when match
 | `target.get(property, ref?)` | Read a target property. |
 | `target.set(property, value, ref?)` | Set a supported property. |
 | `target.touching(selector, ref?)` | Touching-object test; requires costume geometry. |
+| `target.touchingTarget(candidateRef, ref?)` | Touching test against exactly one resolved target (including a clone ID); excludes self and requires costume geometry. |
 | `target.clone(ref?)` | Create a clone and return its ID, or nil when creation is refused. |
 | `target.delete(ref?)` | Delete a clone. |
 | `target.costumes(ref?)` | Costume metadata records. |
@@ -562,7 +563,7 @@ an extension needs that side effect.
 | `audio.projectVolume(value?)` | Read project volume as a percentage, or set it when a value is supplied. |
 | `audio.effect(effect, ref?)` | Read the selected target's `pitch` or `pan` sound effect. |
 | `audio.targetVoice(selector)` | Current target's voice for the selected sound, or nil. |
-| `audio.targetPlay(selector, start, loop)` | Play the selected sound from the current target. |
+| `audio.targetPlay(selector, start, loop, end?)` | Play the selected sound from the current target, optionally stopping at an end position in seconds. An end at or before the start produces an empty segment. |
 | `audio.play(asset, start, end, volume, loop, rate?, pan?)` | Play an asset segment; return a voice handle. |
 | `audio.url(url)` | Start URL playback; return a voice handle. |
 | `audio.voice.get(handle, property)` | `active`, `pending`, `paused`, `position`, `duration`, `loop`, or `clock`. |
@@ -584,6 +585,17 @@ Times and positions are in seconds. Treat asset and voice handles as opaque valu
 | `host.frameMilliseconds()` | Host frame duration in milliseconds. |
 | `host.window(property)` | Read `screenWidth`, `screenHeight`, `focused`, or `title`. Requires a desktop window; screen dimensions use device-independent pixels. |
 | `host.command(kind, value)` | Queue a `title`, `close`, `open-url`, or `fullscreen` request. |
+| `window.list()` | Return window IDs as `[]string`; includes `main` in ordinary single-window mode. |
+| `window.get(id)` | Return JSON window properties. |
+| `window.create(json)` | Create an additional window; requires native multiwindow on Windows. |
+| `window.move(id, x, y)` | Move the outer window in desktop pixels. |
+| `window.viewport(id, x, y, width?, height?)` | Move a native window’s displayed stage region (top-left origin, Y downward). Supply both dimensions to resize it, or neither to preserve its size. Requires native multiwindow. |
+| `window.set(id, json)` | Change only the supplied properties, including border, buttons, fullscreen and opacity. |
+| `window.remove(id)` | Explicitly remove a window, even when `disableClose` is enabled. |
+
+The [Window API](WINDOWS.md) describes property support, coordinates and the
+[GoWarp Windows blocks](examples/gowarpWindows.js). `main` is available without
+enabling multiwindow. Unsupported properties return an error.
 
 Poll file-picker channels without blocking, using `Local` and `Again`/`YieldTick`. Cancellation or a read failure produces an empty string. Project fullscreen requests are tracked separately from the player's F11 mode.
 

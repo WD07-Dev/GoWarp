@@ -45,18 +45,19 @@ func (g *game) drawLoading(screen *ebiten.Image) {
 	if err := updateLoadingTexture(view.images.logo, &view.logo, now); err != nil {
 		g.failure = err
 	}
-	w, h := screen.Bounds().Dx(), screen.Bounds().Dy()
+	bounds := screen.Bounds()
+	w, h := bounds.Dx(), bounds.Dy()
 	face := g.face
 	if g.options.Settings != nil {
 		face = g.scaledFace(g.dpi(), false)
 	}
 	if view.background != nil {
-		drawLoadingImage(screen, view.background, image.Rect(0, 0, w, h), true)
+		drawLoadingImage(screen, view.background, bounds, true)
 	}
 	if view.logo != nil {
 		size := min(g.pixels(160), min(w/2, h/3))
 		centerY := h/2 - g.pixels(72)
-		drawLoadingImage(screen, view.logo, image.Rect((w-size)/2, centerY-size/2, (w+size)/2, centerY+size/2), false)
+		drawLoadingImage(screen, view.logo, image.Rect((w-size)/2, centerY-size/2, (w+size)/2, centerY+size/2).Add(bounds.Min), false)
 	}
 	panelWidth := max(1, min(g.pixels(440), w-g.pixels(32)))
 	panelHeight := g.pixels(112)
@@ -101,7 +102,7 @@ func (g *game) drawLoading(screen *ebiten.Image) {
 	if view.logo != nil {
 		y = min(h-panelHeight, h/2+g.pixels(16))
 	}
-	op.GeoM.Translate(float64((w-panelWidth)/2), float64(max(0, y)))
+	op.GeoM.Translate(float64(bounds.Min.X+(w-panelWidth)/2), float64(bounds.Min.Y+max(0, y)))
 	screen.DrawImage(g.canvas, op)
 }
 

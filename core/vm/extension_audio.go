@@ -115,7 +115,11 @@ func (c *extensionContext) audioCall(operation string, args []any) (any, error) 
 		}
 		return v, nil
 	case "audio.targetPlay":
-		v := r.playSoundAt(t, a.get(0), a.number(1), extension.Bool(a.get(2)))
+		var end []float64
+		if len(args) > 3 {
+			end = []float64{a.number(3)}
+		}
+		v := r.playSoundAt(t, a.get(0), a.number(1), extension.Bool(a.get(2)), end...)
 		if v == nil {
 			return nil, nil
 		}

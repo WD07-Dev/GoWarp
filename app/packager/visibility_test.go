@@ -110,7 +110,7 @@ func TestCloudProviderFields(t *testing.T) {
 	for _, selected := range []string{"custom", "turbowarp"} {
 		provider.value = selected
 		visible := map[string]bool{}
-		for _, index := range f.visibleFields(4) {
+		for _, index := range f.visibleFields(4, "") {
 			visible[f.fields[index].key] = true
 		}
 		if !visible["cloud.provider"] || !visible["cloud.projectId"] ||

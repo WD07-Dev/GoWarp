@@ -135,7 +135,7 @@ func (r *Runtime) soundDuration(t *target, index int) float64 {
 	return duration
 }
 
-func (r *Runtime) playSoundAt(t *target, which any, start float64, loop bool) *soundVoice {
+func (r *Runtime) playSoundAt(t *target, which any, start float64, loop bool, endAt ...float64) *soundVoice {
 	index := soundIndex(t, which)
 	if index < 0 {
 		return nil
@@ -153,23 +153,29 @@ func (r *Runtime) playSoundAt(t *target, which any, start float64, loop bool) *s
 	}
 	duration := r.soundDuration(t, index)
 	start = math.Max(0, math.Min(duration, start))
+	end := duration
+	active, emit := duration > start || loop && duration > 0, duration > 0
+	if len(endAt) > 0 {
+		end = math.Max(start, math.Min(duration, endAt[0]))
+		active, emit = end > start, end > start
+	}
 	r.nextVoice++
 	v := &soundVoice{
 		id:            r.nextVoice,
 		sound:         index,
-		outputPending: r.audioEnabled && duration > 0,
+		outputPending: r.audioEnabled && emit,
 		player:        t,
-		remaining:     duration - start,
+		remaining:     end - start,
 		duration:      duration,
 		position:      start,
-		end:           duration,
+		end:           end,
 		loop:          loop,
 		updated:       r.audioTime(),
 		rate:          math.Pow(2, t.state.Pitch/120),
-		active:        duration > start || loop && duration > 0,
+		active:        active,
 	}
 	r.voices[t.source][index] = v
-	if duration > 0 {
+	if emit {
 		r.emitAudio("play", v)
 	}
 	return v

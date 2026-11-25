@@ -2,12 +2,14 @@ package desktop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,9 +23,15 @@ import (
 	"gowarp/core/media"
 	"gowarp/core/project"
 	"gowarp/core/vm"
+	"gowarp/core/window"
 )
 
 type game struct {
+	mainWindow                                     window.View
+	windowReady, windowDirty, windowCloseRequested bool
+	windowButtonsState                             windowButtonState
+
+	native                      *nativeViews
 	editor                      editorInput
 	stageNoAntialias            bool
 	displayLogged               bool
@@ -74,7 +82,6 @@ type game struct {
 	limitReached, captured      bool
 	drawErr                     error
 	windowButtonsApplied        bool
-	windowButtonsFullscreen     bool
 	hostFullscreen              bool
 	projectFullscreen           bool
 	windowFocused               bool
@@ -110,6 +117,8 @@ func Run(ctx context.Context, path string, p *project.Project, options Options, 
 	ebiten.SetWindowTitle("GoWarp — " + filepath.Base(path))
 	ebiten.SetWindowIcon(assets.DefaultWindowIcon())
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+	ebiten.SetWindowDecorated(true)
+	ebiten.SetWindowClosingHandled(true)
 	if s := options.Settings; s != nil {
 		if len(s.Player.Icon) > 0 {
 			icons, err := assets.IconImages(s.Player.Icon)
@@ -120,12 +129,24 @@ func Run(ctx context.Context, path string, p *project.Project, options Options, 
 		}
 		ebiten.SetWindowTitle(s.Player.Title)
 		width, height := playerWindowSize(s)
+		if !s.Platform.Fullscreen && options.Editor == nil {
+			width, height = s.Loading.WindowSize(width, height)
+		}
 		ebiten.SetWindowSize(width, height)
-		if !s.Window.Resizable {
+		if !s.Platform.Resizable {
 			ebiten.SetWindowResizingMode(ebiten.WindowResizingModeDisabled)
 		}
-		ebiten.SetFullscreen(s.Window.Fullscreen)
-		g.hostFullscreen = s.Window.Fullscreen
+		if s.Platform.CustomPosition() {
+			ebiten.SetWindowPosition(s.Platform.X, s.Platform.Y)
+		}
+		ebiten.SetFullscreen(s.Platform.Fullscreen)
+		ebiten.SetWindowDecorated(s.Platform.Border)
+		ebiten.SetWindowFloating(s.Platform.Topmost && !s.Platform.MultiWindow)
+		g.hostFullscreen = s.Platform.Fullscreen
+	}
+	g.initMainWindow()
+	if err := g.openNativeViews(); err != nil {
+		return nil, err
 	}
 	ebiten.SetTPS(60)
 	ebiten.SetRunnableOnUnfocused(true)
@@ -133,9 +154,17 @@ func Run(ctx context.Context, path string, p *project.Project, options Options, 
 	cleared := ebiten.IsScreenClearedEveryFrame()
 	ebiten.SetScreenClearedEveryFrame(false)
 	defer ebiten.SetScreenClearedEveryFrame(cleared)
-	err := ebiten.RunGame(g)
+	var err error
+	if g.native != nil {
+		err = ebiten.RunGameWithOptions(g, &ebiten.RunGameOptions{GraphicsLibrary: ebiten.GraphicsLibraryDirectX, InitUnfocused: true, SkipTaskbar: true})
+	} else {
+		err = ebiten.RunGame(g)
+	}
 	if err == ebiten.Termination {
 		err = nil
+	}
+	if g.native != nil {
+		err = errors.Join(err, g.native.backend.Close())
 	}
 	if err == nil && g.failure != nil {
 		err = g.failure
@@ -176,6 +205,13 @@ func keyName(key ebiten.Key, text string) string {
 }
 
 func (g *game) Update() error {
+	if g.native == nil && ebiten.IsWindowBeingClosed() && !g.mainWindow.DisableClose {
+		return ebiten.Termination
+	}
+
+	if err := g.pollNativeViews(); err != nil {
+		return err
+	}
 	if g.options.Diagnostic != nil {
 		if !g.lastHostUpdateEnd.IsZero() {
 			// Measure the gap between callbacks, excluding the previous Update's work.
@@ -198,6 +234,9 @@ func (g *game) Update() error {
 		}
 	}
 	err := g.update()
+	if g.native != nil && err != nil {
+		return err
+	}
 	if g.options.Settings != nil && err != nil && err != ebiten.Termination && g.ctx.Err() == nil {
 		if g.options.Diagnostic != nil {
 			g.options.Diagnostic("player failure: " + err.Error())
@@ -223,7 +262,7 @@ func (g *game) update() error {
 		return ebiten.Termination
 	}
 	g.updateFocus(g.sampleWindowFocus())
-	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) && (g.controller == nil || g.controller.monitors.edit == nil) {
+	if (inpututil.IsKeyJustPressed(ebiten.KeyEscape) || (g.native != nil && slices.Contains(g.native.input.Keys, "escape"))) && (g.controller == nil || g.controller.monitors.edit == nil) {
 		if err := g.handleEscape(); err != nil {
 			return err
 		}
@@ -231,13 +270,16 @@ func (g *game) update() error {
 	if g.failure != nil {
 		return nil
 	}
+	if err := g.applyWindowChanges(); err != nil {
+		return err
+	}
 	if err := g.applyWindowButtons(); err != nil {
 		return err
 	}
 	if g.drawErr != nil {
 		return g.drawErr
 	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyF11) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyF11) || (g.native != nil && slices.Contains(g.native.input.Keys, "f11")) {
 		g.toggleFullscreen()
 	}
 	if g.controller == nil {
@@ -247,6 +289,9 @@ func (g *game) update() error {
 		g.controller.vm.SetPaused(false)
 	}
 	if g.limitReached {
+		if g.native != nil {
+			return ebiten.Termination
+		}
 		return nil
 	}
 	cursorX, cursorY := ebiten.CursorPosition()
@@ -276,6 +321,10 @@ func (g *game) update() error {
 			in.MouseDown = false
 		}
 	}
+	g.nativeInput(&in)
+	if g.native != nil {
+		pressed = in.MousePressed
+	}
 	if g.waitingStart && g.options.Editor == nil {
 		if !pressed && !in.Enter && !in.Restart {
 			return nil
@@ -283,7 +332,7 @@ func (g *game) update() error {
 		g.waitingStart = false
 		in = Input{Restart: true}
 	}
-	if buttonX, toolbar := g.toolbarPosition(cursorX, cursorY); pressed && toolbar {
+	if buttonX, toolbar := g.toolbarPosition(cursorX, cursorY); g.native == nil && pressed && toolbar {
 		if buttonX >= 8 && buttonX < 32 {
 			in.Restart = true
 		}
@@ -303,6 +352,9 @@ func (g *game) update() error {
 	for _, key := range inpututil.AppendJustReleasedKeys(nil) {
 		in.Released = append(in.Released, keyName(key, ""))
 	}
+	if g.native != nil && !in.Restart {
+		g.nativeInput(&in)
+	}
 	g.editorInput(&in)
 	if err := g.audio.poll(g.controller.vm); err != nil {
 		return err
@@ -311,6 +363,9 @@ func (g *game) update() error {
 		return err
 	}
 	if err := g.applyHostCommands(); err != nil {
+		return err
+	}
+	if err := g.applyWindowChanges(); err != nil {
 		return err
 	}
 	if err := g.controller.assets.Err(); err != nil {
@@ -325,6 +380,9 @@ func (g *game) update() error {
 }
 
 func (g *game) sampleWindowFocus() bool {
+	if g.native != nil {
+		return true
+	}
 	if g.options.Editor != nil {
 		return true
 	}
@@ -337,6 +395,15 @@ func (g *game) sampleWindowFocus() bool {
 }
 
 func (g *game) sampleFullscreen() bool {
+	if g.native != nil {
+		for _, v := range g.native.layout.Views {
+			if v.ID == "main" {
+				return v.Fullscreen
+			}
+		}
+		return false
+	}
+
 	if !g.windowFullscreenRead {
 		g.windowFullscreen = ebiten.IsFullscreen()
 		g.windowFullscreenRead = true
@@ -345,6 +412,17 @@ func (g *game) sampleFullscreen() bool {
 }
 
 func (g *game) handleEscape() error {
+	if g.native != nil {
+		for i := range g.native.layout.Views {
+			v := &g.native.layout.Views[i]
+			if v.ID == g.native.input.Window && v.Fullscreen {
+				v.Fullscreen = false
+				g.native.dirty = true
+				return nil
+			}
+		}
+	}
+
 	if ebiten.IsFullscreen() {
 		g.hostFullscreen, g.projectFullscreen = false, false
 		ebiten.SetFullscreen(false)
@@ -361,9 +439,24 @@ func (g *game) handleEscape() error {
 }
 
 func (g *game) toggleFullscreen() {
+	if g.native != nil {
+		id := g.native.input.Window
+		if id == "" {
+			id = "main"
+		}
+		for i := range g.native.layout.Views {
+			v := &g.native.layout.Views[i]
+			if v.ID == id {
+				v.Fullscreen = !v.Fullscreen
+				g.native.dirty = true
+				break
+			}
+		}
+		return
+	}
 	/*
-		Browser F11 and document.requestFullscreen are independent modes.
-		A project's exitFullscreen must not cancel the player's F11 shortcut.
+		  Browser F11 and document.requestFullscreen are independent modes.
+				A project's exitFullscreen must not cancel the player's F11 shortcut.
 	*/
 	g.hostFullscreen = !g.hostFullscreen
 	ebiten.SetFullscreen(g.hostFullscreen || g.projectFullscreen)
@@ -578,6 +671,10 @@ func (g *game) Draw(screen *ebiten.Image) {
 }
 
 func (g *game) draw(screen *ebiten.Image, focused bool) {
+	if g.native != nil {
+		g.drawNativeViews(screen)
+		return
+	}
 	g.updateFocus(focused)
 	if g.controller == nil {
 		// Start loading after its first frame, even without focus.
@@ -703,6 +800,15 @@ func (g *game) LayoutF(width, height float64) (float64, float64) {
 }
 
 func (g *game) layoutScale(width, height, scale float64) (float64, float64) {
+	if g.native != nil {
+		size := g.native.layout.Size
+		g.outsideWidth, g.outsideHeight = size.X, size.Y
+		g.windowDPI = 1
+		if g.controller == nil && scale > 0 && !math.IsNaN(scale) && !math.IsInf(scale, 0) {
+			g.windowDPI = scale
+		}
+		return float64(size.X), float64(size.Y)
+	}
 	packaged := g.options.Settings != nil || (g.controller != nil && g.controller.options.Settings != nil)
 	if !packaged {
 		w, h := g.Layout(int(width), int(height))

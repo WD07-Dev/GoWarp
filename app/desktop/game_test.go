@@ -113,12 +113,18 @@ func TestProjectFullscreenPreservesF11(t *testing.T) {
 			if enter {
 				op = "cubesterWindowControls_enterFullscreen"
 			}
+			if _, err := g.windowCall("set", []any{"main", `{"title":"changing title"}`}); err != nil {
+				t.Fatal(err)
+			}
 			p.Targets[0].Blocks["command"].Opcode = op
 			r.GreenFlag()
 			if err := r.Tick(context.Background(), 30, false); err != nil {
 				t.Fatal(err)
 			}
 			if err := g.applyHostCommands(); err != nil {
+				t.Fatal(err)
+			}
+			if err := g.applyWindowChanges(); err != nil {
 				t.Fatal(err)
 			}
 		}

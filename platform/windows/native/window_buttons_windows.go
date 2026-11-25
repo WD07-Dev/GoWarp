@@ -2,65 +2,101 @@ package native
 
 import (
 	"fmt"
+	"math"
+	"runtime"
 	"syscall"
 	"unsafe"
+
+	"github.com/lxn/win"
+	"golang.org/x/sys/windows"
 )
 
-var windowUser32 = syscall.NewLazyDLL("user32.dll")
+var windowUser32 = windows.NewLazySystemDLL("user32.dll")
 
-/*
-Find the player window on its event thread, including hidden or unfocused startup. Update applies
-styles before the first presentation.
-*/
-func SetWindowButtons(disableMinimize, disableMaximize bool) error {
-	var handle uintptr
-	var name [64]uint16
-	callback := syscall.NewCallback(func(window, _ uintptr) uintptr {
-		/*
-			GLFW's hidden message window uses the same class. Only the player
-			has WS_EX_APPWINDOW, including while hidden or in fullscreen.
-		*/
-		const exStyleIndex = ^uintptr(19) // GWL_EXSTYLE = -20
-		exStyle, _, _ := windowUser32.NewProc("GetWindowLongW").Call(window, exStyleIndex)
-		if exStyle&0x00040000 == 0 { // WS_EX_APPWINDOW
-			return 1
-		}
-		windowUser32.NewProc("GetClassNameW").Call(window, uintptr(unsafe.Pointer(&name[0])), uintptr(len(name)))
-		if syscall.UTF16ToString(name[:]) == "GLFW30" {
-			handle = window
-			return 0
-		}
+// Allocate this callback once: Windows callback trampolines cannot be freed.
+var findPlayerWindow = syscall.NewCallback(func(window, context uintptr) uintptr {
+	exStyle := win.GetWindowLong(win.HWND(window), win.GWL_EXSTYLE)
+	if exStyle&win.WS_EX_APPWINDOW == 0 { // WS_EX_APPWINDOW excludes GLFW's message window.
 		return 1
-	})
-	thread, _, _ := syscall.NewLazyDLL("kernel32.dll").NewProc("GetCurrentThreadId").Call()
-	windowUser32.NewProc("EnumThreadWindows").Call(thread, callback, 0)
+	}
+	var name [64]uint16
+	win.GetClassName(win.HWND(window), &name[0], len(name))
+	if syscall.UTF16ToString(name[:]) == "GLFW30" {
+		*(*uintptr)(unsafe.Pointer(context)) = window
+		return 0
+	}
+	return 1
+})
+
+// SetWindowProperties runs on the GLFW event thread, including hidden startup.
+// The caller handles close requests; disabling SC_CLOSE also greys the title button.
+func SetWindowProperties(disableMinimize, disableMaximize, disableClose bool, opacity float64) error {
+	if math.IsNaN(opacity) || math.IsInf(opacity, 0) || opacity < 0 || opacity > 1 {
+		return fmt.Errorf("window opacity must be between 0 and 1")
+	}
+	var handle uintptr
+	thread := windows.GetCurrentThreadId()
+	windowUser32.NewProc("EnumThreadWindows").Call(uintptr(thread), findPlayerWindow, uintptr(unsafe.Pointer(&handle)))
+	runtime.KeepAlive(&handle)
 	if handle == 0 {
 		return fmt.Errorf("player window not found")
 	}
-	// Window styles are 32-bit even on 64-bit Windows; no pointer-sized API needed.
-	const styleIndex = ^uintptr(15) // GWL_STYLE = -16
+	const styleIndex = ^uintptr(15)
 	style, _, err := windowUser32.NewProc("GetWindowLongW").Call(handle, styleIndex)
 	if style == 0 {
 		return err
 	}
-	updated := style
-	if disableMinimize {
-		updated &^= 0x00020000 // WS_MINIMIZEBOX
+	updated := style &^ uintptr(win.WS_MINIMIZEBOX|win.WS_MAXIMIZEBOX)
+	if !disableMinimize {
+		updated |= win.WS_MINIMIZEBOX
 	}
-	if disableMaximize {
-		updated &^= 0x00010000 // WS_MAXIMIZEBOX
+	if !disableMaximize && style&win.WS_THICKFRAME != 0 {
+		updated |= win.WS_MAXIMIZEBOX
 	}
-	if updated == style {
-		return nil
+	if updated != style {
+		previous, _, err := windowUser32.NewProc("SetWindowLongW").Call(handle, styleIndex, updated)
+		if previous == 0 {
+			return err
+		}
+		ok, _, err := windowUser32.NewProc("SetWindowPos").Call(handle, 0, 0, 0, 0, 0, 0x37)
+		if ok == 0 {
+			return err
+		}
 	}
-	previous, _, err := windowUser32.NewProc("SetWindowLongW").Call(handle, styleIndex, updated)
-	if previous == 0 {
-		return err
+	menu := win.GetSystemMenu(win.HWND(handle), false)
+	if menu != 0 {
+		flags := uint32(win.MF_ENABLED)
+		if disableClose {
+			flags = win.MF_GRAYED
+		}
+		win.EnableMenuItem(menu, win.SC_CLOSE, flags)
+		win.DrawMenuBar(win.HWND(handle))
 	}
-	// Refresh the title bar without moving, resizing, activating, or raising it.
-	ok, _, err := windowUser32.NewProc("SetWindowPos").Call(handle, 0, 0, 0, 0, 0, 0x37)
-	if ok == 0 {
-		return err
+	const exStyleIndex = ^uintptr(19)
+	exStyle := uintptr(uint32(win.GetWindowLong(win.HWND(handle), win.GWL_EXSTYLE)))
+	layered := opacityExtendedStyle(exStyle, opacity)
+	if layered != exStyle {
+		// A zero previous extended style is valid. Clear LastError to distinguish it.
+		win.SetLastError(0)
+		previous, _, err := windowUser32.NewProc("SetWindowLongW").Call(handle, exStyleIndex, layered)
+		if previous == 0 && err != syscall.Errno(0) {
+			return err
+		}
+	}
+	if layered&win.WS_EX_LAYERED != 0 {
+		ok, _, err := windowUser32.NewProc("SetLayeredWindowAttributes").Call(handle, 0, uintptr(math.Round(opacity*255)), 2)
+		if ok == 0 {
+			return err
+		}
 	}
 	return nil
+}
+
+// GLFW mouse passthrough requires both TRANSPARENT and LAYERED. Retain that
+// combination at full opacity, while removing opacity-only layering otherwise.
+func opacityExtendedStyle(style uintptr, opacity float64) uintptr {
+	if opacity < 1 || style&win.WS_EX_TRANSPARENT != 0 {
+		return style | win.WS_EX_LAYERED
+	}
+	return style &^ win.WS_EX_LAYERED
 }

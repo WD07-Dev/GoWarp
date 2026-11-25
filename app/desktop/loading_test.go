@@ -20,6 +20,7 @@ import (
 	"gowarp/core/extension"
 	"gowarp/core/project"
 	"gowarp/core/vm"
+	"gowarp/core/window"
 )
 
 func TestLoadingGIFUpdatesExistingTexture(t *testing.T) {
@@ -72,6 +73,63 @@ func TestLoadingPanelIsTransparent(t *testing.T) {
 		g.canvas.ReadPixels(pixels)
 		if pixels[3] != 0 {
 			t.Fatal("loading panel still has an opaque background")
+		}
+	})
+}
+
+func TestNativeLoadingUsesDisplayScale(t *testing.T) {
+	for _, scale := range []float64{1, 1.25, 1.5, 2} {
+		s := config.Default(nil)
+		g := &game{options: Options{Settings: &s}, native: &nativeViews{layout: window.Layout{Size: image.Pt(1200, 900)}}}
+		w, h := g.layoutScale(800, 600, scale)
+		if w != 1200 || h != 900 || g.dpi() != scale {
+			t.Errorf("scale %v: atlas=%vx%v, loading scale=%v", scale, w, h, g.dpi())
+		}
+		g.controller = &controller{}
+		g.layoutScale(800, 600, scale)
+		if g.dpi() != 1 {
+			t.Fatal("loading DPI changed logical stage overlay scale")
+		}
+	}
+}
+
+func TestNativeLoadingFitsEachWindow(t *testing.T) {
+	runGPUFrame(t, func() {
+		s := config.Default(nil)
+		s.Loading.Text = "Loading"
+		layout, err := window.Pack([]window.View{
+			{ID: "main", Width: 480, Height: 360, StageWidth: 480, StageHeight: 360},
+			{ID: "other", Width: 360, Height: 240, StageWidth: 480, StageHeight: 360},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		g := &game{options: Options{Settings: &s}, windowDPI: 1.5}
+		defer g.close()
+		defer func() { g.canvas.Deallocate() }()
+		g.loading.background = ebiten.NewImage(2, 2)
+		g.loading.background.WritePixels([]byte{255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255})
+		g.loading.logo = ebiten.NewImage(12, 8)
+		g.loading.logo.Fill(color.White)
+		atlas := ebiten.NewImage(layout.Size.X, layout.Size.Y)
+		defer atlas.Deallocate()
+		g.native = &nativeViews{layout: layout}
+		g.drawNativeViews(atlas)
+		for i, tile := range layout.Tiles {
+			single := ebiten.NewImage(tile.Dx(), tile.Dy())
+			g.drawLoading(single)
+			want := make([]byte, tile.Dx()*tile.Dy()*4)
+			got := make([]byte, len(want))
+			single.ReadPixels(want)
+			atlas.SubImage(tile).(*ebiten.Image).ReadPixels(got)
+			single.Deallocate()
+			// Linear filtering can round a channel differently at another atlas origin.
+			for p := range got {
+				if d := int(got[p]) - int(want[p]); d < -1 || d > 1 {
+					t.Errorf("window %d loading differs at (%d,%d): channel %d = %d, want %d", i, p/4%tile.Dx(), p/4/tile.Dx(), p%4, got[p], want[p])
+					break
+				}
+			}
 		}
 	})
 }
@@ -554,5 +612,80 @@ func TestLoadingAppliesAntialiasBeforePreparingSVG(t *testing.T) {
 		if visible == 0 || (enabled && partial == 0) || (!enabled && partial != 0) {
 			t.Fatalf("SVG antialias=%t: visible=%d partial coverage=%d", enabled, visible, partial)
 		}
+	}
+}
+
+func TestLoadingWindowRestoresGameSize(t *testing.T) {
+	oldW, oldH := ebiten.WindowSize()
+	oldX, oldY := ebiten.WindowPosition()
+	t.Cleanup(func() { ebiten.SetWindowSize(oldW, oldH); ebiten.SetWindowPosition(oldX, oldY) })
+	for _, position := range []string{"auto", "custom"} {
+		s := config.Default(nil)
+		s.Window.Width, s.Window.Height = 800, 600
+		s.Player.Controls = false
+		s.Platform.Position = position
+		s.Loading.Width, s.Loading.Height = 640, 360
+		ebiten.SetWindowSize(640, 360)
+		ebiten.SetWindowPosition(200, 200)
+		g := &game{options: Options{Settings: &s}}
+		if err := g.restoreGameWindowSize(); err != nil {
+			t.Fatal(err)
+		}
+		if w, h := ebiten.WindowSize(); w != 800 || h != 600 {
+			t.Fatalf("restored size: %dx%d", w, h)
+		}
+		wantX, wantY := 200, 200
+		if position == "auto" {
+			wantX, wantY = 120, 80
+		}
+		if x, y := ebiten.WindowPosition(); x != wantX || y != wantY {
+			t.Fatalf("restored position: %d,%d want %d,%d", x, y, wantX, wantY)
+		}
+	}
+	s := config.Default(nil)
+	s.Platform.Fullscreen = true
+	s.Loading.Width, s.Loading.Height = 640, 360
+	ebiten.SetWindowSize(900, 700)
+	if err := (&game{options: Options{Settings: &s}}).restoreGameWindowSize(); err != nil {
+		t.Fatal(err)
+	}
+	if w, h := ebiten.WindowSize(); w != 900 || h != 700 {
+		t.Fatal("fullscreen restore changed window size")
+	}
+}
+
+type loadingWindowBackend struct {
+	window.Backend
+	views []window.View
+}
+
+func (b *loadingWindowBackend) Views() []window.View { return append([]window.View(nil), b.views...) }
+func (b *loadingWindowBackend) SetViews(views []window.View) error {
+	b.views = append([]window.View(nil), views...)
+	return nil
+}
+
+func TestLoadingWindowRestoresNativeMainOnly(t *testing.T) {
+	oldW, oldH := ebiten.WindowSize()
+	t.Cleanup(func() { ebiten.SetWindowSize(oldW, oldH) })
+	s := config.Default(nil)
+	s.Loading.Width, s.Loading.Height = 400, 300
+	s.Window.Width, s.Window.Height = 800, 600
+	s.Width, s.Height = 960, 360
+	s.Platform.MultiWindow = true
+	views, gameSize := nativeWindowViews(&s, 1.5)
+	views[0].X, views[0].Y = 400, 300
+	views = append(views, window.View{ID: "second", X: 900, Y: 100, Width: 200, Height: 200, StageWidth: 200, StageHeight: 200})
+	b := &loadingWindowBackend{views: views}
+	g := &game{options: Options{Settings: &s}, native: &nativeViews{backend: b, gameWindowSize: gameSize}}
+	if err := g.restoreGameWindowSize(); err != nil {
+		t.Fatal(err)
+	}
+	main, other := b.views[0], b.views[1]
+	if main.Width != 1200 || main.Height != 900 || main.X != 100 || main.Y != 75 || main.StageWidth != 960 || main.StageHeight != 360 {
+		t.Fatalf("main restore: %+v", main)
+	}
+	if other.X != 900 || other.Y != 100 || other.Width != 200 || other.Height != 200 {
+		t.Fatalf("second window changed: %+v", other)
 	}
 }

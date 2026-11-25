@@ -129,6 +129,28 @@ func (c *extensionContext) logicCall(operation string, args []any) (any, error) 
 			return nil, fmt.Errorf("target.touching requires costume geometry")
 		}
 		return r.touchingObject(t, a.string(0)), nil
+	case "target.touchingTarget":
+		candidate, err := resolve(0)
+		if err != nil {
+			return nil, err
+		}
+		t, err := resolve(1)
+		if err != nil {
+			return nil, err
+		}
+		if r.graphics == nil {
+			return nil, fmt.Errorf("target.touchingTarget requires costume geometry")
+		}
+		if candidate == t || candidate.state.IsStage || !candidate.state.Visible {
+			return false, nil
+		}
+		d := display(candidate)
+		d.State.Variables, d.State.Lists = nil, nil
+		// The candidate is already resolved. An empty query name avoids treating
+		// sprites named _edge_ or _mouse_ as special sensing selectors.
+		d.State.Name = ""
+		x, y := r.mousePosition()
+		return r.graphics.Touching([]DisplayTarget{d}, display(t), "", x, y), nil
 	case "target.list":
 		out := make([]any, 0, len(r.targets))
 		for _, t := range r.targets {

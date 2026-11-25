@@ -51,7 +51,7 @@ func New() e.Extension {
 			}
 			return call(c, "camera.get", key)
 		})}}
-	for _, key := range []string{"thing", "enabled", "dimension"} {
+	for _, key := range []string{"thing", "enabled", "dimension", "clones"} {
 		x.Blocks = append(x.Blocks, menu("runtimeoptions_menu_"+key, key))
 	}
 	for _, entry := range []struct{ op, key, input string }{{"Framerate", "framerate", "fps"}, {"CloneLimit", "cloneLimit", "limit"}, {"Username", "username", "username"}} {

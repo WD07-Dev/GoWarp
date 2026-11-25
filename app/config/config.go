@@ -18,20 +18,37 @@ import (
 
 	"gowarp/app/assets"
 	"gowarp/core/project"
+	"gowarp/core/window"
 )
 
 const Version = 1
 
 type Window struct {
 	// Initial game display size, excluding player controls. Zero inherits the stage size.
-	Width           int    `json:"width"`
-	Height          int    `json:"height"`
-	Resizable       bool   `json:"resizable"`
-	Fullscreen      bool   `json:"fullscreen"`
-	Fit             string `json:"fit"`
-	Background      string `json:"background"`
-	DisableMinimize bool   `json:"disableMinimize"`
-	DisableMaximize bool   `json:"disableMaximize"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	Fit        string `json:"fit"`
+	Background string `json:"background"`
+}
+
+type Platform struct {
+	Resizable       bool          `json:"resizable"`
+	Fullscreen      bool          `json:"fullscreen"`
+	Position        string        `json:"position"`
+	X               int           `json:"x"`
+	Y               int           `json:"y"`
+	DisableMinimize bool          `json:"disableMinimize"`
+	DisableMaximize bool          `json:"disableMaximize"`
+	Border          bool          `json:"border"`
+	Topmost         bool          `json:"topmost"`
+	DisableClose    bool          `json:"disableClose"`
+	Opacity         float64       `json:"opacity"`
+	MultiWindow     bool          `json:"multiWindow"`
+	Views           []window.View `json:"views,omitempty"`
+}
+
+func (p Platform) CustomPosition() bool {
+	return !p.Fullscreen && p.Position == "custom"
 }
 
 type Canvas struct {
@@ -73,6 +90,7 @@ type Settings struct {
 	Width            int             `json:"width"`
 	Height           int             `json:"height"`
 	Window           Window          `json:"window"`
+	Platform         Platform        `json:"platform"`
 	Canvas           Canvas          `json:"canvas"`
 	Player           Player          `json:"player"`
 	Cloud            Cloud           `json:"cloud"`
@@ -94,7 +112,8 @@ func Default(p *project.Project) Settings {
 		FPS:              30,
 		Width:            480,
 		Height:           360,
-		Window:           Window{Resizable: true, Fit: "preserve", Background: "#1f1f1f"},
+		Window:           Window{Fit: "preserve", Background: "#1f1f1f"},
+		Platform:         Platform{Resizable: true, Border: true, Opacity: 1, Position: "auto", X: 100, Y: 100},
 		Loading:          DefaultLoadingSettings(),
 		Player: Player{
 			Title:     "GoWarp",
@@ -141,6 +160,19 @@ var safeID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,80}$`)
 var hexColor = regexp.MustCompile(`^#[a-fA-F0-9]{6}$`)
 
 func (s Settings) Validate() error {
+	if s.Platform.Position != "auto" && s.Platform.Position != "custom" {
+		return fmt.Errorf("window start position must be auto or custom")
+	}
+	if s.Platform.X < -100000 || s.Platform.X > 100000 || s.Platform.Y < -100000 || s.Platform.Y > 100000 {
+		return fmt.Errorf("window start coordinates must be -100000..100000")
+	}
+
+	if _, err := window.Pack(s.Platform.Views); err != nil {
+		return err
+	}
+	if math.IsNaN(s.Platform.Opacity) || math.IsInf(s.Platform.Opacity, 0) || s.Platform.Opacity < 0 || s.Platform.Opacity > 1 {
+		return fmt.Errorf("window opacity must be 0..1")
+	}
 	if s.Player.RenderFPS != 0 && s.Player.RenderFPS != 30 && s.Player.RenderFPS != 60 {
 		return fmt.Errorf("display FPS must be 0, 30 or 60")
 	}
@@ -258,7 +290,12 @@ func SaveContext(ctx context.Context, path string, s Settings) error {
 	if err := s.Validate(); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(s, "", "  ")
+	// Saved projects read stage dimensions from the SB3, not the settings file.
+	data, err := json.MarshalIndent(struct {
+		Settings
+		Width  *int `json:"width,omitempty"`
+		Height *int `json:"height,omitempty"`
+	}{Settings: s}, "", "  ")
 	if err != nil {
 		return err
 	}

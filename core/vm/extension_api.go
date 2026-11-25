@@ -14,6 +14,14 @@ type extensionAPI struct {
 }
 
 var hostAPIs = map[string]extensionAPI{
+	"window": {
+		call: func(c *extensionContext, operation string, args []any) (any, error) {
+			if c.r.host.windowAPI == nil {
+				return nil, fmt.Errorf("window API requires a desktop player")
+			}
+			return c.r.host.windowAPI(strings.TrimPrefix(operation, "window."), args)
+		},
+	},
 	"procedures": {
 		call: (*extensionContext).proceduresCall,
 	},

@@ -31,6 +31,7 @@ import (
 	x57 "gowarp/test/extensions/languageChecker"
 	x54 "gowarp/test/extensions/listkeyfinder"
 	x39 "gowarp/test/extensions/lmsAssets"
+	x59 "gowarp/test/extensions/lmsData"
 	x15 "gowarp/test/extensions/lmsLooksPlus"
 	x16 "gowarp/test/extensions/lmsMoreEvents"
 	x17 "gowarp/test/extensions/lmsSoundExpanded"
@@ -41,6 +42,7 @@ import (
 	x41 "gowarp/test/extensions/lmsutilsblocks"
 	x20 "gowarp/test/extensions/navigatorinfo"
 	x21 "gowarp/test/extensions/nkmoremotion"
+	x60 "gowarp/test/extensions/nonameawacomparisons"
 	x55 "gowarp/test/extensions/nonameawagraph"
 	x22 "gowarp/test/extensions/notSound"
 	x23 "gowarp/test/extensions/oaccaa"
@@ -64,5 +66,5 @@ import (
 )
 
 func Bundle() extension.Bundle {
-	return extension.Bundle{x0.New, x1.New, x2.New, x3.New, x4.New, x5.New, x6.New, x7.New, x8.New, x9.New, x10.New, x11.New, x12.New, x13.New, x14.New, x15.New, x16.New, x17.New, x18.New, x19.New, x20.New, x21.New, x22.New, x23.New, x24.New, x25.New, x26.New, x27.New, x28.New, x29.New, x30.New, x31.New, x32.New, x33.New, x34.New, x35.New, x36.New, x37.New, x38.New, x39.New, x40.New, x41.New, x42.New, x43.New, x44.New, x45.New, x46.New, x47.New, x48.New, x49.New, x50.New, x51.New, x52.New, x53.New, x54.New, x55.New, x56.New, x57.New, x58.New}
+	return extension.Bundle{x0.New, x1.New, x2.New, x3.New, x4.New, x5.New, x6.New, x7.New, x8.New, x9.New, x10.New, x11.New, x12.New, x13.New, x14.New, x15.New, x16.New, x17.New, x18.New, x19.New, x20.New, x21.New, x22.New, x23.New, x24.New, x25.New, x26.New, x27.New, x28.New, x29.New, x30.New, x31.New, x32.New, x33.New, x34.New, x35.New, x36.New, x37.New, x38.New, x39.New, x40.New, x41.New, x42.New, x43.New, x44.New, x45.New, x46.New, x47.New, x48.New, x49.New, x50.New, x51.New, x52.New, x53.New, x54.New, x55.New, x56.New, x57.New, x58.New, x59.New, x60.New}
 }

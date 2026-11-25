@@ -22,6 +22,10 @@ func TestLoadingFormPreservesAndRemovesImages(t *testing.T) {
 	}
 	for i := range f.fields {
 		switch f.fields[i].key {
+		case "loading.width":
+			f.fields[i].value = "640"
+		case "loading.height":
+			f.fields[i].value = "360"
 		case "loading.background":
 			f.fields[i].value = "#123456"
 		case "loading.progress":
@@ -34,7 +38,7 @@ func TestLoadingFormPreservesAndRemovesImages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Loading.Background != "#123456" || got.Loading.Progress != "#abcdef" || got.Loading.Text != "Ready soon" || !bytes.Equal(got.Loading.Logo, data.Bytes()) || !bytes.Equal(got.Loading.Image, data.Bytes()) {
+	if got.Loading.Width != 640 || got.Loading.Height != 360 || got.Loading.Background != "#123456" || got.Loading.Progress != "#abcdef" || got.Loading.Text != "Ready soon" || !bytes.Equal(got.Loading.Logo, data.Bytes()) || !bytes.Equal(got.Loading.Image, data.Bytes()) {
 		t.Fatal("loading form binding lost")
 	}
 	f.setLoadingImage("loading.logo", nil, nil)
@@ -93,7 +97,7 @@ func TestLoadingProgressCanBeHidden(t *testing.T) {
 	if s.Loading.Text != "Please wait" || s.Loading.ShowProgress {
 		t.Fatal("hiding progress changed the custom loading message")
 	}
-	for _, i := range a.form.visibleFields(5) {
+	for _, i := range a.form.visibleFields(5, "") {
 		if a.form.fields[i].key == "loading.progress" {
 			t.Fatal("hidden progress still exposes its color setting")
 		}

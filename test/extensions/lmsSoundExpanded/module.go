@@ -46,6 +46,9 @@ func New() e.Extension {
 		cmd("lmsSoundExpanded_playSoundAt", []string{"SOUND", "START"}, func(c *e.Context) (e.Result, error) {
 			return call(c, "audio.targetPlay", c.Args["SOUND"], c.Number("START"), false)
 		}),
+		cmd("lmsSoundExpanded_playSoundTo", []string{"SOUND", "START", "END"}, func(c *e.Context) (e.Result, error) {
+			return call(c, "audio.targetPlay", c.Args["SOUND"], c.Number("START"), false, c.Number("END"))
+		}),
 		cmd("lmsSoundExpanded_stopSound", []string{"SOUND"}, func(c *e.Context) (e.Result, error) {
 			v, err := c.Call("audio.targetVoice", c.Args["SOUND"])
 			if err != nil {

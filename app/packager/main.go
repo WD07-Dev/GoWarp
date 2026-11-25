@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -276,6 +277,13 @@ func (a *application) loadSettings(path string) {
 	})
 }
 
+func (a *application) targetOS() string {
+	if a.target < 0 || a.target >= len(a.templates) {
+		return ""
+	}
+	return a.templates[a.target].OS
+}
+
 func (a *application) runPreview() {
 	if a.busy || a.preview != nil {
 		return
@@ -289,6 +297,7 @@ func (a *application) runPreview() {
 				if err != nil {
 					return result{err: err}
 				}
+				s = settingsForPlatform(s, t.OS)
 				p, err := startPreview(ctx, a.ctx, t, s.Project, s)
 				return result{
 					preview: p,
@@ -305,6 +314,9 @@ func (a *application) runPreview() {
 
 func (a *application) save(path string, export bool) {
 	if a.busy {
+		return
+	}
+	if export && !a.requireProject() {
 		return
 	}
 	f := *a.form
@@ -327,6 +339,7 @@ func (a *application) save(path string, export bool) {
 			return result{err: err}
 		}
 		if export {
+			s = settingsForPlatform(s, tpl.OS)
 			err = compiler.Export(ctx, tpl, s.Project, path, s)
 		} else {
 			if s.Project != "" {
@@ -340,8 +353,22 @@ func (a *application) save(path string, export bool) {
 	})
 }
 
+func (a *application) requireProject() bool {
+	for _, field := range a.form.fields {
+		if field.key == "project" && strings.TrimSpace(field.value) != "" {
+			return true
+		}
+	}
+	a.errorText = i18n.Tr("error.project_required")
+	a.dirty = true
+	return false
+}
+
 func (a *application) choose(mode string) {
 	if a.busy {
+		return
+	}
+	if mode == "export" && !a.requireProject() {
 		return
 	}
 	a.editor = nil
@@ -920,7 +947,7 @@ func (a *application) input(x, y, w int, value *string) {
 	})
 }
 
-var sections = []string{"section.project", "section.runtime", "section.window", "section.player", "section.cloud", "section.loading", "section.export", "section.extensions"}
+var sections = []string{"section.project", "section.runtime", "section.window", "section.player", "section.cloud", "section.loading", "section.platform", "section.extensions"}
 
 func (a *application) render() {
 	a.hits = nil
@@ -1053,6 +1080,8 @@ func displayChoice(s string) string {
 		return i18n.Tr("choice.websocket")
 	case "turbowarp":
 		return "TurboWarp"
+	case "auto":
+		return i18n.Tr("choice.auto")
 	case "custom":
 		return i18n.Tr("choice.custom")
 	case "inherit":

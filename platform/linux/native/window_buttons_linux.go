@@ -2,7 +2,9 @@ package native
 
 import (
 	"fmt"
+	"math"
 	"os"
+	"sync"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
@@ -16,6 +18,7 @@ type windowX11 struct {
 	queryTree       func(uintptr, uintptr, *uintptr, *uintptr, **uintptr, *uint32) int32
 	getProperty     func(uintptr, uintptr, uintptr, int, int, int32, uintptr, *uintptr, *int32, *uintptr, *uintptr, **uintptr) int32
 	changeProperty  func(uintptr, uintptr, uintptr, uintptr, int32, int32, *uintptr, int32) int32
+	deleteProperty  func(uintptr, uintptr, uintptr) int32
 	free            func(unsafe.Pointer) int32
 	sync            func(uintptr, int32) int32
 	setErrorHandler func(uintptr) uintptr
@@ -29,7 +32,15 @@ var windowX11ErrorHandler = purego.NewCallback(func(uintptr, uintptr) int32 {
 	return 0
 })
 
-func SetWindowButtons(disableMinimize, disableMaximize bool) error {
+var windowX11Mu sync.Mutex
+
+func SetWindowProperties(disableMinimize, disableMaximize, disableClose bool, opacity float64) error {
+	if math.IsNaN(opacity) || math.IsInf(opacity, 0) || opacity < 0 || opacity > 1 {
+		return fmt.Errorf("window opacity must be between 0 and 1")
+	}
+	// XSetErrorHandler is process-global; serialize our temporary replacement.
+	windowX11Mu.Lock()
+	defer windowX11Mu.Unlock()
 	lib, err := purego.Dlopen("libX11.so.6", purego.RTLD_NOW|purego.RTLD_LOCAL)
 	if err != nil {
 		return err
@@ -44,6 +55,7 @@ func SetWindowButtons(disableMinimize, disableMaximize bool) error {
 	purego.RegisterLibFunc(&x.getProperty, lib, "XGetWindowProperty")
 	purego.RegisterLibFunc(&x.changeProperty, lib, "XChangeProperty")
 	purego.RegisterLibFunc(&x.free, lib, "XFree")
+	purego.RegisterLibFunc(&x.deleteProperty, lib, "XDeleteProperty")
 	purego.RegisterLibFunc(&x.sync, lib, "XSync")
 	purego.RegisterLibFunc(&x.setErrorHandler, lib, "XSetErrorHandler")
 	display := x.openDisplay(nil)
@@ -69,15 +81,27 @@ func SetWindowButtons(disableMinimize, disableMaximize bool) error {
 	} else if hints[1]&1 != 0 {
 		hints[1] = allFunctions &^ hints[1]
 	}
-	hints[0] |= 1 // MWM_HINTS_FUNCTIONS; preserve decorations and other fields.
+	hints[1] |= 8 | 16 | 32 // Restore buttons previously disabled by this API.
+	hints[0] |= 1           // MWM_HINTS_FUNCTIONS; preserve decorations and other fields.
 	if disableMinimize {
 		hints[1] &^= 8
 	}
 	if disableMaximize {
 		hints[1] &^= 16
 	}
+	if disableClose {
+		hints[1] &^= 32
+	}
 	// Xlib stores each 32-bit property item in a native unsigned long.
 	x.changeProperty(display, window, atom, atom, 32, 0, &hints[0], 5)
+	opacityAtom := x.internAtom(display, "_NET_WM_WINDOW_OPACITY", 0)
+	if opacity == 1 {
+		x.deleteProperty(display, window, opacityAtom)
+	} else {
+		alpha := uintptr(math.Round(opacity * 0xffffffff))
+		cardinal := x.internAtom(display, "CARDINAL", 0)
+		x.changeProperty(display, window, opacityAtom, cardinal, 32, 0, &alpha, 1)
+	}
 	x.sync(display, 0)
 	got := x.property(display, window, atom)
 	if len(got) < 2 || got[0] != hints[0] || got[1] != hints[1] {

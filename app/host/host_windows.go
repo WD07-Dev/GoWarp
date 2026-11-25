@@ -13,8 +13,8 @@ const (
 	ClipboardUsesMeta = native.ClipboardUsesMeta
 )
 
-func SetWindowButtons(disableMinimize, disableMaximize bool) error {
-	return native.SetWindowButtons(disableMinimize, disableMaximize)
+func SetWindowProperties(disableMinimize, disableMaximize, disableClose bool, opacity float64) error {
+	return native.SetWindowProperties(disableMinimize, disableMaximize, disableClose, opacity)
 }
 
 func Command(ctx context.Context, name string, args ...string) *exec.Cmd {

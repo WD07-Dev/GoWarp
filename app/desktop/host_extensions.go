@@ -40,7 +40,14 @@ func (g *game) sampleHostWindow() (vm.HostWindow, error) {
 	if s := g.options.Settings; s != nil {
 		title = s.Player.Title
 	}
-	return vm.HostWindow{ScreenWidth: w, ScreenHeight: h, Focused: ebiten.IsFocused(), Title: title}, nil
+	if g.windowReady {
+		title = g.mainWindow.Title
+	}
+	focused := ebiten.IsFocused()
+	if g.native != nil {
+		focused = g.native.input.Focused
+	}
+	return vm.HostWindow{ScreenWidth: w, ScreenHeight: h, Focused: focused, Title: title}, nil
 }
 
 func (g *game) applyHostCommands() error {
@@ -52,11 +59,27 @@ func (g *game) applyHostCommands() error {
 	for _, command := range g.controller.vm.DrainHostCommands() {
 		switch command.Kind {
 		case "fullscreen":
+			if g.native != nil {
+				_, err := g.nativeWindowCall("set", []any{"main", fmt.Sprintf("{\"fullscreen\":%t}", command.Value == "true")})
+				if err != nil {
+					return err
+				}
+				continue
+			}
 			g.projectFullscreen = command.Value == "true"
-			ebiten.SetFullscreen(g.hostFullscreen || g.projectFullscreen)
+			g.mainWindow.Fullscreen = g.hostFullscreen || g.projectFullscreen
+			ebiten.SetFullscreen(g.mainWindow.Fullscreen)
 			g.windowFocusRead, g.windowFullscreenRead = false, false
 		case "title":
-			ebiten.SetWindowTitle(command.Value)
+			if g.native != nil {
+				for i := range g.native.layout.Views {
+					g.native.layout.Views[i].Title = command.Value
+				}
+				g.native.dirty = true
+			} else {
+				ebiten.SetWindowTitle(command.Value)
+				g.mainWindow.Title = command.Value
+			}
 		case "stop-all":
 			if s := g.options.Settings; s != nil && s.Player.CloseOnStop {
 				if g.options.Diagnostic != nil {

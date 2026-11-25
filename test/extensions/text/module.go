@@ -24,7 +24,7 @@ func menu(op, key string) e.Block {
 }
 func New() e.Extension {
 	x := e.Extension{ID: "text"}
-	for _, entry := range []struct{ op, key, input string }{{"setFont", "font", ""}, {"setText", "text", "TEXT"}, {"setColor", "color", "COLOR"}, {"setOutlineColor", "outlineColor", "COLOR"}, {"setOutlineWidth", "outlineWidth", "WIDTH"}, {"clearText", "visible", ""}} {
+	for _, entry := range []struct{ op, key, input string }{{"setWidth", "width", "WIDTH"}, {"setFont", "font", ""}, {"setText", "text", "TEXT"}, {"setColor", "color", "COLOR"}, {"setOutlineColor", "outlineColor", "COLOR"}, {"setOutlineWidth", "outlineWidth", "WIDTH"}, {"clearText", "visible", ""}} {
 		entry := entry
 		var inputs []string
 		if entry.input != "" {
@@ -44,6 +44,15 @@ func New() e.Extension {
 				skin = map[string]any{"width": width, "font": "Handwriting", "color": "#575e75", "outlineColor": "#000000"}
 			}
 			switch entry.op {
+			case "setWidth":
+				skin["width"] = c.Number("WIDTH")
+				skin["align"] = 0.0
+				switch c.Field("ALIGN") {
+				case "center":
+					skin["align"] = 0.5
+				case "right":
+					skin["align"] = 1.0
+				}
 			case "setFont":
 				skin[entry.key] = c.Field("FONT")
 			case "clearText":
@@ -113,7 +122,7 @@ func textCall(host e.Host, operation string, args []any) (any, error) {
 
 func property(key string) bool {
 	switch key {
-	case "text", "font", "color", "outlineColor", "width", "outlineWidth", "visible":
+	case "text", "font", "color", "outlineColor", "width", "outlineWidth", "visible", "align":
 		return true
 	}
 	return false

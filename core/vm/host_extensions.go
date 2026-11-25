@@ -11,6 +11,7 @@ type HostCommand struct {
 }
 
 type hostExtensionState struct {
+	windowAPI         func(string, []any) (any, error)
 	files             filePickerState
 	commands          []HostCommand
 	keys              []string
@@ -22,6 +23,10 @@ type hostExtensionState struct {
 	windowRead        bool
 	windowTitle       string
 	windowTitleSet    bool
+}
+
+func (r *Runtime) SetWindowHandler(handler func(string, []any) (any, error)) {
+	r.host.windowAPI = handler
 }
 
 // HostWindow contains native properties with matching browser reporter units.

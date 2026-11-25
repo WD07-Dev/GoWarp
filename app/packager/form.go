@@ -80,10 +80,6 @@ func newForm(s config.Settings, variables map[string]string) *form {
 	add(1, "removeMiscLimits", "field.misc_limits")
 	add(2, "window.width", "field.width")
 	add(2, "window.height", "field.height")
-	add(2, "window.resizable", "field.resizable")
-	add(2, "window.disableMinimize", "field.no_minimize")
-	add(2, "window.disableMaximize", "field.no_maximize")
-	add(2, "window.fullscreen", "field.fullscreen")
 	add(2, "canvas.antialias", "field.antialias")
 	add(2, "player.renderFPS", "field.render_fps", "0", "30", "60")
 	add(2, "window.fit", "field.fit", "preserve", "integer", "stretch")
@@ -110,11 +106,25 @@ func newForm(s config.Settings, variables map[string]string) *form {
 	add(5, "loading.text", "field.loading_text")
 	add(5, "loading.showProgress", "field.loading_show_progress")
 	add(5, "loading.progress", "field.loading_progress")
+	add(5, "loading.width", "field.loading_width")
+	add(5, "loading.height", "field.loading_height")
 	f.fields = append(f.fields,
 		field{label: "field.loading_logo", key: "loading.logo", kind: "loadingImage", section: 5},
 		field{label: "field.loading_image", key: "loading.image", kind: "loadingImage", section: 5},
 		field{label: "field.loading_preview", kind: "loadingPreview", section: 5},
 	)
+	add(6, "platform.resizable", "field.resizable")
+	add(6, "platform.disableClose", "field.no_close")
+	add(6, "platform.disableMinimize", "field.no_minimize")
+	add(6, "platform.disableMaximize", "field.no_maximize")
+	add(6, "platform.fullscreen", "field.fullscreen")
+	add(6, "platform.position", "field.start_position", "auto", "custom")
+	add(6, "platform.x", "field.start_x")
+	add(6, "platform.y", "field.start_y")
+	add(6, "platform.border", "field.border")
+	add(6, "platform.opacity", "field.opacity")
+	add(6, "platform.topmost", "field.topmost")
+	add(6, "platform.multiWindow", "field.multiwindow")
 	ids := make([]string, 0, len(variables))
 	for id := range variables {
 		ids = append(ids, id)
@@ -137,17 +147,22 @@ func newForm(s config.Settings, variables map[string]string) *form {
 	return f
 }
 
-func (f *form) visibleFields(section int) []int {
+func (f *form) visibleFields(section int, targetOS string) []int {
 	usesNetwork := false
 	showsControls := false
 	showsProgress := false
 	provider := ""
+	fullscreen, customPosition := false, false
 	for _, field := range f.fields {
 		if field.kind == "variable" {
 			usesNetwork = usesNetwork || field.value == "websocket"
 			continue
 		}
 		switch field.key {
+		case "platform.fullscreen":
+			fullscreen = field.value == "true"
+		case "platform.position":
+			customPosition = field.value == "custom"
 		case "cloud.mode":
 			usesNetwork = usesNetwork || field.value == "websocket"
 		case "cloud.provider":
@@ -164,8 +179,19 @@ func (f *form) visibleFields(section int) []int {
 		if field.section != section {
 			continue
 		}
+		if section == 6 && (targetOS != "windows" && targetOS != "linux" || field.key == "platform.multiWindow" && targetOS != "windows") {
+			continue
+		}
 		if field.kind != "variable" {
 			switch field.key {
+			case "platform.position":
+				if fullscreen {
+					continue
+				}
+			case "platform.x", "platform.y":
+				if fullscreen || !customPosition {
+					continue
+				}
 			case "cloud.provider", "cloud.projectId":
 				if !usesNetwork {
 					continue
@@ -237,4 +263,12 @@ func (f *form) settings() (config.Settings, error) {
 	}
 	s.Window.Width, s.Window.Height = s.DisplaySize()
 	return s, s.Validate()
+}
+
+// settingsForPlatform applies target restrictions without changing the saved project.
+func settingsForPlatform(s config.Settings, targetOS string) config.Settings {
+	if targetOS != "windows" {
+		s.Platform.MultiWindow = false
+	}
+	return s
 }

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "appId": "gowarp-window-api-demo",
+  "project": "native-windows.sb3",
+  "fps": 30,
+  "player": {
+    "title": "Window API demo",
+    "autoStart": true,
+    "controls": false
+  },
+  "platform": {
+    "multiWindow": true
+  }
+}

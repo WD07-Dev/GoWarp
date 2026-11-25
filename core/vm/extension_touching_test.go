@@ -36,6 +36,59 @@ func TestExtensionTargetTouching(t *testing.T) {
 	}
 }
 
+func TestExtensionTouchingTargetUsesExactCandidate(t *testing.T) {
+	r := eventProject(t, `[{"isStage":true},{"name":"Probe","visible":true},{"name":"Obstacle","visible":true}]`)
+	probe, original := r.targets[1], r.targets[2]
+	r.createClone(original)
+	clone := r.targets[len(r.targets)-1]
+	c := &extensionContext{r: r, th: &thread{target: probe}}
+	if _, err := c.Call("target.touchingTarget", logicTargetID(clone)); err == nil {
+		t.Fatal("missing costume geometry must be reported")
+	}
+	calls := 0
+	r.graphics = &extensionTouchGraphics{inspect: func(scene []DisplayTarget) {
+		calls++
+		if len(scene) != 1 || scene[0].Source != clone.sourceIndex || scene[0].State.CloneID != clone.state.CloneID {
+			t.Fatalf("query included unrelated targets: %+v", scene)
+		}
+		if scene[0].State.Variables != nil || scene[0].State.Lists != nil {
+			t.Fatal("query leaked VM data")
+		}
+	}}
+	if value, err := c.Call("target.touchingTarget", logicTargetID(clone)); err != nil || value != true {
+		t.Fatal(value, err)
+	}
+	// Existing name queries must not populate a broader cached scene for this API.
+	r.graphics = &extensionTouchGraphics{}
+	if _, err := c.Call("target.touching", "Obstacle"); err != nil {
+		t.Fatal(err)
+	}
+	r.graphics = &extensionTouchGraphics{inspect: func(scene []DisplayTarget) {
+		calls++
+		if len(scene) != 1 || scene[0].State.CloneID != clone.state.CloneID {
+			t.Fatal("name query polluted exact-target query", scene)
+		}
+	}}
+	if _, err := c.Call("target.touchingTarget", logicTargetID(clone)); err != nil {
+		t.Fatal(err)
+	}
+	for _, ref := range []string{logicTargetID(probe), "_stage_"} {
+		if value, err := c.Call("target.touchingTarget", ref); err != nil || value != false {
+			t.Fatal(ref, value, err)
+		}
+	}
+	clone.state.Visible = false
+	if value, err := c.Call("target.touchingTarget", logicTargetID(clone)); err != nil || value != false {
+		t.Fatal(value, err)
+	}
+	if calls != 2 {
+		t.Fatal("invalid candidates reached geometry", calls)
+	}
+	if _, err := c.Call("target.touchingTarget", "missing"); err == nil {
+		t.Fatal("unknown target accepted")
+	}
+}
+
 func TestExtensionFullscreenCommandUpdatesReportedState(t *testing.T) {
 	r := fixture(t, `{}`)
 	c := &extensionContext{r: r}

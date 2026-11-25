@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -60,19 +61,25 @@ func TestRenderingSettingsProjectDefaultsAndRoundTrip(t *testing.T) {
 	}
 }
 
-func TestStageAndWindowDimensionsRemainIndependent(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "game.gowarp.json")
-	if err := os.WriteFile(path, []byte(`{"width":800,"height":600,"window":{"width":1600,"height":1376}}`), 0600); err != nil {
-		t.Fatal(err)
+func TestSavedSettingsReadStageDimensionsFromProject(t *testing.T) {
+	dir := t.TempDir()
+	projectPath := filepath.Join(dir, "project.json")
+	writeProject := func(width int) {
+		t.Helper()
+		data := fmt.Sprintf(`{"targets":[{"isStage":true,"name":"Stage","comments":{"c":{"text":"{\"width\":%d,\"height\":360} // _twconfig_"}}}]}`, width)
+		if err := os.WriteFile(projectPath, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
 	}
-	s, err := Load(path)
+	writeProject(480)
+	p, err := project.Load(projectPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Width != 800 || s.Height != 600 || s.Window.Width != 1600 || s.Window.Height != 1376 {
-		t.Fatalf("display dimensions were overwritten: %+v", s)
-	}
-	s.Width, s.Height = 640, 480
+	s := DefaultForProject(projectPath, p)
+	s.Window.Width, s.Window.Height = 960, 360
+	s.Loading.Width, s.Loading.Height = 480, 360
+	path := filepath.Join(dir, "game.gowarp.json")
 	if err := Save(path, s); err != nil {
 		t.Fatal(err)
 	}
@@ -80,12 +87,25 @@ func TestStageAndWindowDimensionsRemainIndependent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var saved Settings
-	if err := json.Unmarshal(data, &saved); err != nil {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
 		t.Fatal(err)
 	}
-	if saved.Width != 640 || saved.Height != 480 || saved.Window.Width != 1600 || saved.Window.Height != 1376 {
-		t.Fatalf("saving logical dimensions changed display size: %+v", saved)
+	for _, key := range []string{"width", "height"} {
+		if _, ok := fields[key]; ok {
+			t.Fatalf("saved settings contain stage %s", key)
+		}
+	}
+	writeProject(960)
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Width != 960 || got.Height != 360 {
+		t.Fatalf("stage dimensions did not follow the edited project: %dx%d", got.Width, got.Height)
+	}
+	if got.Window != s.Window || got.Loading.Width != 480 || got.Loading.Height != 360 {
+		t.Fatalf("window or loading dimensions changed: %+v, %+v", got.Window, got.Loading)
 	}
 }
 
