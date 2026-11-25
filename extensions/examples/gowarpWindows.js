@@ -7,7 +7,6 @@
 @gowarp-config {
 }
 @gowarp-go {
-// Code generated from the extension Go comment for regression tests. DO NOT EDIT.
 package extension
 
 import (
@@ -34,8 +33,15 @@ func New() e.Extension {
 			return e.Result{}, nil
 		}},
 		{Opcode: "gowarpWindows_create", Kind: "command", Inputs: []string{"ID", "X", "Y", "W", "H"}, Handler: func(c *e.Context) (e.Result, error) {
-			data, err := json.Marshal(map[string]any{"id": c.String("ID"), "title": c.String("ID"), "x": c.Number("X"), "y": c.Number("Y"),
-				"width": c.Number("W"), "height": c.Number("H"), "stageWidth": c.Number("W"), "stageHeight": c.Number("H"), "border": e.Bool(c.Field("BORDER")), "resizable": true, "opacity": 1})
+			id := c.String("ID")
+			width, height := c.Number("W"), c.Number("H")
+			data, err := json.Marshal(map[string]any{
+				"id": id, "title": id,
+				"x": c.Number("X"), "y": c.Number("Y"),
+				"width": width, "height": height,
+				"stageWidth": width, "stageHeight": height,
+				"border": e.Bool(c.Field("BORDER")), "resizable": true, "opacity": 1,
+			})
 			if err != nil {
 				return e.Result{}, err
 			}
@@ -51,20 +57,13 @@ func New() e.Extension {
 			return e.Result{}, err
 		}},
 		{Opcode: "gowarpWindows_setBoolean", Kind: "command", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
-			data, err := json.Marshal(map[string]any{c.Field("PROPERTY"): e.Bool(c.Field("VALUE"))})
-			if err != nil {
-				return e.Result{}, err
-			}
-			_, err = c.Call("window.set", c.String("ID"), string(data))
-			return e.Result{}, err
+			return setProperty(c, c.Field("PROPERTY"), e.Bool(c.Field("VALUE")))
+		}},
+		{Opcode: "gowarpWindows_topmost", Kind: "command", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			return setProperty(c, "topmost", e.Bool(c.Field("VALUE")))
 		}},
 		{Opcode: "gowarpWindows_opacity", Kind: "command", Inputs: []string{"ID", "PERCENT"}, Handler: func(c *e.Context) (e.Result, error) {
-			data, err := json.Marshal(map[string]any{"opacity": c.Number("PERCENT") / 100})
-			if err != nil {
-				return e.Result{}, err
-			}
-			_, err = c.Call("window.set", c.String("ID"), string(data))
-			return e.Result{}, err
+			return setProperty(c, "opacity", c.Number("PERCENT") / 100)
 		}},
 		{Opcode: "gowarpWindows_list", Text: "window IDs", Kind: "reporter", Handler: func(c *e.Context) (e.Result, error) {
 			v, err := c.Call("window.list")
@@ -87,6 +86,15 @@ func New() e.Extension {
 			return e.Result{Value: v}, err
 		}},
 	}}
+}
+
+func setProperty(c *e.Context, property string, value any) (e.Result, error) {
+	data, err := json.Marshal(map[string]any{property: value})
+	if err != nil {
+		return e.Result{}, err
+	}
+	_, err = c.Call("window.set", c.String("ID"), string(data))
+	return e.Result{}, err
 }
 
 }
@@ -225,6 +233,9 @@ func New() e.Extension {
             text: "set window [ID] [PROPERTY] to [VALUE]",
             arguments: {ID: str("main"), PROPERTY: {type: Scratch.ArgumentType.STRING, menu: "properties", defaultValue: "border"},
               VALUE: {type: Scratch.ArgumentType.STRING, menu: "booleans", defaultValue: "true"}}},
+          {opcode: "topmost", blockType: Scratch.BlockType.COMMAND,
+            text: "set window [ID] always on top to [VALUE]",
+            arguments: {ID: str("main"), VALUE: {type: Scratch.ArgumentType.STRING, menu: "booleans", defaultValue: "true"}}},
           {opcode: "opacity", blockType: Scratch.BlockType.COMMAND, text: "set window [ID] opacity to [PERCENT] %",
             arguments: {ID: str("main"), PERCENT: num(100)}},
           {opcode: "list", blockType: Scratch.BlockType.REPORTER, text: "window IDs", disableMonitor: true},
@@ -264,6 +275,7 @@ func New() e.Extension {
     move({ID, X, Y}) { this.patch(ID, {x: Math.round(number(X)), y: Math.round(number(Y))}); }
     set({ID, JSON: properties}) { this.patch(ID, JSON.parse(String(properties))); }
     setBoolean({ID, PROPERTY, VALUE}) { this.patch(ID, {[PROPERTY]: Scratch.Cast.toBoolean(VALUE)}); }
+    topmost({ID, VALUE}) { this.patch(ID, {topmost: Scratch.Cast.toBoolean(VALUE)}); }
     opacity({ID, PERCENT}) { this.patch(ID, {opacity: number(PERCENT) / 100}); }
     list() { return JSON.stringify([...this.views.keys()]); }
     quit() { this.views.clear(); this.guides.clear(); this.removeOverlay(); }

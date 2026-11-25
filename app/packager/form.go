@@ -118,11 +118,7 @@ func newForm(s config.Settings, variables map[string]string) *form {
 	add(6, "platform.disableMinimize", "field.no_minimize")
 	add(6, "platform.disableMaximize", "field.no_maximize")
 	add(6, "platform.fullscreen", "field.fullscreen")
-	add(6, "platform.position", "field.start_position", "auto", "custom")
-	add(6, "platform.x", "field.start_x")
-	add(6, "platform.y", "field.start_y")
 	add(6, "platform.border", "field.border")
-	add(6, "platform.opacity", "field.opacity")
 	add(6, "platform.topmost", "field.topmost")
 	add(6, "platform.multiWindow", "field.multiwindow")
 	ids := make([]string, 0, len(variables))
@@ -152,17 +148,12 @@ func (f *form) visibleFields(section int, targetOS string) []int {
 	showsControls := false
 	showsProgress := false
 	provider := ""
-	fullscreen, customPosition := false, false
 	for _, field := range f.fields {
 		if field.kind == "variable" {
 			usesNetwork = usesNetwork || field.value == "websocket"
 			continue
 		}
 		switch field.key {
-		case "platform.fullscreen":
-			fullscreen = field.value == "true"
-		case "platform.position":
-			customPosition = field.value == "custom"
 		case "cloud.mode":
 			usesNetwork = usesNetwork || field.value == "websocket"
 		case "cloud.provider":
@@ -184,14 +175,6 @@ func (f *form) visibleFields(section int, targetOS string) []int {
 		}
 		if field.kind != "variable" {
 			switch field.key {
-			case "platform.position":
-				if fullscreen {
-					continue
-				}
-			case "platform.x", "platform.y":
-				if fullscreen || !customPosition {
-					continue
-				}
 			case "cloud.provider", "cloud.projectId":
 				if !usesNetwork {
 					continue

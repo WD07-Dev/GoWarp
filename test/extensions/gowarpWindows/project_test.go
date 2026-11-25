@@ -142,11 +142,24 @@ func TestScratchExampleStopsOnQ(t *testing.T) {
 	if created["id"] != "second" || created["border"] != true || created["resizable"] != true || created["opacity"] != float64(1) {
 		t.Fatalf("create dropdown/defaults=%v", created)
 	}
-	if len(calls) != 6 || calls[3].op != "viewport" {
+	if len(calls) != 8 || calls[3].op != "viewport" {
 		t.Fatalf("window configuration changed after startup: %+v", calls)
 	}
 	if args := calls[3].args; len(args) != 5 || args[0] != "second" || args[1] != float64(480) || args[2] != float64(0) || args[3] != float64(480) || args[4] != float64(360) {
 		t.Fatalf("second window does not show the right half: %v", args)
+	}
+	for i, id := range []string{"main", "second"} {
+		call := calls[6+i]
+		var properties map[string]any
+		if call.op != "set" || len(call.args) != 2 || call.args[0] != id {
+			t.Fatalf("always-on-top call for %s: %+v", id, call)
+		}
+		if err := json.Unmarshal([]byte(call.args[1].(string)), &properties); err != nil {
+			t.Fatal(err)
+		}
+		if len(properties) != 1 || properties["topmost"] != true {
+			t.Fatalf("always-on-top properties for %s: %v", id, properties)
+		}
 	}
 	stage := r.Snapshot()[0]
 	if stage.Variables["window IDs"].Value != `["main","second"]` || stage.Variables["second properties"].Value != `{"id":"second","stageX":480}` {

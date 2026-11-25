@@ -34,21 +34,13 @@ type Window struct {
 type Platform struct {
 	Resizable       bool          `json:"resizable"`
 	Fullscreen      bool          `json:"fullscreen"`
-	Position        string        `json:"position"`
-	X               int           `json:"x"`
-	Y               int           `json:"y"`
 	DisableMinimize bool          `json:"disableMinimize"`
 	DisableMaximize bool          `json:"disableMaximize"`
 	Border          bool          `json:"border"`
 	Topmost         bool          `json:"topmost"`
 	DisableClose    bool          `json:"disableClose"`
-	Opacity         float64       `json:"opacity"`
 	MultiWindow     bool          `json:"multiWindow"`
 	Views           []window.View `json:"views,omitempty"`
-}
-
-func (p Platform) CustomPosition() bool {
-	return !p.Fullscreen && p.Position == "custom"
 }
 
 type Canvas struct {
@@ -113,7 +105,7 @@ func Default(p *project.Project) Settings {
 		Width:            480,
 		Height:           360,
 		Window:           Window{Fit: "preserve", Background: "#1f1f1f"},
-		Platform:         Platform{Resizable: true, Border: true, Opacity: 1, Position: "auto", X: 100, Y: 100},
+		Platform:         Platform{Resizable: true, Border: true},
 		Loading:          DefaultLoadingSettings(),
 		Player: Player{
 			Title:     "GoWarp",
@@ -160,18 +152,8 @@ var safeID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,80}$`)
 var hexColor = regexp.MustCompile(`^#[a-fA-F0-9]{6}$`)
 
 func (s Settings) Validate() error {
-	if s.Platform.Position != "auto" && s.Platform.Position != "custom" {
-		return fmt.Errorf("window start position must be auto or custom")
-	}
-	if s.Platform.X < -100000 || s.Platform.X > 100000 || s.Platform.Y < -100000 || s.Platform.Y > 100000 {
-		return fmt.Errorf("window start coordinates must be -100000..100000")
-	}
-
 	if _, err := window.Pack(s.Platform.Views); err != nil {
 		return err
-	}
-	if math.IsNaN(s.Platform.Opacity) || math.IsInf(s.Platform.Opacity, 0) || s.Platform.Opacity < 0 || s.Platform.Opacity > 1 {
-		return fmt.Errorf("window opacity must be 0..1")
 	}
 	if s.Player.RenderFPS != 0 && s.Player.RenderFPS != 30 && s.Player.RenderFPS != 60 {
 		return fmt.Errorf("display FPS must be 0, 30 or 60")

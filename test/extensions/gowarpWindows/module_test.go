@@ -38,6 +38,8 @@ func TestFieldMenusAndOpacity(t *testing.T) {
 	}{
 		{"setBoolean", "disableClose", map[string]any{"ID": "main", "PROPERTY": "wrong", "VALUE": "false"}, map[string]string{"PROPERTY": "disableClose", "VALUE": "true"}, true},
 		{"setBoolean", "border", map[string]any{"ID": "main"}, map[string]string{"PROPERTY": "border", "VALUE": "false"}, false},
+		{"topmost", "topmost", map[string]any{"ID": "main", "VALUE": "false"}, map[string]string{"VALUE": "true"}, true},
+		{"topmost", "topmost", map[string]any{"ID": "main"}, map[string]string{"VALUE": "false"}, false},
 		{"opacity", "opacity", map[string]any{"ID": "main", "PERCENT": 55}, nil, 0.55},
 	} {
 		t.Run(tc.property, func(t *testing.T) {

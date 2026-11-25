@@ -136,9 +136,6 @@ func Run(ctx context.Context, path string, p *project.Project, options Options, 
 		if !s.Platform.Resizable {
 			ebiten.SetWindowResizingMode(ebiten.WindowResizingModeDisabled)
 		}
-		if s.Platform.CustomPosition() {
-			ebiten.SetWindowPosition(s.Platform.X, s.Platform.Y)
-		}
 		ebiten.SetFullscreen(s.Platform.Fullscreen)
 		ebiten.SetWindowDecorated(s.Platform.Border)
 		ebiten.SetWindowFloating(s.Platform.Topmost && !s.Platform.MultiWindow)

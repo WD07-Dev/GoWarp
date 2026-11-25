@@ -89,7 +89,7 @@ func (a *application) renderSettings() {
 		if f.key == "cloud.provider" {
 			customProvider = f.value == "custom"
 		}
-		compact := f.kind == "bool" || f.kind == "number" || f.key == "loading.progress" || f.key == "platform.position"
+		compact := f.kind == "bool" || f.kind == "number" || f.key == "loading.progress"
 		if (!compact || f.key == "loading.width") && column == 1 {
 			y += 96
 			column = 0

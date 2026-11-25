@@ -262,10 +262,8 @@ func (g *game) restoreGameWindowSize() error {
 			if v.ID != "main" {
 				continue
 			}
-			if s.Platform.Position == "auto" {
-				v.X += (v.Width - n.gameWindowSize.X) / 2
-				v.Y += (v.Height - n.gameWindowSize.Y) / 2
-			}
+			v.X += (v.Width - n.gameWindowSize.X) / 2
+			v.Y += (v.Height - n.gameWindowSize.Y) / 2
 			v.Width, v.Height = n.gameWindowSize.X, n.gameWindowSize.Y
 		}
 		layout, err := window.Pack(views)
@@ -279,9 +277,7 @@ func (g *game) restoreGameWindowSize() error {
 	oldWidth, oldHeight := ebiten.WindowSize()
 	x, y := ebiten.WindowPosition()
 	ebiten.SetWindowSize(width, height)
-	if s.Platform.Position == "auto" {
-		ebiten.SetWindowPosition(x+(oldWidth-width)/2, y+(oldHeight-height)/2)
-	}
+	ebiten.SetWindowPosition(x+(oldWidth-width)/2, y+(oldHeight-height)/2)
 	g.initMainWindow()
 	return nil
 }

@@ -89,7 +89,6 @@ field.topmost,Always on top,항상 맨 위
 field.loading_width,Loading window width (0 = game),로딩 창 너비 (0 = 게임 창)
 field.loading_height,Loading window height (0 = game),로딩 창 높이 (0 = 게임 창)
 field.no_close,Disable close button,닫기 버튼 비활성화
-field.opacity,Window opacity (0–1),창 불투명도 (0–1)
 field.fit,Screen fit,화면 맞춤
 field.background,Window background (outside stage),창 배경색 (무대 바깥)
 field.title,Window title,창 제목
@@ -197,7 +196,3 @@ editor.state.running,Preview running,미리보기 실행 중
 editor.state.stopping,Stopping…,중지 중…
 editor.state.error,Preview failed,미리보기 실패
 action.connect_turbowarp,Connect TurboWarp,TurboWarp 연결
-field.start_position,Window start position,창 시작 위치
-field.start_x,Start X,시작 X
-field.start_y,Start Y,시작 Y
-choice.auto,Automatic,자동

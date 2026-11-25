@@ -18,11 +18,10 @@ func (g *game) initMainWindow() {
 		Border: ebiten.IsWindowDecorated(), Resizable: ebiten.WindowResizingMode() == ebiten.WindowResizingModeEnabled,
 	}
 	if s := g.options.Settings; s != nil {
-		alpha := s.Platform.Opacity
 		v.Title, v.Border, v.Resizable = s.Player.Title, s.Platform.Border, s.Platform.Resizable
 		v.Topmost = s.Platform.Topmost
 		v.DisableMinimize, v.DisableMaximize = s.Platform.DisableMinimize, s.Platform.DisableMaximize
-		v.DisableClose, v.Opacity, v.Fullscreen = s.Platform.DisableClose, &alpha, s.Platform.Fullscreen
+		v.DisableClose, v.Fullscreen = s.Platform.DisableClose, s.Platform.Fullscreen
 		v.StageWidth, v.StageHeight = float64(s.Width), float64(s.Height)
 	}
 	g.mainWindow, g.windowReady = v, true

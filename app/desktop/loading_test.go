@@ -619,32 +619,24 @@ func TestLoadingWindowRestoresGameSize(t *testing.T) {
 	oldW, oldH := ebiten.WindowSize()
 	oldX, oldY := ebiten.WindowPosition()
 	t.Cleanup(func() { ebiten.SetWindowSize(oldW, oldH); ebiten.SetWindowPosition(oldX, oldY) })
-	for _, position := range []string{"auto", "custom"} {
-		s := config.Default(nil)
-		s.Window.Width, s.Window.Height = 800, 600
-		s.Player.Controls = false
-		s.Platform.Position = position
-		s.Loading.Width, s.Loading.Height = 640, 360
-		ebiten.SetWindowSize(640, 360)
-		ebiten.SetWindowPosition(200, 200)
-		g := &game{options: Options{Settings: &s}}
-		if err := g.restoreGameWindowSize(); err != nil {
-			t.Fatal(err)
-		}
-		if w, h := ebiten.WindowSize(); w != 800 || h != 600 {
-			t.Fatalf("restored size: %dx%d", w, h)
-		}
-		wantX, wantY := 200, 200
-		if position == "auto" {
-			wantX, wantY = 120, 80
-		}
-		if x, y := ebiten.WindowPosition(); x != wantX || y != wantY {
-			t.Fatalf("restored position: %d,%d want %d,%d", x, y, wantX, wantY)
-		}
-	}
 	s := config.Default(nil)
-	s.Platform.Fullscreen = true
+	s.Window.Width, s.Window.Height = 800, 600
+	s.Player.Controls = false
 	s.Loading.Width, s.Loading.Height = 640, 360
+	ebiten.SetWindowSize(640, 360)
+	ebiten.SetWindowPosition(200, 200)
+	g := &game{options: Options{Settings: &s}}
+	if err := g.restoreGameWindowSize(); err != nil {
+		t.Fatal(err)
+	}
+	if w, h := ebiten.WindowSize(); w != 800 || h != 600 {
+		t.Fatalf("restored size: %dx%d", w, h)
+	}
+	wantX, wantY := 120, 80
+	if x, y := ebiten.WindowPosition(); x != wantX || y != wantY {
+		t.Fatalf("restored position: %d,%d want %d,%d", x, y, wantX, wantY)
+	}
+	s.Platform.Fullscreen = true
 	ebiten.SetWindowSize(900, 700)
 	if err := (&game{options: Options{Settings: &s}}).restoreGameWindowSize(); err != nil {
 		t.Fatal(err)

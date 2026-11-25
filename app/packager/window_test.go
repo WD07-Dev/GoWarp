@@ -37,7 +37,7 @@ func TestWindowButtonsCanBeDisabledIndependently(t *testing.T) {
 
 func TestPlatformFieldsFollowTargetOS(t *testing.T) {
 	f := newForm(config.Default(nil), nil)
-	common := []string{"platform.resizable", "platform.disableMinimize", "platform.disableMaximize", "platform.fullscreen", "platform.border", "platform.disableClose", "platform.opacity"}
+	common := []string{"platform.resizable", "platform.disableMinimize", "platform.disableMaximize", "platform.fullscreen", "platform.border", "platform.disableClose"}
 	for _, targetOS := range []string{"windows", "linux", "android", "ios", ""} {
 		visible := map[string]bool{}
 		for _, i := range f.visibleFields(6, targetOS) {
@@ -84,9 +84,6 @@ func TestPlatformFieldsStayBelowTargetSelector(t *testing.T) {
 				t.Fatalf("platform field overlaps target selector: %v", hit.rect)
 			}
 		}
-		if fieldInputVisible(a, "platform.opacity") != (target != 2) {
-			t.Fatalf("target %d did not update opacity visibility", target)
-		}
 	}
 }
 
@@ -98,57 +95,15 @@ func TestPlatformFormBindsNewWindowOptions(t *testing.T) {
 			f.fields[i].value = "false"
 		case "platform.disableClose", "platform.topmost":
 			f.fields[i].value = "true"
-		case "platform.opacity":
-			f.fields[i].value = "0.35"
+		case "platform.opacity", "platform.position", "platform.x", "platform.y":
+			t.Fatalf("%s must only be exposed through the Window API", f.fields[i].key)
 		}
 	}
 	s, err := f.settings()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Platform.Border || !s.Platform.DisableClose || !s.Platform.Topmost || s.Platform.Opacity != 0.35 {
+	if s.Platform.Border || !s.Platform.DisableClose || !s.Platform.Topmost {
 		t.Fatalf("platform form did not bind new settings: %+v", s.Window)
-	}
-}
-
-func TestStartPositionFieldsFollowFullscreen(t *testing.T) {
-	f := newForm(config.Default(nil), nil)
-	set := func(key, value string) {
-		for i := range f.fields {
-			if f.fields[i].key == key {
-				f.fields[i].value = value
-				return
-			}
-		}
-		t.Fatalf("missing %s", key)
-	}
-	visible := func() map[string]bool {
-		out := map[string]bool{}
-		for _, i := range f.visibleFields(6, "windows") {
-			out[f.fields[i].key] = true
-		}
-		return out
-	}
-	if v := visible(); !v["platform.position"] || v["platform.x"] || v["platform.y"] {
-		t.Fatal(v)
-	}
-	set("platform.position", "custom")
-	set("platform.x", "-320")
-	set("platform.y", "80")
-	if v := visible(); !v["platform.x"] || !v["platform.y"] {
-		t.Fatal(v)
-	}
-	set("platform.fullscreen", "true")
-	if v := visible(); v["platform.position"] || v["platform.x"] || v["platform.y"] {
-		t.Fatal(v)
-	}
-	s, err := f.settings()
-	if err != nil || s.Platform.X != -320 || s.Platform.Y != 80 || s.Platform.CustomPosition() {
-		t.Fatalf("hidden settings changed: %+v %v", s.Platform, err)
-	}
-	set("platform.fullscreen", "false")
-	s, err = f.settings()
-	if err != nil || !s.Platform.CustomPosition() {
-		t.Fatalf("restore custom position: %v", err)
 	}
 }

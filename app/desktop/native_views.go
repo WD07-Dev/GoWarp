@@ -27,8 +27,10 @@ type nativeViews struct {
 	input                  window.Input
 }
 
-// Settings use the same startup-monitor DIP scale as Ebitengine. Explicit views
-// and runtime Window API calls already use physical pixels.
+/*
+Settings use Ebitengine’s startup-monitor DIP scale. Explicit views and
+runtime Window API calls use physical pixels.
+*/
 func nativeWindowViews(s *config.Settings, scale float64) ([]window.View, image.Point) {
 	if scale <= 0 {
 		scale = 1
@@ -47,11 +49,8 @@ func nativeWindowViews(s *config.Settings, scale float64) ([]window.View, image.
 			continue
 		}
 		v := &views[i]
-		if s.Platform.CustomPosition() {
-			v.X, v.Y = s.Platform.X, s.Platform.Y
-		}
-		alpha := s.Platform.Opacity
-		v.Border, v.Resizable, v.Opacity = s.Platform.Border, s.Platform.Resizable, &alpha
+		v.Border, v.Resizable = s.Platform.Border, s.Platform.Resizable
+		v.Opacity = nil
 		v.Topmost = s.Platform.Topmost
 		v.DisableMinimize, v.DisableMaximize = s.Platform.DisableMinimize, s.Platform.DisableMaximize
 		v.DisableClose, v.Fullscreen = s.Platform.DisableClose, s.Platform.Fullscreen
@@ -84,7 +83,7 @@ func (g *game) openNativeViews() error {
 	if err != nil {
 		return err
 	}
-	backend, title, err := host.OpenNativeWindows(views, s.Platform.Position == "auto" && !s.Platform.Fullscreen)
+	backend, title, err := host.OpenNativeWindows(views, !s.Platform.Fullscreen)
 	if err != nil {
 		return err
 	}
@@ -121,7 +120,7 @@ func (g *game) pollNativeViews() error {
 	if n == nil {
 		return nil
 	}
-	if !n.prepared || n.drawn && !n.iconsReady {
+	if !n.prepared || (n.drawn && !n.iconsReady) {
 		var err error
 		ebiten.RunOnMainThread(func() { err = n.backend.Prepare() })
 		if err != nil {
@@ -186,10 +185,9 @@ func (g *game) nativeWindowCall(op string, args []any) (any, error) {
 }
 
 func editWindows(current []window.View, op string, args []any) ([]window.View, any, error) {
-	views := slices.Clone(current)
 	if op == "list" {
-		ids := make([]string, len(views))
-		for i, v := range views {
+		ids := make([]string, len(current))
+		for i, v := range current {
 			ids[i] = v.ID
 		}
 		return current, ids, nil
@@ -198,7 +196,15 @@ func editWindows(current []window.View, op string, args []any) ([]window.View, a
 		return current, nil, fmt.Errorf("window %s requires an ID or window description", op)
 	}
 	id := extension.String(args[0])
-	index := slices.IndexFunc(views, func(v window.View) bool { return v.ID == id })
+	index := slices.IndexFunc(current, func(v window.View) bool { return v.ID == id })
+	if op != "create" && index < 0 {
+		return current, nil, fmt.Errorf("unknown native window %q", id)
+	}
+	if op == "get" {
+		data, err := json.Marshal(current[index])
+		return current, string(data), err
+	}
+	views := slices.Clone(current)
 	if op == "create" {
 		var v window.View
 		if err := decodeView(id, &v); err != nil {
@@ -206,18 +212,8 @@ func editWindows(current []window.View, op string, args []any) ([]window.View, a
 		}
 		views = append(views, v)
 	} else {
-		if index < 0 {
-			return current, nil, fmt.Errorf("unknown native window %q", id)
-		}
 		v := &views[index]
-		if v.Opacity != nil {
-			a := *v.Opacity
-			v.Opacity = &a
-		}
 		switch op {
-		case "get":
-			data, err := json.Marshal(v)
-			return current, string(data), err
 		case "move":
 			if len(args) != 3 {
 				return current, nil, fmt.Errorf("move requires ID, x, y")
@@ -238,6 +234,11 @@ func editWindows(current []window.View, op string, args []any) ([]window.View, a
 		case "set":
 			if len(args) != 2 {
 				return current, nil, fmt.Errorf("set requires ID and a JSON object")
+			}
+			// JSON decoding must not mutate the live opacity before validation.
+			if v.Opacity != nil {
+				alpha := *v.Opacity
+				v.Opacity = &alpha
 			}
 			if err := decodeView(extension.String(args[1]), v); err != nil {
 				return current, nil, err

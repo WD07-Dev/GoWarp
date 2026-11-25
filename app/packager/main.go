@@ -1080,8 +1080,6 @@ func displayChoice(s string) string {
 		return i18n.Tr("choice.websocket")
 	case "turbowarp":
 		return "TurboWarp"
-	case "auto":
-		return i18n.Tr("choice.auto")
 	case "custom":
 		return i18n.Tr("choice.custom")
 	case "inherit":

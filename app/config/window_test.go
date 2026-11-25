@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,7 +10,7 @@ import (
 
 func TestPlatformSettingsFileLayout(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "project.gowarp.json")
-	input := `{"window":{"width":800,"height":600,"fit":"preserve"},"platform":{"resizable":false,"fullscreen":false,"position":"custom","x":-320,"y":80,"border":false,"multiWindow":true}}`
+	input := `{"window":{"width":800,"height":600,"fit":"preserve"},"platform":{"resizable":false,"fullscreen":false,"border":false,"multiWindow":true}}`
 	if err := os.WriteFile(path, []byte(input), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -39,14 +38,14 @@ func TestPlatformSettingsFileLayout(t *testing.T) {
 		}
 		model[key] = v
 	}
-	if model["window"]["border"] != nil || model["platform"]["border"] != false || model["platform"]["x"] != float64(-320) || model["platform"]["position"] != "custom" {
+	if model["window"]["border"] != nil || model["platform"]["border"] != false {
 		t.Fatal(model)
 	}
 }
 
 func TestPlatformWindowDefaultsAndRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
-	for _, input := range []string{`{}`, `{"platform":{"border":false,"disableClose":true,"opacity":0.35}}`} {
+	for _, input := range []string{`{}`, `{"platform":{"border":false,"disableClose":true}}`} {
 		if err := os.WriteFile(path, []byte(input), 0600); err != nil {
 			t.Fatal(err)
 		}
@@ -62,9 +61,14 @@ func TestPlatformWindowDefaultsAndRoundTrip(t *testing.T) {
 		if err := json.Unmarshal(data, &got); err != nil {
 			t.Fatal(err)
 		}
-		want := map[string]any{"border": true, "disableClose": false, "opacity": float64(1)}
+		for _, key := range []string{"opacity", "position", "x", "y"} {
+			if _, ok := got[key]; ok {
+				t.Fatalf("platform settings must not store %s", key)
+			}
+		}
+		want := map[string]any{"border": true, "disableClose": false}
 		if input != `{}` {
-			want = map[string]any{"border": false, "disableClose": true, "opacity": 0.35}
+			want = map[string]any{"border": false, "disableClose": true}
 		}
 		for key, value := range want {
 			if got[key] != value {
@@ -87,38 +91,6 @@ func TestNativeMultiWindowAllowsFullscreen(t *testing.T) {
 	s.Platform.Fullscreen = true
 	if err := s.Validate(); err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestStartPositionValidationAndFullscreen(t *testing.T) {
-	s := Default(nil)
-	if s.Platform.CustomPosition() {
-		t.Fatal("default position must remain automatic")
-	}
-	s.Platform.Position, s.Platform.X, s.Platform.Y = "custom", -320, 40
-	if err := s.Validate(); err != nil || !s.Platform.CustomPosition() {
-		t.Fatalf("custom position: %v", err)
-	}
-	s.Platform.Fullscreen = true
-	if s.Platform.CustomPosition() {
-		t.Fatal("fullscreen must ignore custom start position")
-	}
-	for _, p := range []Platform{{Position: "center", Opacity: 1}, {Position: "custom", X: 100001, Opacity: 1}, {Position: "auto", Y: -100001, Opacity: 1}} {
-		s.Platform = p
-		if err := s.Validate(); err == nil {
-			t.Fatalf("invalid position accepted: %+v", p)
-		}
-	}
-}
-
-func TestWindowOpacityRange(t *testing.T) {
-	for _, opacity := range []float64{-0.01, 0, 0.35, 1, 1.01, math.NaN(), math.Inf(1), math.Inf(-1)} {
-		s := Default(nil)
-		s.Platform.Opacity = opacity
-		wantValid := !math.IsNaN(opacity) && opacity >= 0 && opacity <= 1
-		if err := s.Validate(); (err == nil) != wantValid {
-			t.Fatalf("opacity %v validation = %v", opacity, err)
-		}
 	}
 }
 

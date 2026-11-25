@@ -11,9 +11,10 @@ import (
 
 var ErrClosed = errors.New("all native windows were closed")
 
-// Desktop coordinates are physical pixels relative to the primary monitor.
-// Stage coordinates start at the
-// stage's top-left and do not change when a native window moves.
+/*
+Desktop coordinates are physical pixels relative to the primary monitor.
+Stage coordinates start at the stage's top-left, independently of window position.
+*/
 type View struct {
 	ID              string   `json:"id"`
 	Title           string   `json:"title"`
@@ -58,13 +59,15 @@ func Pack(views []View) (Layout, error) {
 		if v.Width < 1 || v.Height < 1 || v.Width > 4096 || v.Height > 4096 {
 			return l, fmt.Errorf("window %q dimensions must be 1..4096", v.ID)
 		}
-		for _, n := range []float64{v.StageX, v.StageY, v.StageWidth, v.StageHeight, v.Alpha()} {
+		alpha := v.Alpha()
+		for _, n := range []float64{v.StageX, v.StageY, v.StageWidth, v.StageHeight, alpha} {
 			if math.IsNaN(n) || math.IsInf(n, 0) {
 				return l, fmt.Errorf("non-finite window value")
 			}
 		}
-		if v.StageWidth <= 0 || v.StageHeight <= 0 || v.StageWidth > 16384 || v.StageHeight > 16384 || v.Alpha() < 0 || v.Alpha() > 1 ||
-			v.X < -100000 || v.X > 100000 || v.Y < -100000 || v.Y > 100000 {
+		validViewport := v.StageWidth > 0 && v.StageWidth <= 16384 && v.StageHeight > 0 && v.StageHeight <= 16384
+		validPosition := v.X >= -100000 && v.X <= 100000 && v.Y >= -100000 && v.Y <= 100000
+		if !validViewport || !validPosition || alpha < 0 || alpha > 1 {
 			return l, fmt.Errorf("invalid window %q viewport, position or opacity", v.ID)
 		}
 		if x+v.Width > 4096 {

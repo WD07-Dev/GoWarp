@@ -4,9 +4,7 @@ package multiwindow
 
 import (
 	"fmt"
-	"gowarp/core/window"
 	"runtime"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -14,6 +12,8 @@ import (
 
 	"github.com/lxn/win"
 	"golang.org/x/sys/windows"
+
+	"gowarp/core/window"
 )
 
 var user32 = windows.NewLazySystemDLL("user32.dll")
@@ -23,6 +23,7 @@ type nativeWindow struct {
 	view    window.View
 	restore window.View // Last windowed geometry, owned by the window thread.
 }
+
 type windowManager struct {
 	centerMain    bool
 	stop          chan struct{}
@@ -60,7 +61,11 @@ func startWindows() (*windowManager, error) {
 
 func (m *windowManager) do(fn func()) {
 	done := make(chan struct{})
-	m.tasks <- func() { fn(); m.updateSnapshot(); close(done) }
+	m.tasks <- func() {
+		fn()
+		m.updateSnapshot()
+		close(done)
+	}
 	m.wake()
 	<-done
 }
@@ -71,6 +76,7 @@ func (m *windowManager) wake() {
 		win.PostMessage(win.HWND(hwnd), win.WM_APP+1, 0, 0)
 	}
 }
+
 func (m *windowManager) drain() {
 	for {
 		select {
@@ -139,10 +145,7 @@ func (m *windowManager) run(ready chan<- error) {
 		}
 		m.drain()
 		var msg win.MSG
-		for {
-			if !win.PeekMessage(&msg, 0, 0, 0, win.PM_REMOVE) {
-				break
-			}
+		for win.PeekMessage(&msg, 0, 0, 0, win.PM_REMOVE) {
 			win.TranslateMessage(&msg)
 			win.DispatchMessage(&msg)
 		}
@@ -153,41 +156,41 @@ func (m *windowManager) run(ready chan<- error) {
 
 func keyName(v uintptr) string {
 	if v >= 'A' && v <= 'Z' {
-		return strings.ToLower(string(rune(v)))
+		return string(rune(v + 'a' - 'A'))
 	}
 	if v >= '0' && v <= '9' {
 		return string(rune(v))
 	}
 	switch v {
-	case 0x20:
+	case win.VK_SPACE:
 		return "space"
-	case 0x25:
+	case win.VK_LEFT:
 		return "left arrow"
-	case 0x26:
+	case win.VK_UP:
 		return "up arrow"
-	case 0x27:
+	case win.VK_RIGHT:
 		return "right arrow"
-	case 0x28:
+	case win.VK_DOWN:
 		return "down arrow"
-	case 0x10:
+	case win.VK_SHIFT:
 		return "shift"
-	case 0x11:
+	case win.VK_CONTROL:
 		return "control"
-	case 0x12:
+	case win.VK_MENU:
 		return "alt"
-	case 0x0d:
+	case win.VK_RETURN:
 		return "enter"
-	case 0x1b:
+	case win.VK_ESCAPE:
 		return "escape"
-	case 0x08:
+	case win.VK_BACK:
 		return "backspace"
-	case 0x09:
+	case win.VK_TAB:
 		return "tab"
-	case 0x2e:
+	case win.VK_DELETE:
 		return "delete"
 	}
-	if v >= 0x70 && v <= 0x87 {
-		return fmt.Sprintf("f%d", v-0x70+1)
+	if v >= win.VK_F1 && v <= win.VK_F24 {
+		return fmt.Sprintf("f%d", v-win.VK_F1+1)
 	}
 	return ""
 }
@@ -201,11 +204,11 @@ func (m *windowManager) wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr
 		}
 	}
 	switch msg {
-	case 3, 5: // WM_MOVE / WM_SIZE, including interactive modal movement.
+	case win.WM_MOVE, win.WM_SIZE:
 		if current != nil {
 			m.updateSnapshot()
 		}
-	case 0x2e0:
+	case win.WM_DPICHANGED:
 		if current != nil && !current.view.Fullscreen {
 			v := current.view
 			b, err := windowBounds(v, uint32(wparam&0xffff))
@@ -217,67 +220,67 @@ func (m *windowManager) wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr
 			}
 		}
 		return 0
-	case 0x8001:
+	case win.WM_APP + 1:
 		m.drain()
 		m.updateSnapshot()
 		return 0
-	case 0x112: // WM_SYSCOMMAND; enforce restrictions for keyboard/system menus too.
+	case win.WM_SYSCOMMAND:
 		if current != nil {
 			switch wparam & 0xfff0 {
-			case 0xf020:
+			case win.SC_MINIMIZE:
 				if current.view.DisableMinimize {
 					return 0
 				}
-			case 0xf030:
+			case win.SC_MAXIMIZE:
 				if current.view.DisableMaximize || !current.view.Resizable || current.view.Fullscreen {
 					return 0
 				}
-			case 0xf060:
+			case win.SC_CLOSE:
 				if current.view.DisableClose {
 					return 0
 				}
 			}
 		}
-	case 0x10:
+	case win.WM_CLOSE:
 		if current != nil && !current.view.DisableClose {
 			m.closed = append(m.closed, current.view.ID)
 			win.ShowWindow(win.HWND(hwnd), win.SW_HIDE)
 		}
 		return 0
-	case 0x14:
+	case win.WM_ERASEBKGND:
 		return 1
-	case 0x84:
+	case win.WM_NCHITTEST:
 		if current != nil && current.view.Passthrough {
-			return ^uintptr(0)
-		} // HTTRANSPARENT
-	case 0x100, 0x104:
+			return ^uintptr(0) // HTTRANSPARENT
+		}
+	case win.WM_KEYDOWN, win.WM_SYSKEYDOWN:
 		if key := keyName(wparam); key != "" && !m.held[key] {
 			m.held[key] = true
 			m.events.Keys = append(m.events.Keys, key)
 		}
-	case 0x101, 0x105:
+	case win.WM_KEYUP, win.WM_SYSKEYUP:
 		if key := keyName(wparam); key != "" {
 			delete(m.held, key)
 			m.events.Released = append(m.events.Released, key)
 		}
-	case 0x102:
+	case win.WM_CHAR:
 		if wparam >= 32 && wparam < 0xd800 || wparam > 0xdfff && wparam <= 0xffff {
 			m.events.Text += string(rune(wparam))
 		}
-	case 0x08:
+	case win.WM_KILLFOCUS:
 		for key := range m.held {
 			m.events.Released = append(m.events.Released, key)
 			delete(m.held, key)
 		}
 		m.events.Down = false
-	case 0x201:
+	case win.WM_LBUTTONDOWN:
 		m.events.Down = true
 		m.events.Pressed = true
 		win.SetCapture(win.HWND(hwnd))
-	case 0x202:
+	case win.WM_LBUTTONUP:
 		m.events.Down = false
 		win.ReleaseCapture()
-	case 0x20a:
+	case win.WM_MOUSEWHEEL:
 		m.events.Wheel += float64(int16(wparam>>16)) / 120
 	}
 	return win.DefWindowProc(win.HWND(hwnd), msg, wparam, lparam)
@@ -439,19 +442,19 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 				}
 			}
 			if created || old.X != v.X || old.Y != v.Y || old.Width != v.Width || old.Height != v.Height || styleChanged || old.Topmost != v.Topmost {
-				z := ^uintptr(1)
+				z := uintptr(win.HWND_NOTOPMOST)
 				if v.Topmost {
-					z = ^uintptr(0)
+					z = uintptr(win.HWND_TOPMOST)
 				}
-				flags := uintptr(0x0010) // NOACTIVATE
+				flags := uintptr(win.SWP_NOACTIVATE)
 				if !created && old.Topmost == v.Topmost {
-					flags |= 0x0004
+					flags |= win.SWP_NOZORDER
 				}
 				if !created && old.Width == v.Width && old.Height == v.Height && !styleChanged {
-					flags |= 0x0001
+					flags |= win.SWP_NOSIZE
 				}
 				if styleChanged {
-					flags |= 0x0020
+					flags |= win.SWP_FRAMECHANGED
 				}
 				dpi := win.GetDpiForWindow(win.HWND(w.handle))
 				bounds, err = windowBounds(v, dpi)
@@ -480,14 +483,10 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 			if v.Hidden {
 				show = win.SW_HIDE
 			}
-			if created || old.Hidden != v.Hidden {
+			shouldShow := !v.Hidden
+			visible := win.IsWindowVisible(win.HWND(w.handle))
+			if created || old.Hidden != v.Hidden || visible != shouldShow {
 				win.ShowWindow(win.HWND(w.handle), show)
-			}
-			if !win.IsWindowVisible(win.HWND(w.handle)) && !v.Hidden {
-				win.ShowWindow(win.HWND(w.handle), win.SW_SHOWNOACTIVATE)
-			}
-			if v.Hidden {
-				win.ShowWindow(win.HWND(w.handle), win.SW_HIDE)
 			}
 			m.updateGeometry(w)
 			actual[i] = w.view
