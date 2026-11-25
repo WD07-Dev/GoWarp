@@ -642,3 +642,62 @@ func BenchmarkPackedBitmapDisplay(b *testing.B) {
 		})
 	}
 }
+
+func TestIndexedPlaybackRegionPixels(t *testing.T) {
+	bitmap := packPlaybackBitmap(newCostumeAsset("indexed", indexedPlaybackFixture(), true), 1<<20)
+	if bitmap == nil || bitmap.indices == nil {
+		t.Fatal("expected indexed playback")
+	}
+	source := bitmap.asset("indexed").image
+	for _, repeated := range []bool{false, true} {
+		bitmap.repeated = repeated
+		scale := 1
+		if repeated {
+			scale = 2
+		}
+		bounds := image.Rectangle{Max: bitmap.size.Mul(scale)}
+		for _, region := range []image.Rectangle{
+			bounds, image.Rect(1, 1, 50, 40), image.Rect(2, 2, 51, 41),
+			image.Rect(1, 2, 2, 3), image.Rect(2, 1, 3, 2),
+			bounds.Add(image.Pt(-3, -5)), bounds.Add(image.Pt(3, 5)),
+			image.Rect(-5, -5, -1, -1),
+		} {
+			got := bitmap.region(region)
+			want := region.Intersect(bounds)
+			if want.Empty() {
+				if got != nil {
+					t.Fatal("nonempty crop outside source")
+				}
+				continue
+			}
+			if got == nil || got.Bounds() != want {
+				t.Fatalf("crop bounds: %v", got)
+			}
+			for y := want.Min.Y; y < want.Max.Y; y++ {
+				for x := want.Min.X; x < want.Max.X; x++ {
+					if got.NRGBAAt(x, y) != source.NRGBAAt(x/scale, y/scale) {
+						t.Fatalf("repeated=%v region=%v pixel=(%d,%d)", repeated, region, x, y)
+					}
+				}
+			}
+		}
+	}
+}
+
+func BenchmarkIndexedPlaybackRegion(b *testing.B) {
+	bitmap := packPlaybackBitmap(newCostumeAsset("indexed", indexedPlaybackFixture(), true), 1<<20)
+	for _, repeated := range []bool{false, true} {
+		b.Run(fmt.Sprintf("repeated=%v", repeated), func(b *testing.B) {
+			bitmap.repeated = repeated
+			bounds := image.Rectangle{Max: bitmap.size}
+			if repeated {
+				bounds.Max = bounds.Max.Mul(2)
+			}
+			bounds.Min = image.Pt(1, 1)
+			b.ReportAllocs()
+			for b.Loop() {
+				bitmap.region(bounds)
+			}
+		})
+	}
+}

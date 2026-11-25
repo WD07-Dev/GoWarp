@@ -139,6 +139,9 @@ func (g *game) pollNativeViews() error {
 	n.input = in
 	if !n.dirty {
 		views := n.backend.Views()
+		if slices.Equal(n.layout.Views, views) {
+			return nil
+		}
 		layout, err := window.Pack(views)
 		if err != nil {
 			return err

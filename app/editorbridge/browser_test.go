@@ -49,7 +49,63 @@ func TestEditorButtonInBrowser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	page, err := template.ParseFiles(filepath.Join(root, "test", "fixtures", "editor", "preview.html"))
+	page, err := template.New("editor").Parse(`<!doctype html>
+<meta charset="utf-8">
+<title>테스트 게임 - TurboWarp</title>
+<div class="menu-bar_main-menu"></div>
+<script>
+class Events extends EventTarget {
+    on(name, handler) { this.addEventListener(name, handler); }
+    removeListener(name, handler) { this.removeEventListener(name, handler); }
+    emit(name) { this.dispatchEvent(new Event(name)); }
+}
+const runtime = Object.assign(new Events(), {
+    targets: [], stageWidth: 640, stageHeight: 480,
+    turboMode: true, interpolationEnabled: true,
+    frameLoop: {framerate: 60, running: false},
+    extensionManager: {getExtensionURLs: () => ({})},
+    toggleScript() {}, greenFlag() {}, stopAll() {}
+});
+const vm = Object.assign(new Events(), {
+    runtime,
+    toJSON: () => JSON.stringify({targets: [], extensions: []}),
+    serializeAssets: () => [],
+    exports: {JSZip: class {
+        file() {}
+        async generateAsync() { return new Blob(["test snapshot"]); }
+    }}
+});
+window.Scratch = {
+    vm, translate: {language: "en"},
+    BlockType: {BUTTON: "button", REPORTER: "reporter"},
+    extensions: {unsandboxed: true, register() {}}
+};
+window.addEventListener("error", event => {
+    document.body.dataset.testResult = event.message;
+});
+</script>
+<script src="/editor.js"></script>
+<script>
+(async () => {
+    try {
+        const run = document.getElementById("gowarp-editor-button");
+        run.click();
+        const dialog = document.getElementById("gowarp-editor-dialog");
+        if (!dialog.open) throw new Error("Run did not open connection settings");
+        dialog.querySelector("input").value = {{.}};
+        const connect = [...dialog.querySelectorAll("button")].find(button => button.textContent === "Connect");
+        await connect.onclick();
+        if (dialog.querySelector("pre").textContent !== "Ready") throw new Error(dialog.querySelector("pre").textContent);
+        await run.onclick();
+        if (dialog.open) throw new Error("Run did not close connection settings");
+        document.body.dataset.testResult = "pass";
+    } catch (error) {
+        document.body.dataset.testResult = String(error);
+    } finally {
+        window.__gowarpEditor?.dispose();
+    }
+})();
+</script>`)
 	if err != nil {
 		t.Fatal(err)
 	}

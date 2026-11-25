@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"image"
 	"math"
+	"slices"
 	"testing"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -221,5 +222,57 @@ func TestNativeExplicitViewsKeepPixelSizes(t *testing.T) {
 	views, restore := nativeWindowViews(&s, 2)
 	if views[0].Width != 600 || views[0].Height != 201 || restore != image.Pt(321, 201) || s.Platform.Views[0].Width != 321 {
 		t.Fatal("loading override must scale only the configured axis without mutating saved views")
+	}
+}
+
+type pollingWindowBackend struct {
+	window.Backend
+	views []window.View
+}
+
+func (b *pollingWindowBackend) Views() []window.View        { return slices.Clone(b.views) }
+func (b *pollingWindowBackend) Poll() (window.Input, error) { return window.Input{Focused: true}, nil }
+
+func TestNativeViewPolling(t *testing.T) {
+	backend := &pollingWindowBackend{views: []window.View{{ID: "main", Width: 480, Height: 360, StageWidth: 480, StageHeight: 360}}}
+	layout, err := window.Pack(backend.views)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := &game{native: &nativeViews{backend: backend, layout: layout, prepared: true, iconsReady: true}}
+	allocs := testing.AllocsPerRun(100, func() {
+		if err := g.pollNativeViews(); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if allocs > 1 {
+		t.Errorf("unchanged views allocated beyond the backend snapshot: %g", allocs)
+	}
+	backend.views[0].X = 70
+	backend.views[0].StageX = 20
+	if err := g.pollNativeViews(); err != nil {
+		t.Fatal(err)
+	}
+	if g.native.layout.Views[0].X != 70 || g.native.layout.Views[0].StageX != 20 || !g.native.input.Focused {
+		t.Fatal("window or input changes were not reflected")
+	}
+	backend.views[0].Width = 0
+	if err := g.pollNativeViews(); err == nil {
+		t.Fatal("invalid resized window accepted")
+	}
+}
+
+func BenchmarkNativeViewPolling(b *testing.B) {
+	backend := &pollingWindowBackend{views: []window.View{{ID: "main", Width: 480, Height: 360, StageWidth: 480, StageHeight: 360}}}
+	layout, err := window.Pack(backend.views)
+	if err != nil {
+		b.Fatal(err)
+	}
+	g := &game{native: &nativeViews{backend: backend, layout: layout, prepared: true, iconsReady: true}}
+	b.ReportAllocs()
+	for b.Loop() {
+		if err := g.pollNativeViews(); err != nil {
+			b.Fatal(err)
+		}
 	}
 }

@@ -130,12 +130,12 @@ function editor(t) {
     }
     const window = {devicePixelRatio: 1, addEventListener() {}, removeEventListener() {}};
     const context = {
-        window, document, navigator: {language: "en"}, URL, AbortController, TextEncoder, Blob,
+        window, document, navigator: {language: "en"}, URL, Request, AbortController, TextEncoder, Blob,
         ArrayBuffer, DataView, Uint8ClampedArray, ImageData: class {},
         setTimeout, clearTimeout, requestAnimationFrame: () => 0, cancelAnimationFrame() {},
         MutationObserver: class { observe() {} disconnect() {} },
         WebSocket: Socket,
-        Scratch: {vm: scratchVM, BlockType: {BUTTON: "button", REPORTER: "reporter"},
+        Scratch: {vm: scratchVM, translate: {language: "en"}, BlockType: {BUTTON: "button", REPORTER: "reporter"},
         extensions: {unsandboxed: true, register() {}}},
         fetch: async (url, options) => {
             if (url.endsWith("/run")) {

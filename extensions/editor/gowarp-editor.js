@@ -15,6 +15,13 @@
     const previous = window.__gowarpEditor;
     if(previous) previous.dispose();
     
+    // Older browsers reject the loopback enum before sending any request.
+    let targetAddressSpace;
+    try {
+        new Request("http://127.0.0.1", {targetAddressSpace: "loopback"});
+        targetAddressSpace = "loopback";
+    } catch {}
+
     const vm = Scratch.vm;
     const korean = (Scratch.translate.language || 'en').toLowerCase().startsWith('ko');
     const tr = (en, ko) => korean ? ko : en;
@@ -209,7 +216,7 @@
             const response = await fetch(target.base + path, {
                 method, headers, body, signal: controller.signal,
                 credentials: "omit", cache: "no-store", redirect: "error",
-                targetAddressSpace: "loopback"
+                targetAddressSpace
             });
             if(!response.ok) throw new Error(await response.text());
             return path === "/status" || path === "/run" ? await response.json() : null;

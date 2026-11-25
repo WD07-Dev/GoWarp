@@ -12,9 +12,8 @@ import (
 	"sync"
 	"time"
 
-	e "gowarp/core/extension"
-
 	"golang.org/x/net/websocket"
+	e "gowarp/core/extension"
 )
 
 type pingResult struct {

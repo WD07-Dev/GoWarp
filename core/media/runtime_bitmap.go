@@ -234,10 +234,30 @@ func (bitmap *playbackBitmap) region(region image.Rectangle) *image.NRGBA {
 	pixels := image.NewNRGBA(region)
 	if bitmap.indices != nil {
 		for y := region.Min.Y; y < region.Max.Y; y++ {
-			row := pixels.Pix[(y-region.Min.Y)*pixels.Stride:]
-			for x := region.Min.X; x < region.Max.X; x++ {
-				index := bitmap.indices[y/scale*bitmap.size.X+x/scale]
-				binary.LittleEndian.PutUint32(row[(x-region.Min.X)*4:], bitmap.palette[index])
+			row := pixels.Pix[(y-region.Min.Y)*pixels.Stride : (y-region.Min.Y+1)*pixels.Stride]
+			if scale == 2 && y > region.Min.Y && y%2 == 1 {
+				copy(row, pixels.Pix[(y-region.Min.Y-1)*pixels.Stride:])
+				continue
+			}
+			sourceRow := y / scale * bitmap.size.X
+			indices := bitmap.indices[sourceRow+region.Min.X/scale : sourceRow+(region.Max.X+scale-1)/scale]
+			if scale == 1 {
+				for x, index := range indices {
+					binary.LittleEndian.PutUint32(row[x*4:], bitmap.palette[index])
+				}
+				continue
+			}
+			if region.Min.X%2 == 1 {
+				binary.LittleEndian.PutUint32(row, bitmap.palette[indices[0]])
+				row, indices = row[4:], indices[1:]
+			}
+			for len(row) >= 8 {
+				value := uint64(bitmap.palette[indices[0]])
+				binary.LittleEndian.PutUint64(row, value|value<<32)
+				row, indices = row[8:], indices[1:]
+			}
+			if len(row) != 0 {
+				binary.LittleEndian.PutUint32(row, bitmap.palette[indices[0]])
 			}
 		}
 		return pixels
