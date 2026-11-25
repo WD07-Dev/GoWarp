@@ -120,3 +120,16 @@ func TestViewportAndStageSize(t *testing.T) {
 		t.Fatal("browser guide should do nothing in Go", err)
 	}
 }
+
+func TestWindowStateReporter(t *testing.T) {
+	host := &recordingHost{value: true}
+	c := &e.Context{Host: host, Args: map[string]any{"ID": "second", "STATE": "wrong"}, Fields: map[string]string{"STATE": "minimized"}}
+	result, err := runBlock(t, "state", c)
+	if err != nil || result.Value != true || host.operation != "window.state" || len(host.args) != 2 || host.args[0] != "second" || host.args[1] != "minimized" {
+		t.Fatalf("state result=%+v call=%+v err=%v", result, host, err)
+	}
+	host.err = errors.New("state unavailable")
+	if _, err := runBlock(t, "state", c); !errors.Is(err, host.err) {
+		t.Fatal("lost host error", err)
+	}
+}

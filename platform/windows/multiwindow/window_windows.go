@@ -551,7 +551,8 @@ func (m *windowManager) updateSnapshot() {
 	for _, w := range m.items {
 		m.updateGeometry(w)
 		v := w.view
-		in.Visible = in.Visible || (win.IsWindowVisible(win.HWND(w.handle)) && !win.IsIconic(win.HWND(w.handle)))
+		v.State = window.State{Minimized: win.IsIconic(win.HWND(w.handle)), Maximized: win.IsZoomed(win.HWND(w.handle)), Focused: foreground == w.handle}
+		in.Visible = in.Visible || (win.IsWindowVisible(win.HWND(w.handle)) && !v.State.Minimized)
 		views = append(views, v)
 		if foreground == w.handle {
 			in.Focused = true

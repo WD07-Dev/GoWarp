@@ -11,11 +11,17 @@ import (
 
 var ErrClosed = errors.New("all native windows were closed")
 
+// State is observed from the OS, not a requested window configuration.
+type State struct {
+	Minimized, Maximized, Focused bool
+}
+
 /*
 Desktop coordinates are physical pixels relative to the primary monitor.
 Stage coordinates start at the stage's top-left, independently of window position.
 */
 type View struct {
+	State           State    `json:"-"`
 	ID              string   `json:"id"`
 	Title           string   `json:"title"`
 	X               int      `json:"x"`

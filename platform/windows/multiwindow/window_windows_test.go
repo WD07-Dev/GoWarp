@@ -126,3 +126,23 @@ func TestMainWindowStartsCenteredOnlyOnce(t *testing.T) {
 		})
 	}
 }
+
+func TestPollUpdatesWindowStateWithoutRepacking(t *testing.T) {
+	v := window.View{ID: "main", Width: 320, Height: 240, StageWidth: 480, StageHeight: 360}
+	layout, err := window.Pack([]window.View{v})
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := &frame{layout: layout, handles: []uintptr{1}}
+	b := &Backend{manager: &windowManager{}, views: layout.Views, frame: old}
+	for _, state := range []window.State{{Minimized: true}, {Maximized: true}, {Focused: true}, {}} {
+		v.State = state
+		b.manager.positions = []window.View{v}
+		if _, err := b.Poll(); err != nil {
+			t.Fatal(err)
+		}
+		if b.Views()[0].State != state || b.frame != old || old.layout.Views[0].State != (window.State{}) {
+			t.Fatal("state poll lost state or mutated the published frame")
+		}
+	}
+}

@@ -38,6 +38,7 @@ func (g *game) readMainWindow() window.View {
 		v.Width, v.Height = ebiten.WindowSize()
 		v.Fullscreen = ebiten.IsFullscreen()
 	}
+	g.mainWindow.State = window.State{Minimized: ebiten.IsWindowMinimized(), Maximized: ebiten.IsWindowMaximized(), Focused: ebiten.IsFocused()}
 	return g.mainWindow
 }
 
@@ -48,9 +49,13 @@ func (g *game) windowCall(op string, args []any) (any, error) {
 	if op == "create" {
 		return nil, fmt.Errorf("creating additional windows requires Windows multiwindow mode")
 	}
+	if op == "state" && g.windowCloseRequested {
+		_, value, err := editWindows(nil, op, args)
+		return value, err
+	}
 	current := g.readMainWindow()
 	views, value, err := editWindows([]window.View{current}, op, args)
-	if err != nil || op == "get" || op == "list" {
+	if err != nil || op == "get" || op == "list" || op == "state" {
 		return value, err
 	}
 	if len(views) == 0 {

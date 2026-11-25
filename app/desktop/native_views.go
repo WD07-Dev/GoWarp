@@ -176,7 +176,7 @@ func (g *game) syncNativeViews() error {
 func (g *game) nativeWindowCall(op string, args []any) (any, error) {
 	n := g.native
 	views, value, err := editWindows(n.layout.Views, op, args)
-	if err != nil || op == "get" || op == "list" {
+	if err != nil || op == "get" || op == "list" || op == "state" {
 		return value, err
 	}
 	layout, err := window.Pack(views)
@@ -200,6 +200,31 @@ func editWindows(current []window.View, op string, args []any) ([]window.View, a
 	}
 	id := extension.String(args[0])
 	index := slices.IndexFunc(current, func(v window.View) bool { return v.ID == id })
+	if op == "state" {
+		if len(args) != 2 {
+			return current, nil, fmt.Errorf("state requires ID and state name")
+		}
+		state := extension.String(args[1])
+		switch state {
+		case "open", "minimized", "maximized", "focused":
+		default:
+			return current, nil, fmt.Errorf("unknown window state %q", state)
+		}
+		if index < 0 {
+			return current, false, nil
+		}
+		v := current[index]
+		switch state {
+		case "minimized":
+			return current, v.State.Minimized, nil
+		case "maximized":
+			return current, v.State.Maximized, nil
+		case "focused":
+			return current, v.State.Focused, nil
+		default:
+			return current, true, nil
+		}
+	}
 	if op != "create" && index < 0 {
 		return current, nil, fmt.Errorf("unknown native window %q", id)
 	}

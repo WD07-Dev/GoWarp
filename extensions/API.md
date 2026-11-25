@@ -587,11 +587,14 @@ Times and positions are in seconds. Treat asset and voice handles as opaque valu
 | `host.command(kind, value)` | Queue a `title`, `close`, `open-url`, or `fullscreen` request. |
 | `window.list()` | Return window IDs as `[]string`; includes `main` in ordinary single-window mode. |
 | `window.get(id)` | Return JSON window properties. |
+| `window.state(id, state)` | Return a boolean for `open`, `minimized`, `maximized` or `focused`. Reads actual OS state; missing or closed IDs return `false`. Hidden windows remain open. Maximized is distinct from fullscreen. |
 | `window.create(json)` | Create an additional window; requires native multiwindow on Windows. |
 | `window.move(id, x, y)` | Move the outer window in desktop pixels. |
 | `window.viewport(id, x, y, width?, height?)` | Move a native window’s displayed stage region (top-left origin, Y downward). Supply both dimensions to resize it, or neither to preserve its size. Requires native multiwindow. |
 | `window.set(id, json)` | Change only the supplied properties, including border, buttons, fullscreen and opacity. |
 | `window.remove(id)` | Explicitly remove a window, even when `disableClose` is enabled. |
+
+The `gowarpWindows` example exposes `window.state` through its “window [ID] is [STATE]?” boolean block. In the browser, `open` reflects the simulated window list, `focused` reflects browser focus for the visible `main` view, and `minimized`/`maximized` return `false` because no native windows are created. Closing the last native window exits the player, so scripts cannot run afterward.
 
 The [Window API](WINDOWS.md) describes property support, coordinates and the
 [GoWarp Windows blocks](examples/gowarpWindows.js). `main` is available without

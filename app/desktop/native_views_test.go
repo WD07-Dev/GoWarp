@@ -276,3 +276,51 @@ func BenchmarkNativeViewPolling(b *testing.B) {
 		}
 	}
 }
+
+func TestWindowStateQueries(t *testing.T) {
+	views := []window.View{{ID: "main", Width: 480, Height: 360, StageWidth: 480, StageHeight: 360, DisableMinimize: true, DisableMaximize: true}}
+	for _, id := range []string{"main", "removed"} {
+		for _, state := range []string{"open", "minimized", "maximized", "focused"} {
+			_, value, err := editWindows(views, "state", []any{id, state})
+			want := id == "main" && state == "open"
+			if err != nil || value != want {
+				t.Fatalf("%s %s: %v, %v", id, state, value, err)
+			}
+		}
+	}
+	for _, args := range [][]any{nil, {"main"}, {"main", "bad"}, {"removed", "bad"}, {"main", "open", true}} {
+		if _, _, err := editWindows(views, "state", args); err == nil {
+			t.Fatalf("invalid query accepted: %v", args)
+		}
+	}
+}
+
+func TestWindowStateIsReadOnlyAndTracksSnapshot(t *testing.T) {
+	layout, err := window.Pack([]window.View{{ID: "main", Width: 480, Height: 360, StageWidth: 480, StageHeight: 360}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &pollingWindowBackend{views: layout.Views}
+	g := &game{native: &nativeViews{backend: backend, layout: layout, prepared: true, iconsReady: true}}
+	for _, state := range []window.State{{Minimized: true}, {Maximized: true}, {Focused: true}, {}} {
+		backend.views = slices.Clone(backend.views)
+		backend.views[0].State = state
+		if err := g.pollNativeViews(); err != nil {
+			t.Fatal(err)
+		}
+		for name, want := range map[string]bool{"open": true, "minimized": state.Minimized, "maximized": state.Maximized, "focused": state.Focused} {
+			got, err := g.nativeWindowCall("state", []any{"main", name})
+			if err != nil || got != want || g.native.dirty {
+				t.Fatalf("%s: %v %v dirty=%v", name, got, err, g.native.dirty)
+			}
+		}
+	}
+	if _, err := g.nativeWindowCall("set", []any{"main", `{"State":{"Minimized":true}}`}); err == nil {
+		t.Fatal("runtime state accepted as window configuration")
+	}
+	g = &game{windowCloseRequested: true}
+	got, err := g.windowCall("state", []any{"main", "open"})
+	if err != nil || got != false {
+		t.Fatalf("closing main: %v %v", got, err)
+	}
+}

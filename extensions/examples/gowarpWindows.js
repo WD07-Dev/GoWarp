@@ -81,6 +81,10 @@ func New() e.Extension {
 			_, err := c.Call("window.remove", c.String("ID"))
 			return e.Result{}, err
 		}},
+		{Opcode: "gowarpWindows_state", Text: "window [ID] is [STATE]?", Kind: "boolean", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			v, err := c.Call("window.state", c.String("ID"), c.Field("STATE"))
+			return e.Result{Value: v}, err
+		}},
 		{Opcode: "gowarpWindows_get", Text: "window [ID] properties", Kind: "reporter", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
 			v, err := c.Call("window.get", c.String("ID"))
 			return e.Result{Value: v}, err
@@ -273,11 +277,16 @@ func setProperty(c *e.Context, property string, value any) (e.Result, error) {
                         arguments: {ID: str("view")}
                     },
                     {
+                        opcode: "state", blockType: Scratch.BlockType.BOOLEAN, text: "window [ID] is [STATE]?",
+                        arguments: {ID: str("main"), STATE: {type: Scratch.ArgumentType.STRING, menu: "states", defaultValue: "open"}}
+                    },
+                    {
                         opcode: "get", blockType: Scratch.BlockType.REPORTER, text: "window [ID] properties",
                         disableMonitor: true, arguments: {ID: str("main")}
                     }
                 ],
                 menus: {
+                    states: {acceptReporters: false, items: ["open", "minimized", "maximized", "focused"]},
                     dimensions: {acceptReporters: false, items: ["width", "height"]},
                     booleans: {acceptReporters: false, items: ["true", "false"]},
                     properties: {acceptReporters: false, items: ["border", "resizable", "disableMinimize", "disableMaximize", "disableClose", "fullscreen"]}
@@ -312,6 +321,14 @@ func setProperty(c *e.Context, property string, value any) (e.Result, error) {
         list() { return JSON.stringify([...this.views.keys()]); }
         quit() { this.views.clear(); this.guides.clear(); this.removeOverlay(); }
         remove({ID}) { this.view(ID); this.views.delete(String(ID)); this.guides.delete(String(ID)); this.draw(); }
+        state({ID, STATE}) {
+            if (!["open", "minimized", "maximized", "focused"].includes(STATE)) throw new Error(`Unknown window state: ${STATE}`);
+            const view = this.views.get(String(ID));
+            if (!view) return false;
+            if (STATE === "open") return true;
+            if (STATE === "focused") return view.id === "main" && !view.hidden && document.hasFocus();
+            return false;
+        }
         get({ID}) { return JSON.stringify(this.view(ID)); }
     }
     Scratch.extensions.register(new GoWarpWindows());

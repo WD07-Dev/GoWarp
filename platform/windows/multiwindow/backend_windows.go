@@ -115,6 +115,7 @@ func (b *Backend) Poll() (window.Input, error) {
 		for _, v := range current {
 			if views[i].ID == v.ID {
 				views[i].X, views[i].Y = v.X, v.Y
+				views[i].State = v.State
 				if views[i].Width != v.Width || views[i].Height != v.Height {
 					views[i].Width, views[i].Height = v.Width, v.Height
 					resized = true
@@ -141,11 +142,8 @@ func (b *Backend) Poll() (window.Input, error) {
 		// only when DrawFinalScreen submits the corresponding resized source atlas.
 		b.frame = &frame{layout: layout, handles: slices.Clone(b.frame.handles)}
 	} else {
-		// Desktop dragging changes only coordinates, not atlas/resource identity.
-		for i := range views {
-			b.views[i].X = views[i].X
-			b.views[i].Y = views[i].Y
-		}
+		// Position and state changes do not affect atlas resources.
+		b.views = views
 	}
 	count := b.bridge.presents.Load()
 	if count != b.presents {

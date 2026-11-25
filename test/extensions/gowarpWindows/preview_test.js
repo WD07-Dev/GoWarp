@@ -38,7 +38,7 @@ const Scratch = {
             extension = value;
         }
     },
-    BlockType: {COMMAND: "command", REPORTER: "reporter"},
+    BlockType: {COMMAND: "command", REPORTER: "reporter", BOOLEAN: "boolean"},
     ArgumentType: {STRING: "string", NUMBER: "number", COLOR: "color"},
     Cast: {
         toNumber: value => Number(value) || 0,
@@ -46,12 +46,27 @@ const Scratch = {
         toRgbColorObject(value) { const n = parseInt(value.slice(1), 16); return {r: n >> 16, g: (n >> 8) & 255, b: n & 255}; }
     }
 };
+let focused = true;
 vm.runInNewContext(fs.readFileSync(process.argv[2], "utf8"), {
-    Scratch, document: {createElementNS(namespace, tag) { return new Element(tag); }}
+    Scratch, document: {hasFocus: () => focused, createElementNS(namespace, tag) { return new Element(tag); }}
 });
+const stateBlock = extension.getInfo().blocks.find(block => block.opcode === "state");
+assert.equal(stateBlock?.blockType, Scratch.BlockType.BOOLEAN);
+assert.equal(extension[stateBlock.opcode]({ID: "main", STATE: stateBlock.arguments.STATE.defaultValue}), true);
+assert.equal(extension.state({ID: "missing", STATE: "open"}), false);
+assert.equal(extension.state({ID: "main", STATE: "focused"}), true);
+focused = false;
+assert.equal(extension.state({ID: "main", STATE: "focused"}), false);
+focused = true;
+assert.throws(() => extension.state({ID: "missing", STATE: "bad"}));
+for (const state of ["minimized", "maximized"]) {
+    assert.equal(extension.state({ID: "main", STATE: state}), false);
+}
 assert.equal(extension.stageSize({DIMENSION: "width"}), 960);
 assert.equal(extension.stageSize({DIMENSION: "height"}), 360);
 extension.create({ID: "second", X: 600, Y: 100, W: 480, H: 360, BORDER: "false"});
+assert.equal(extension.state({ID: "second", STATE: "open"}), true);
+assert.equal(extension.state({ID: "second", STATE: "focused"}), false);
 extension.viewport({ID: "second", X: 480, Y: 0, W: 240, H: 180});
 extension.boundary({ID: "second", SHOW: "true", COLOR: "#55ccff"});
 let rect = extension.overlay.children[2];
@@ -78,12 +93,19 @@ assert.equal(JSON.parse(extension.get({ID: "second"})).stageWidth, 240);
 extension.boundary({ID: "second", SHOW: "false", COLOR: "#55ccff"});
 assert.equal(extension.overlay.children.length, 2);
 extension.set({ID: "main", JSON: '{"hidden":true}'});
+assert.equal(extension.state({ID: "main", STATE: "open"}), true);
+assert.equal(extension.state({ID: "main", STATE: "minimized"}), false);
+assert.equal(extension.state({ID: "main", STATE: "focused"}), false);
 assert.equal(overlays.size, 0);
 extension.boundary({ID: "second", SHOW: "true", COLOR: "#ff0000"});
 assert.equal(overlays.size, 1);
 assert.equal(extension.overlay.style.pointerEvents, "none");
+extension.remove({ID: "second"});
+assert.equal(extension.state({ID: "second", STATE: "open"}), false);
 runtime.emit("PROJECT_LOADED");
 assert.equal(extension.list(), '["main"]');
+extension.quit();
+assert.equal(extension.state({ID: "main", STATE: "open"}), false);
 runtime.emit("RUNTIME_DISPOSED");
 assert.equal(overlays.size, 0);
 assert.equal(runtime.listenerCount("STAGE_SIZE_CHANGED"), 0);

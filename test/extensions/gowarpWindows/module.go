@@ -73,6 +73,10 @@ func New() e.Extension {
 			_, err := c.Call("window.remove", c.String("ID"))
 			return e.Result{}, err
 		}},
+		{Opcode: "gowarpWindows_state", Text: "window [ID] is [STATE]?", Kind: "boolean", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			v, err := c.Call("window.state", c.String("ID"), c.Field("STATE"))
+			return e.Result{Value: v}, err
+		}},
 		{Opcode: "gowarpWindows_get", Text: "window [ID] properties", Kind: "reporter", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
 			v, err := c.Call("window.get", c.String("ID"))
 			return e.Result{Value: v}, err
