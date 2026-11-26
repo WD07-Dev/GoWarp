@@ -55,7 +55,6 @@ type result struct {
 	browser                                *browser
 	status                                 string
 	form                                   *form
-	preview                                *preview
 	err                                    error
 }
 
@@ -94,7 +93,6 @@ type application struct {
 	clipboard       chan clipboardResult
 	templates       []compiler.Template
 	target          int
-	preview         *preview
 	browser         *browser
 	lastDir         string
 	errorText       string
@@ -117,12 +115,6 @@ func Main() {
 	defer func() {
 		a.face.Close()
 		a.title.Close()
-	}()
-	defer func() {
-		if a.preview != nil {
-			a.preview.cancel()
-			<-a.preview.Done
-		}
 	}()
 	ebiten.SetWindowTitle("GoWarp Packager")
 	ebiten.SetWindowIcon(assets.DefaultWindowIcon())
@@ -206,20 +198,12 @@ func (a *application) job(label string, work func(context.Context) result) {
 	go func() {
 		r := work(ctx)
 		if err := ctx.Err(); err != nil && !r.committed {
-			if r.preview != nil {
-				r.preview.cancel()
-				<-r.preview.Done
-			}
 			r = result{err: err}
 		}
 		cancel()
 		select {
 		case a.results <- r:
 		case <-a.ctx.Done():
-			if r.preview != nil {
-				r.preview.cancel()
-				<-r.preview.Done
-			}
 		}
 	}()
 }
@@ -282,34 +266,6 @@ func (a *application) targetOS() string {
 		return ""
 	}
 	return a.templates[a.target].OS
-}
-
-func (a *application) runPreview() {
-	if a.busy || a.preview != nil {
-		return
-	}
-	f := *a.form
-	f.fields = append([]field(nil), f.fields...)
-	for _, t := range a.templates {
-		if t.OS == runtime.GOOS && t.Arch == runtime.GOARCH {
-			a.job(i18n.Tr("job.preview"), func(ctx context.Context) result {
-				s, err := f.settings()
-				if err != nil {
-					return result{err: err}
-				}
-				s = settingsForPlatform(s, t.OS)
-				p, err := startPreview(ctx, a.ctx, t, s.Project, s)
-				return result{
-					preview: p,
-					err:     err,
-					status:  i18n.Tr("status.preview"),
-				}
-			})
-			return
-		}
-	}
-	a.status = i18n.Tr("status.no_preview_runtime")
-	a.dirty = true
 }
 
 func (a *application) save(path string, export bool) {
@@ -589,25 +545,8 @@ func (a *application) Update() error {
 				a.editor = nil
 				a.scroll = 0
 			}
-			if r.preview != nil {
-				a.preview = r.preview
-			}
 		}
 	default:
-	}
-	if a.preview != nil {
-		select {
-		case err := <-a.preview.Done:
-			a.preview = nil
-			a.dirty = true
-			if !a.busy {
-				a.status = i18n.Tr("status.preview_ended")
-				if err != nil {
-					a.status = err.Error()
-				}
-			}
-		default:
-		}
 	}
 	if a.busy {
 		if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
@@ -700,11 +639,6 @@ func (a *application) Update() error {
 	}
 	if a.editor != nil {
 		a.edit()
-	}
-	if a.extensions == nil && !a.editorScreen && a.browser == nil && a.errorText == "" {
-		if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-			a.runPreview()
-		}
 	}
 	return nil
 }

@@ -24,8 +24,7 @@ Go must be installed on the creator's PC to preview or export projects. The firs
 
 1. Obtain a JS extension that includes both its TurboWarp implementation and an `@gowarp-go` implementation.
 2. Load that file or its URL as a custom extension in TurboWarp, add its blocks, and save the project as SB3.
-3. Open the SB3 in GoWarp and choose **Preview (F5)**.
-4. Once the project works as expected, use **Create executable**.
+3. Open the SB3 in GoWarp, choose **Create executable**, and run the exported game.
 
 GoWarp loads the sources referenced by the SB3. It does not scan this directory or automatically replace an existing extension with a similarly named file. A project that still references the original JS-only source needs its source reference updated.
 

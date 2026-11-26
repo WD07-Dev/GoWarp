@@ -5,7 +5,6 @@ language.changed,Interface language changed.,표시 언어를 변경했습니다
 status.open_hint,Open an SB3 file or drag it here.,SB3 파일을 열거나 이 창으로 끌어오세요.
 job.open_project,Loading project…,프로젝트 불러오는 중…
 job.open_settings,Loading settings and project…,설정과 프로젝트 불러오는 중…
-job.preview,Preparing preview…,테스트 실행 준비 중…
 job.save,Saving settings…,설정 저장 중…
 job.export,Creating executable…,실행 파일 만드는 중…
 job.select,Waiting for file selection…,파일 선택 기다리는 중…
@@ -15,7 +14,6 @@ job.loading_image,Loading image…,로딩 이미지 불러오는 중…
 job.canceling,Canceling…,작업을 취소하는 중…
 status.project_loaded,%s · %d×%d · %g FPS · Turbo %s,%s · %d×%d · %g FPS · 터보 %s
 status.settings_loaded,Settings loaded.,설정을 불러왔습니다.
-status.preview,Preview running · Local saves use the preview profile.,"테스트 실행 중 · 로컬 저장은 preview 영역, 네트워크는 설정한 서버 사용"
 status.no_preview_runtime,No player template for this OS. Check the runtimes folder.,현재 OS용 플레이어 템플릿이 없습니다. runtimes 폴더를 확인하세요.
 status.no_runtime,No runtime templates available for export.,내보낼 런타임 템플릿이 없습니다.
 status.saved,Saved: %s,저장 완료: %s
@@ -28,7 +26,6 @@ dialog.save_executable,Save executable,실행 파일 저장
 status.selection_canceled,File selection canceled.,파일 선택 취소
 status.fallback_browser,System file picker unavailable. Using the built-in picker.,시스템 파일 선택 도구가 없어 내장 선택기를 사용합니다.
 status.canceled,Operation canceled.,작업을 취소했습니다.
-status.preview_ended,Preview ended.,테스트 실행 종료
 section.project,Project,프로젝트
 section.runtime,Runtime,실행
 section.window,Stage / window,무대 / 창
@@ -39,7 +36,6 @@ section.platform,Platform options,플랫폼 옵션
 action.open_project,Open SB3 file,SB3 파일 열기
 action.open_settings,Open project,프로젝트 열기
 action.save_settings,Save project,프로젝트 저장
-action.preview,Preview (F5),테스트 실행 (F5)
 action.stop,Stop preview,실행 중지
 action.export,Create executable,실행 파일 만들기
 action.cancel,Cancel,취소

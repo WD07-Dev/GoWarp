@@ -28,8 +28,8 @@ Each distribution ZIP includes runtimes for both platforms, allowing you to choo
 1. Extract the distribution ZIP for your operating system and launch GoWarp.
 2. Select a project with **Open SB3 file**, or drag an SB3 file into the window.
 3. Adjust the runtime, window, and player settings using the menu on the left.
-4. Use **Preview (F5)** to check the result.
-5. Choose the target platform under Export, then click **Create executable**.
+4. Choose the target platform under Export, then click **Create executable**.
+5. Run the exported executable to check the result.
 
 GoWarp is a tool for running and packaging games. To edit blocks, costumes, or sounds, make your changes in Scratch or TurboWarp and import the updated SB3 file.
 
