@@ -21,7 +21,8 @@ type Renderer struct {
 	colorCandidates []colorCandidate
 
 	textSkinBytes    int
-	textSkins        map[textSkinKey]*media.Costume
+	textSkinUse      uint64
+	textSkins        map[textSkinKey]cachedTextSkin
 	Assets           *media.Library
 	frame            *image.RGBA
 	displayFrame     *image.RGBA

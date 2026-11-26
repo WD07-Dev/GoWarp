@@ -454,3 +454,37 @@ func BenchmarkCanvasUniforms(b *testing.B) {
 		canvas.uniformValues(640, 480, c)
 	}
 }
+
+func TestCanvasFadingBlurAppliesColorEffectsOnce(t *testing.T) {
+	runGPUFrame(t, func() {
+		r := render.New(&media.Library{})
+		v := vm.View{Width: 32, Height: 24, Zoom: 100, Direction: 90, Color: "#804020"}
+		v.Canvas = vm.CanvasEffects{}.Defaults()
+		v.Canvas.Brightness = 50
+		var g stageGPU
+		defer g.Close()
+		dst := ebiten.NewImage(32, 24)
+		defer dst.Deallocate()
+		for _, blur := range []float64{1, 0.001, 1e-40, 1e-50, 0} {
+			v.Canvas.Blur = blur
+			r.SetView(v)
+			for range 3 {
+				if err := g.Draw(dst, r, nil); err != nil {
+					t.Fatal(err)
+				}
+				got := color.RGBAModel.Convert(dst.At(16, 12)).(color.RGBA)
+				if got.R < 63 || got.R > 65 || got.G < 31 || got.G > 33 || got.B < 15 || got.B > 17 {
+					t.Fatalf("blur=%g: color effects repeated: %v", blur, got)
+				}
+			}
+		}
+		v.Canvas = vm.CanvasEffects{}.Defaults()
+		r.SetView(v)
+		if err := g.Draw(dst, r, nil); err != nil {
+			t.Fatal(err)
+		}
+		if got := color.RGBAModel.Convert(dst.At(16, 12)).(color.RGBA); got != (color.RGBA{128, 64, 32, 255}) {
+			t.Fatalf("clear did not restore image: %v", got)
+		}
+	})
+}

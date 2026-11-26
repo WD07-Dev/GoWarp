@@ -21,6 +21,11 @@ type textSkinKey struct {
 	NoAntialias bool
 }
 
+type cachedTextSkin struct {
+	costume  *media.Costume
+	lastUsed uint64
+}
+
 var textSkinSerial atomic.Uint64
 
 func (r *Renderer) textCostume(t vm.DisplayTarget) *media.Costume {
@@ -33,18 +38,11 @@ func (r *Renderer) textCostume(t vm.DisplayTarget) *media.Costume {
 		scale = 1
 	}
 	key := textSkinKey{skin, scale, r.view.NoAntialias}
-	if c := r.textSkins[key]; c != nil {
-		return c
-	}
-	if len(r.textSkins) >= 128 || r.textSkinBytes >= 16<<20 {
-		for _, c := range r.textSkins {
-			delete(r.hulls, c)
-		}
-		r.textSkins = nil
-		r.textSkinBytes = 0
-	}
-	if r.textSkins == nil {
-		r.textSkins = make(map[textSkinKey]*media.Costume)
+	r.textSkinUse++
+	if cached, ok := r.textSkins[key]; ok {
+		cached.lastUsed = r.textSkinUse
+		r.textSkins[key] = cached
+		return cached.costume
 	}
 	const density = 2
 	fontSize := skin.FontSize
@@ -89,7 +87,23 @@ func (r *Renderer) textCostume(t vm.DisplayTarget) *media.Costume {
 		drawer.DrawString(line)
 	}
 	c := &media.Costume{Image: img, Width: width, Height: height, CenterX: width / 2, CenterY: skin.AnchorY + outline}
-	r.textSkins[key] = c
+	if r.textSkins == nil {
+		r.textSkins = make(map[textSkinKey]cachedTextSkin)
+	}
+	for len(r.textSkins) > 0 && (len(r.textSkins) >= 128 || r.textSkinBytes+len(img.Pix) > 16<<20) {
+		var oldest textSkinKey
+		lastUsed := ^uint64(0)
+		for k, cached := range r.textSkins {
+			if cached.lastUsed < lastUsed {
+				oldest, lastUsed = k, cached.lastUsed
+			}
+		}
+		removed := r.textSkins[oldest].costume
+		r.textSkinBytes -= len(removed.Image.Pix)
+		delete(r.hulls, removed)
+		delete(r.textSkins, oldest)
+	}
+	r.textSkins[key] = cachedTextSkin{costume: c, lastUsed: r.textSkinUse}
 	c.CacheKey = fmt.Sprintf("text:%d", textSkinSerial.Add(1))
 	r.textSkinBytes += len(img.Pix)
 	return c

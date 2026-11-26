@@ -1,6 +1,7 @@
 package render
 
 import (
+	"fmt"
 	"image"
 	"math"
 	"reflect"
@@ -138,5 +139,78 @@ func TestTextSkinUsesCallerLayoutAndWidthUnits(t *testing.T) {
 	costume = r.textCostume(target)
 	if costume == first || costume.Width != 54 {
 		t.Fatalf("screen width should compensate for 200%% sprite scale: %+v", costume)
+	}
+}
+
+func TestTextSkinCacheKeepsFrequentlyUsedText(t *testing.T) {
+	r := New(&media.Library{})
+	skin := vm.TextSkin{Text: "HUD", Width: 100, FontSize: 18, Visible: true}
+	target := vm.DisplayTarget{State: vm.TargetState{Text: &skin, Size: 100, StretchX: 100}}
+	first := r.textCostume(target)
+	for i := range 260 {
+		skin.Text = fmt.Sprint(i)
+		r.textCostume(target)
+		skin.Text = "HUD"
+		if r.textCostume(target) != first {
+			t.Fatalf("changing text flushed active HUD at %d", i)
+		}
+	}
+	if len(r.textSkins) > 128 || r.textSkinBytes > 16<<20 {
+		t.Fatalf("unbounded text cache: entries=%d bytes=%d", len(r.textSkins), r.textSkinBytes)
+	}
+}
+
+func BenchmarkTextSkinCacheChurn(b *testing.B) {
+	for _, count := range []int{64, 96} {
+		b.Run(fmt.Sprint(count), func(b *testing.B) {
+			r := New(&media.Library{})
+			skin := vm.TextSkin{Width: 480, FontSize: 24, Visible: true}
+			target := vm.DisplayTarget{State: vm.TargetState{Text: &skin, Size: 100, StretchX: 100}}
+			labels := make([]string, count)
+			for i := range labels {
+				labels[i] = fmt.Sprintf("Label %d", i)
+			}
+			b.ReportAllocs()
+			n := 0
+			for b.Loop() {
+				for _, label := range labels {
+					skin.Text = label
+					r.textCostume(target)
+				}
+				skin.Text = fmt.Sprint(n)
+				r.textCostume(target)
+				n++
+			}
+		})
+	}
+}
+
+func TestTextSkinCacheEvictsByBytesAndDropsHulls(t *testing.T) {
+	r := New(&media.Library{})
+	skin := vm.TextSkin{Text: "HUD", Width: 100, FontSize: 24, Visible: true}
+	target := vm.DisplayTarget{State: vm.TargetState{Text: &skin, Size: 100, StretchX: 100}}
+	hot := r.textCostume(target)
+	var first *media.Costume
+	for i := range 100 {
+		skin.Text, skin.Width = fmt.Sprint(i), 4096
+		c := r.textCostume(target)
+		if i == 0 {
+			first = c
+			r.hulls = map[*media.Costume][]hullPoint{first: nil}
+		}
+		skin.Text, skin.Width = "HUD", 100
+		if r.textCostume(target) != hot {
+			t.Fatalf("byte pressure evicted hot text at %d", i)
+		}
+	}
+	if _, ok := r.hulls[first]; ok {
+		t.Fatal("evicted text retained its collision hull")
+	}
+	total := 0
+	for _, cached := range r.textSkins {
+		total += len(cached.costume.Image.Pix)
+	}
+	if total != r.textSkinBytes || total > 16<<20 {
+		t.Fatalf("cache bytes=%d actual=%d", r.textSkinBytes, total)
 	}
 }

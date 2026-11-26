@@ -291,7 +291,8 @@ func (g *stageGPU) Draw(dst *ebiten.Image, r *render.Renderer, scene []vm.Displa
 		}
 	}
 	uniforms := p.uniformValues(w, h, c)
-	if c.Blur > 0 {
+	// GPUs may flush subnormal float32 values to zero, selecting the color-filter branch.
+	if c.Blur >= 0x1p-126 {
 		canvasImage(&p.blur, &p.blurBacking, w, h)
 		other := p.frame
 		if src == other {
