@@ -29,15 +29,22 @@ func (g *game) stageBounds(width, height int) image.Rectangle {
 	if g.controller.options.Settings.Player.Controls {
 		top = min(g.pixels(playerControlsHeight), max(0, height-1))
 	}
+	return fittedStageBounds(width, height, float64(w), float64(h), top, g.controller.options.Settings.Window.Fit, g.sampleFullscreen())
+}
+
+func fittedStageBounds(width, height int, w, h float64, top int, fit string, fullscreen bool) image.Rectangle {
+	top = min(top, max(0, height-1))
 	available := max(1, height-top)
 	drawWidth, drawHeight := max(1, width), available
-	if g.controller.options.Settings.Window.Fit != "stretch" {
-		scale := math.Min(float64(drawWidth)/float64(w), float64(available)/float64(h))
-		if g.controller.options.Settings.Window.Fit == "integer" && g.sampleFullscreen() && scale >= 1 {
+	if fit != "stretch" {
+		scale := math.Min(float64(drawWidth)/w, float64(available)/h)
+		if fit == "integer" && fullscreen && scale >= 1 {
 			scale = math.Floor(scale)
 		}
-		drawWidth = max(1, int(math.Round(float64(w)*scale)))
-		drawHeight = max(1, int(math.Round(float64(h)*scale)))
+		if !math.IsInf(scale, 0) {
+			drawWidth = max(1, int(math.Round(w*scale)))
+			drawHeight = max(1, int(math.Round(h*scale)))
+		}
 	}
 	x := (width - drawWidth) / 2
 	y := top + (available-drawHeight)/2
@@ -52,12 +59,31 @@ func (g *game) toolbarPosition(x, y int) (int, bool) {
 	if !s.Player.Controls {
 		return 0, false
 	}
-	stage := g.stageBounds(g.outsideWidth, g.outsideHeight)
+	var stage image.Rectangle
+	if g.native != nil {
+		if g.native.input.Window != "main" {
+			return 0, false
+		}
+		found := false
+		for _, v := range g.native.layout.Views {
+			if v.ID == "main" {
+				stage = g.nativeStageBounds(v)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return 0, false
+		}
+		x, y = int(math.Floor(g.native.input.X)), int(math.Floor(g.native.input.Y))
+	} else {
+		stage = g.stageBounds(g.outsideWidth, g.outsideHeight)
+	}
 	bar := image.Rect(stage.Min.X, stage.Min.Y-g.pixels(playerControlsHeight), stage.Max.X, stage.Min.Y)
 	return int(math.Floor(float64(x-stage.Min.X) / g.dpi())), image.Pt(x, y).In(bar)
 }
 
-func (g *game) drawPlayerControls(screen *ebiten.Image, stage image.Rectangle) {
+func (g *game) drawPlayerControls(screen *ebiten.Image, stage image.Rectangle, opacity float64) {
 	s := g.controller.options.Settings
 	if !s.Player.Controls {
 		return
@@ -81,7 +107,8 @@ func (g *game) drawPlayerControls(screen *ebiten.Image, stage image.Rectangle) {
 	painter.text(47, 29, "■", ui.Text)
 	painter.text(80, 29, "⛶", ui.Text)
 	painter.text(112, 29, fmt.Sprintf("%g FPS", g.controller.vm.FPS()), ui.Muted)
-	options := &ebiten.DrawImageOptions{}
+	options := &ebiten.DrawImageOptions{Blend: ebiten.BlendCopy}
+	options.ColorScale.ScaleAlpha(float32(opacity))
 	options.GeoM.Translate(float64(stage.Min.X), float64(stage.Min.Y-g.pixels(playerControlsHeight)))
 	screen.DrawImage(g.controlsCanvas, options)
 }

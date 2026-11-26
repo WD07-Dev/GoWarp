@@ -8,6 +8,7 @@ import (
 	"math"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
@@ -194,6 +195,7 @@ func TestNativeSettingsUseDisplayScale(t *testing.T) {
 	for _, scale := range []float64{1, 1.25, 1.5, 2} {
 		s := config.Default(nil)
 		s.Window.Width, s.Window.Height = 801, 601
+		s.Player.Controls = false
 		views, restore := nativeWindowViews(&s, scale)
 		v := views[0]
 		if v.Width != int(math.Round(801*scale)) || v.Height != int(math.Round(601*scale)) || restore != (image.Point{}) {
@@ -456,15 +458,16 @@ func TestNativeCanvasSizeIgnoresInactiveWindowsAndBoundsZoom(t *testing.T) {
 		{Width: 4000, Height: 3000, StageWidth: 240, StageHeight: 180, Hidden: true},
 		{Width: 4000, Height: 3000, StageWidth: 240, StageHeight: 180, State: window.State{Minimized: true}},
 	}
-	if w, h := nativeCanvasSize(480, 360, views); w != 800 || h != 600 {
+	g := &game{native: &nativeViews{layout: window.Layout{Views: views}}}
+	if w, h := g.nativeCanvasSize(480, 360); w != 800 || h != 600 {
 		t.Fatalf("inactive windows increased render size: %dx%d", w, h)
 	}
 	views[0].Width, views[0].Height = 120, 90
-	if w, h := nativeCanvasSize(480, 360, views); w != 240 || h != 180 {
+	if w, h := g.nativeCanvasSize(480, 360); w != 240 || h != 180 {
 		t.Fatalf("shrinking windows kept oversized canvas: %dx%d", w, h)
 	}
 	views[0].StageWidth, views[0].StageHeight = math.SmallestNonzeroFloat64, math.SmallestNonzeroFloat64
-	w, h := nativeCanvasSize(480, 360, views)
+	w, h := g.nativeCanvasSize(480, 360)
 	if w < 1 || h < 1 || w > 8192 || h > 8192 || w*h > 16<<20 {
 		t.Fatalf("unbounded canvas for extreme zoom: %dx%d", w, h)
 	}
@@ -693,4 +696,192 @@ func TestFrameEditPreservesOnlyUnspecifiedClientCoordinates(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNativeFitPreservesTransparentStageAndFillsMargins(t *testing.T) {
+	runGPUFrame(t, func() {
+		for _, tc := range []struct {
+			fit        string
+			fullscreen bool
+			height     int
+			stage      image.Rectangle
+		}{
+			{"preserve", true, 360, image.Rect(80, 0, 560, 360)},
+			{"stretch", true, 360, image.Rect(0, 0, 640, 360)},
+			{"integer", true, 400, image.Rect(80, 20, 560, 380)},
+			{"integer", false, 400, image.Rect(53, 0, 586, 400)},
+		} {
+			g := nativeRenderTestGame(t, []window.View{{ID: "main", Width: 640, Height: tc.height, StageWidth: 480, StageHeight: 360, Fullscreen: tc.fullscreen}}, &media.Library{})
+			g.options.Settings.Window.Fit = tc.fit
+			g.options.Settings.Window.Background = "#123456"
+			dst := ebiten.NewImage(640, tc.height)
+			g.drawNativeViews(dst)
+			if g.drawErr != nil {
+				t.Fatal(g.drawErr)
+			}
+			pixels := image.NewRGBA(dst.Bounds())
+			dst.ReadPixels(pixels.Pix)
+			for y := 0; y < tc.height; y++ {
+				for x := 0; x < 640; x++ {
+					want := color.RGBA{R: 0x12, G: 0x34, B: 0x56, A: 255}
+					if image.Pt(x, y).In(tc.stage) {
+						want = color.RGBA{}
+					}
+					if got := pixels.RGBAAt(x, y); got != want {
+						t.Fatalf("fit=%s fullscreen=%v at %d,%d: %v, want %v", tc.fit, tc.fullscreen, x, y, got, want)
+					}
+				}
+			}
+			dst.Deallocate()
+			g.close()
+		}
+	})
+}
+
+func TestNativeFitMapsInputToViewport(t *testing.T) {
+	g := nativeRenderTestGame(t, []window.View{{ID: "main", Width: 1280, Height: 720, StageX: 120, StageY: 90, StageWidth: 240, StageHeight: 180, Fullscreen: true}}, &media.Library{})
+	g.native.input = window.Input{Window: "main", X: 160, Y: 0, Down: true, Pressed: true}
+	var in Input
+	g.nativeInput(&in)
+	if in.MouseX != 120 || in.MouseY != 90+ToolbarHeight || !in.MousePressed {
+		t.Fatalf("viewport origin input: %+v", in)
+	}
+	g.native.input.X = 0
+	g.nativeInput(&in)
+	if in.MousePressed {
+		t.Fatal("letterbox click reached stage")
+	}
+}
+
+func TestNativePlayerControls(t *testing.T) {
+	runGPUFrame(t, func() {
+		g := nativeRenderTestGame(t, []window.View{{ID: "main", Width: 480, Height: 408, StageWidth: 480, StageHeight: 360}}, &media.Library{})
+		defer g.close()
+		g.options.Settings.Player.Controls = true
+		dst := ebiten.NewImage(480, 408)
+		defer dst.Deallocate()
+		g.drawNativeViews(dst)
+		if g.drawErr != nil {
+			t.Fatal(g.drawErr)
+		}
+		if _, _, _, a := dst.At(20, 20).RGBA(); a == 0 {
+			t.Fatal("player controls missing")
+		}
+		alpha := 0.5
+		g.native.layout.Views[0].Opacity = &alpha
+		g.drawNativeViews(dst)
+		if _, _, _, a := dst.At(20, 20).RGBA(); a < 127*257 || a > 128*257 {
+			t.Fatalf("toolbar opacity compounded with margin: %d", a)
+		}
+		g.native.input = window.Input{Window: "main", X: 20, Y: 20, Down: true, Pressed: true}
+		var in Input
+		g.nativeInput(&in)
+		if in.MousePressed || in.MouseDown {
+			t.Fatal("toolbar click reached stage")
+		}
+		if x, ok := g.toolbarPosition(0, 0); !ok || x != 20 {
+			t.Fatalf("toolbar input=%d,%v", x, ok)
+		}
+		g.native.input.Y = 48
+		g.nativeInput(&in)
+		if in.MouseY != ToolbarHeight || !in.MousePressed {
+			t.Fatalf("stage below toolbar: %+v", in)
+		}
+	})
+}
+
+func TestNativeDefaultWindowIncludesControls(t *testing.T) {
+	for _, scale := range []float64{1, 1.5, 2} {
+		s := config.Default(nil)
+		s.Window.Width, s.Window.Height = 640, 480
+		s.Player.Controls = true
+		views, _ := nativeWindowViews(&s, scale)
+		g := &game{options: Options{Settings: &s}, windowDPI: scale}
+		stage := g.nativeStageBounds(views[0])
+		if views[0].Height != int(528*scale) || stage != image.Rect(0, int(48*scale), int(640*scale), int(528*scale)) {
+			t.Fatalf("scale %g: view=%+v stage=%v", scale, views[0], stage)
+		}
+	}
+}
+
+func TestNativeFitCropsStageAtNonzeroAtlasOrigin(t *testing.T) {
+	runGPUFrame(t, func() {
+		pixels := image.NewNRGBA(image.Rect(0, 0, 64, 48))
+		for y := 0; y < 48; y++ {
+			for x := 0; x < 64; x++ {
+				c := color.NRGBA{R: 255, A: 255}
+				if x >= 32 {
+					c = color.NRGBA{G: 255, A: 255}
+				}
+				pixels.SetNRGBA(x, y, c)
+			}
+		}
+		alpha := 0.5
+		g := nativeRenderTestGame(t, []window.View{
+			{ID: "main", Width: 64, Height: 48, StageWidth: 64, StageHeight: 48},
+			{ID: "right", Width: 96, Height: 96, StageX: 32, StageWidth: 32, StageHeight: 48, Opacity: &alpha, Fullscreen: true},
+		}, &media.Library{Costumes: [][]*media.Costume{{{Image: pixels, Width: 64, Height: 48, CenterX: 32, CenterY: 24, Bitmap: true}}}})
+		defer g.close()
+		if err := g.controller.vm.Configure(60, false, false, 64, 48, "player", "transparent"); err != nil {
+			t.Fatal(err)
+		}
+		v := g.controller.vm.View()
+		v.NoAntialias = true
+		g.controller.renderer.SetView(v)
+		g.options.Settings.Window.Background = "#0000ff"
+		dst := ebiten.NewImage(g.native.layout.Size.X, g.native.layout.Size.Y)
+		defer dst.Deallocate()
+		g.drawNativeViews(dst)
+		if g.drawErr != nil {
+			t.Fatal(g.drawErr)
+		}
+		for _, p := range []struct {
+			x, y int
+			want color.RGBA
+		}{
+			{10, 24, color.RGBA{R: 255, A: 255}},
+			{70, 48, color.RGBA{B: 128, A: 128}},
+			{100, 48, color.RGBA{G: 128, A: 128}},
+			{150, 48, color.RGBA{B: 128, A: 128}},
+		} {
+			got := color.RGBAModel.Convert(dst.At(p.x, p.y)).(color.RGBA)
+			// GPU alpha multiplication may round a channel down.
+			for i, c := range []uint8{got.R, got.G, got.B, got.A} {
+				want := []uint8{p.want.R, p.want.G, p.want.B, p.want.A}[i]
+				if d := int(c) - int(want); d < -1 || d > 1 {
+					t.Fatalf("at %d,%d: %v, want %v", p.x, p.y, got, p.want)
+				}
+			}
+		}
+	})
+}
+
+func TestNativeDisplayFPSKeepsFrameAndRedrawsViewportChanges(t *testing.T) {
+	runGPUFrame(t, func() {
+		g := nativeRenderTestGame(t, []window.View{{ID: "main", Width: 640, Height: 360, StageWidth: 480, StageHeight: 360}}, &media.Library{})
+		defer g.close()
+		g.options.Settings.Player.RenderFPS = 30
+		g.options.Settings.Window.Background = "#ff0000"
+		g.native.backend = &centeringWindowBackend{pollingWindowBackend{views: g.native.layout.Views}}
+		dst := ebiten.NewImage(640, 360)
+		defer dst.Deallocate()
+		g.drawNativeViews(dst)
+		g.nextPresentation = time.Now().Add(time.Hour)
+		g.options.Settings.Window.Background = "#0000ff"
+		g.drawNativeViews(dst)
+		if got := color.RGBAModel.Convert(dst.At(0, 0)).(color.RGBA); got != (color.RGBA{R: 255, A: 255}) || !g.native.drawn {
+			t.Fatalf("frame was recomposed before deadline or not published: %v", got)
+		}
+		// Same atlas size, different viewport: this must bypass the display deadline.
+		if _, err := g.nativeWindowCall("viewport", []any{"main", 0.0, 0.0, 360.0, 360.0}); err != nil {
+			t.Fatal(err)
+		}
+		g.drawNativeViews(dst)
+		if g.drawErr != nil {
+			t.Fatal(g.drawErr)
+		}
+		if got := color.RGBAModel.Convert(dst.At(100, 180)).(color.RGBA); got != (color.RGBA{B: 255, A: 255}) {
+			t.Fatalf("viewport change reused stale frame: %v", got)
+		}
+	})
 }

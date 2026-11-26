@@ -131,7 +131,7 @@ func (v View) StagePoint(x, y float64) (float64, float64) {
 
 type Input struct {
 	Window                          string
-	X, Y                            float64
+	X, Y                            float64 // Client coordinates in physical pixels.
 	Focused, Visible, Down, Pressed bool
 	Keys, Released                  []string
 	Text                            string

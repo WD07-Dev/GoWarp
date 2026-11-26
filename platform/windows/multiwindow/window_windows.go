@@ -886,7 +886,7 @@ func (m *windowManager) updateSnapshot() {
 			in.Window = v.ID
 			client := point
 			win.ScreenToClient(win.HWND(w.handle), &client)
-			in.X, in.Y = v.StagePoint(float64(client.X), float64(client.Y))
+			in.X, in.Y = float64(client.X), float64(client.Y)
 		}
 	}
 	m.snapshotMu.Lock()

@@ -319,7 +319,7 @@ func (g *game) update() error {
 	}
 	g.nativeInput(&in)
 	if g.native != nil {
-		pressed = in.MousePressed
+		pressed = g.native.input.Pressed
 	}
 	if g.waitingStart && g.options.Editor == nil {
 		if !pressed && !in.Enter && !in.Restart {
@@ -328,7 +328,7 @@ func (g *game) update() error {
 		g.waitingStart = false
 		in = Input{Restart: true}
 	}
-	if buttonX, toolbar := g.toolbarPosition(cursorX, cursorY); g.native == nil && pressed && toolbar {
+	if buttonX, toolbar := g.toolbarPosition(cursorX, cursorY); pressed && toolbar {
 		if buttonX >= 8 && buttonX < 32 {
 			in.Restart = true
 		}
@@ -340,16 +340,15 @@ func (g *game) update() error {
 		}
 	}
 
-	for _, key := range inpututil.AppendJustPressedKeys(nil) {
-		if key != ebiten.KeyF5 && key != ebiten.KeyF8 {
-			in.Pressed = append(in.Pressed, keyName(key, in.Text))
+	if g.native == nil {
+		for _, key := range inpututil.AppendJustPressedKeys(nil) {
+			if key != ebiten.KeyF5 && key != ebiten.KeyF8 {
+				in.Pressed = append(in.Pressed, keyName(key, in.Text))
+			}
 		}
-	}
-	for _, key := range inpututil.AppendJustReleasedKeys(nil) {
-		in.Released = append(in.Released, keyName(key, ""))
-	}
-	if g.native != nil && !in.Restart {
-		g.nativeInput(&in)
+		for _, key := range inpututil.AppendJustReleasedKeys(nil) {
+			in.Released = append(in.Released, keyName(key, ""))
+		}
 	}
 	g.editorInput(&in)
 	if err := g.audio.poll(g.controller.vm); err != nil {
@@ -792,7 +791,7 @@ func (g *game) layoutScale(width, height, scale float64) (float64, float64) {
 		size := g.native.layout.Size
 		g.outsideWidth, g.outsideHeight = size.X, size.Y
 		g.windowDPI = 1
-		if g.controller == nil && scale > 0 && !math.IsNaN(scale) && !math.IsInf(scale, 0) {
+		if scale > 0 && !math.IsNaN(scale) && !math.IsInf(scale, 0) {
 			g.windowDPI = scale
 		}
 		return float64(size.X), float64(size.Y)

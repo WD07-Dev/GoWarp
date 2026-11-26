@@ -767,6 +767,14 @@ at most 4096×4096 pixels. Ordinary single-window mode cannot change the stage
 viewport or use `bordered-locked`. Native visibility/state is read through
 `window.state`, not written through JSON.
 
+Each native viewport uses the player's screen fit setting. `preserve` centers
+its stage region without stretching; `integer` uses integer scaling only while
+that window is fullscreen. Letterbox margins use the window background color;
+empty stage pixels remain transparent. Antialiasing applies to all views.
+Player controls, when enabled, appear only in `main`, above its stage region.
+Mouse coordinates account for both the fitted region and the controls. The
+player display-FPS limit also applies; viewport changes redraw immediately.
+
 For example, inside a handler:
 
 ```go

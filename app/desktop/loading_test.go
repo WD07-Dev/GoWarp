@@ -87,8 +87,8 @@ func TestNativeLoadingUsesDisplayScale(t *testing.T) {
 		}
 		g.controller = &controller{}
 		g.layoutScale(800, 600, scale)
-		if g.dpi() != 1 {
-			t.Fatal("loading DPI changed logical stage overlay scale")
+		if g.dpi() != scale {
+			t.Fatal("player controls lost display scaling after loading")
 		}
 	}
 }
@@ -674,7 +674,7 @@ func TestLoadingWindowRestoresNativeMainOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	main, other := b.views[0], b.views[1]
-	if main.Width != 1200 || main.Height != 900 || main.X != 100 || main.Y != 75 || main.StageWidth != 960 || main.StageHeight != 360 {
+	if main.Width != 1200 || main.Height != 972 || main.X != 100 || main.Y != 39 || main.StageWidth != 960 || main.StageHeight != 360 {
 		t.Fatalf("main restore: %+v", main)
 	}
 	if other.X != 900 || other.Y != 100 || other.Width != 200 || other.Height != 200 {

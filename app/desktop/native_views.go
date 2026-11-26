@@ -9,6 +9,7 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
@@ -16,6 +17,7 @@ import (
 	"gowarp/app/host"
 	"gowarp/core/extension"
 	"gowarp/core/render"
+	"gowarp/core/vm"
 	"gowarp/core/window"
 )
 
@@ -40,7 +42,7 @@ func nativeWindowViews(s *config.Settings, scale float64) ([]window.View, image.
 	views := slices.Clone(s.Platform.Views)
 	var gameWindowSize image.Point
 	if len(views) == 0 {
-		w, h := s.DisplaySize()
+		w, h := playerWindowSize(s)
 		w, h = pixels(w), pixels(h)
 		views = []window.View{{ID: "main", Title: s.Player.Title, X: 100, Y: 100, Width: w, Height: h,
 			StageWidth: float64(s.Width), StageHeight: float64(s.Height)}}
@@ -152,6 +154,7 @@ func (g *game) pollNativeViews() error {
 		}
 		changed := n.layout.Size != layout.Size
 		n.layout = layout
+		g.nextPresentation = time.Time{}
 		if changed {
 			g.sizeNativeSource()
 		}
@@ -173,6 +176,7 @@ func (g *game) syncNativeViews() error {
 	}
 	n.layout = layout
 	n.dirty = false
+	g.nextPresentation = time.Time{}
 	g.sizeNativeSource()
 	return nil
 }
@@ -369,17 +373,43 @@ func (g *game) nativeInput(in *Input) {
 		Text: v.Text, Pressed: v.Keys, Released: v.Released, WheelY: v.Wheel,
 		Enter: slices.Contains(v.Keys, "enter"), Backspace: slices.Contains(v.Keys, "backspace"),
 		Escape: slices.Contains(v.Keys, "escape"), Delete: slices.Contains(v.Keys, "delete"), Restart: slices.Contains(v.Keys, "f5")}
+	for _, view := range n.layout.Views {
+		if view.ID != v.Window {
+			continue
+		}
+		stage := g.nativeStageBounds(view)
+		in.MouseX = view.StageX + (v.X-float64(stage.Min.X))*view.StageWidth/float64(stage.Dx())
+		in.MouseY = view.StageY + (v.Y-float64(stage.Min.Y))*view.StageHeight/float64(stage.Dy()) + ToolbarHeight
+		inside := v.X >= float64(stage.Min.X) && v.X < float64(stage.Max.X) && v.Y >= float64(stage.Min.Y) && v.Y < float64(stage.Max.Y)
+		in.MousePressed = in.MousePressed && inside
+		if _, toolbar := g.toolbarPosition(0, 0); toolbar {
+			in.MouseDown = false
+		}
+		return
+	}
+}
+
+func (g *game) nativeStageBounds(v window.View) image.Rectangle {
+	fit, top := "stretch", 0
+	if s := g.options.Settings; s != nil {
+		fit = s.Window.Fit
+		if v.ID == "main" && s.Player.Controls {
+			top = g.pixels(playerControlsHeight)
+		}
+	}
+	return fittedStageBounds(v.Width, v.Height, v.StageWidth, v.StageHeight, top, fit, v.Fullscreen)
 }
 
 // Render once at the density needed by the visible windows, without changing stage coordinates.
-func nativeCanvasSize(w, h int, views []window.View) (int, int) {
+func (g *game) nativeCanvasSize(w, h int) (int, int) {
 	sx, sy := 0.0, 0.0
-	for _, v := range views {
+	for _, v := range g.native.layout.Views {
 		if v.Hidden || v.State.Minimized {
 			continue
 		}
-		sx = math.Max(sx, float64(v.Width)/v.StageWidth)
-		sy = math.Max(sy, float64(v.Height)/v.StageHeight)
+		stage := g.nativeStageBounds(v)
+		sx = math.Max(sx, float64(stage.Dx())/v.StageWidth)
+		sy = math.Max(sy, float64(stage.Dy())/v.StageHeight)
 	}
 	if sx == 0 || sy == 0 {
 		return render.DisplaySize(w, h)
@@ -420,9 +450,14 @@ func (g *game) drawNativeViews(dst *ebiten.Image) {
 		n.drawn = true
 		return
 	}
+	if !g.shouldPresent(time.Now(), n.layout.Size) {
+		n.drawn = true
+		return
+	}
+	g.focusDraws = max(0, g.focusDraws-1)
 	c := g.controller
 	w, h := c.renderer.Size()
-	width, height := nativeCanvasSize(w, h, n.layout.Views)
+	width, height := g.nativeCanvasSize(w, h)
 	if g.stageCanvas == nil || g.stageCanvas.Bounds().Size() != image.Pt(width, height) {
 		if g.stageCanvas != nil {
 			g.stageCanvas.Deallocate()
@@ -447,17 +482,36 @@ func (g *game) drawNativeViews(dst *ebiten.Image) {
 			continue
 		}
 		tile := n.layout.Tiles[i]
+		stage := g.nativeStageBounds(v).Add(tile.Min)
+		surface := dst.SubImage(tile).(*ebiten.Image)
+		background := vm.ParseColor(c.options.Settings.Window.Background)
+		a := v.Alpha()
+		background.A = uint8(math.Round(float64(background.A) * a))
+		// Only the letterbox is opaque; empty stage pixels must remain transparent.
+		for _, margin := range [4]image.Rectangle{
+			image.Rect(tile.Min.X, tile.Min.Y, tile.Max.X, stage.Min.Y),
+			image.Rect(tile.Min.X, stage.Max.Y, tile.Max.X, tile.Max.Y),
+			image.Rect(tile.Min.X, stage.Min.Y, stage.Min.X, stage.Max.Y),
+			image.Rect(stage.Max.X, stage.Min.Y, tile.Max.X, stage.Max.Y),
+		} {
+			if !margin.Empty() {
+				surface.SubImage(margin).(*ebiten.Image).Fill(background)
+			}
+		}
+		content := surface.SubImage(stage).(*ebiten.Image)
 		op := ebiten.DrawImageOptions{Blend: ebiten.BlendCopy}
 		if !view.NoAntialias && !view.Canvas.Nearest {
 			op.Filter = ebiten.FilterLinear
 		}
 		op.GeoM.Scale(float64(w)/float64(width), float64(h)/float64(height))
 		op.GeoM.Translate(-v.StageX, -v.StageY)
-		op.GeoM.Scale(float64(v.Width)/v.StageWidth, float64(v.Height)/v.StageHeight)
-		op.GeoM.Translate(float64(tile.Min.X), float64(tile.Min.Y))
-		a := float32(v.Alpha())
-		op.ColorScale.Scale(a, a, a, a)
-		dst.SubImage(tile).(*ebiten.Image).DrawImage(g.stageCanvas, &op)
+		op.GeoM.Scale(float64(stage.Dx())/v.StageWidth, float64(stage.Dy())/v.StageHeight)
+		op.GeoM.Translate(float64(stage.Min.X), float64(stage.Min.Y))
+		op.ColorScale.ScaleAlpha(float32(a))
+		content.DrawImage(g.stageCanvas, &op)
+		if v.ID == "main" {
+			g.drawPlayerControls(surface, stage, a)
+		}
 	}
 	n.drawn = true
 }

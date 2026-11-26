@@ -58,7 +58,7 @@ func (g *game) drawPlayer(screen *ebiten.Image) {
 	if g.waitingStart && g.failure == nil {
 		g.drawStartOverlay(screen, stage)
 	}
-	g.drawPlayerControls(screen, stage)
+	g.drawPlayerControls(screen, stage, 1)
 }
 
 func (g *game) drawStartOverlay(screen *ebiten.Image, stage image.Rectangle) {
