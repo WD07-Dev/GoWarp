@@ -14,12 +14,18 @@
 
 The extension is saved with the SB3 even when no extension blocks are used. Connection addresses and tokens are never saved.
 
+Once connected, the packager shows **TurboWarp Preview** and imports the editor project's settings. Change execution, stage/window and other settings in the packager; they apply on the **next GoWarp Run**, without interrupting the current game. A settings change restarts the player on that next run, while unchanged projects still reuse their uploaded snapshot.
+
+Disconnect before opening a different SB3 or project settings file. File opening, extension editing and exporting are disabled during preview mode. Disconnecting restores the previously open packager settings. **GoWarp Stop** closes the game but keeps the editor connected.
+
 Keep GoWarp open while connected. Allow local network access if your browser asks, and never share your connection address.
 
 ## Display modes
 
 - **Native window** (default): runs the game in a separate native window.
 - **Embedded preview** (experimental): streams the native game's frames directly into the TurboWarp stage, with keyboard and mouse input forwarded to GoWarp.
+
+**Multi-window** forces Native window mode and disables Embedded preview. This also applies when the mode is requested by an older or modified editor helper.
 
 Embedded preview supports up to 60 streamed frames per second with a maximum image edge of 960 pixels. Frames are transmitted as uncompressed RGBA over authenticated loopback WebSockets.
 
@@ -42,7 +48,7 @@ Changes to assets, sprites, variable/list definitions, extensions or runtime set
 
 ## Compilation and project settings
 
-GoWarp imports unsaved project changes, assets and supported TurboWarp settings. Compiler caching and snapshot reuse reduce unnecessary uploads and compilation.
+GoWarp imports supported TurboWarp settings on connection. Each run includes unsaved project changes and assets, using the settings currently shown in the packager. Compiler caching and snapshot reuse reduce unnecessary uploads and compilation.
 
 Preview launches use the cached native runtime with a separate project and settings file. They skip executable packaging, icon insertion and project recompression. **GoWarp Stop** still closes the process; another run reuses the compiler cache but loads game resources again. Use the green flag and Scratch's stop button to restart scripts in the open preview without reloading resources.
 

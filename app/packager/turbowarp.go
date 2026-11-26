@@ -2,6 +2,7 @@ package packager
 
 import (
 	"context"
+	"fmt"
 	"image"
 	"runtime"
 	"strings"
@@ -17,6 +18,76 @@ import (
 	webbrowser "github.com/pkg/browser"
 )
 
+type editorProjectRequest struct {
+	ctx     context.Context
+	server  *editorbridge.Server
+	project *project.Project
+	options editorbridge.Options
+	done    chan error
+}
+
+func (a *application) previewMode() bool { return a.editorLocalForm != nil }
+
+func (a *application) blockProjectChange() bool {
+	if !a.previewMode() {
+		return false
+	}
+	a.status = i18n.Tr("editor.disconnect_first")
+	a.dirty = true
+	return true
+}
+
+func (a *application) importEditorProject(r editorProjectRequest) error {
+	if err := r.ctx.Err(); err != nil {
+		return err
+	}
+	if a.busy || a.extensions != nil || a.previewMode() || a.editorBridge != r.server {
+		return fmt.Errorf("packager is busy; close the current task before connecting")
+	}
+	settings := editorPreviewSettings("", r.project, r.options)
+	if err := settings.Validate(); err != nil {
+		return err
+	}
+	a.editorLocalForm, a.editorLocalTarget = a.form, a.target
+	a.form = newForm(settings, variableNames(r.project))
+	for i, template := range a.templates {
+		if template.OS == runtime.GOOS && template.Arch == runtime.GOARCH {
+			a.target = i
+			break
+		}
+	}
+	a.editorScreen = false
+	a.browser, a.editor = nil, nil
+	a.closeDropdown()
+	a.keyboardFocus, a.scroll = -1, 0
+	if a.section == 7 {
+		a.section = 1
+	}
+	a.status, a.dirty = i18n.Tr("editor.preview_settings"), true
+	a.syncEditorSettings()
+	return nil
+}
+
+func (a *application) syncEditorSettings() {
+	if a.editorBridge == nil || !a.previewMode() {
+		return
+	}
+	s, err := a.form.settings()
+	a.editorBridge.Configure(settingsForPlatform(s, runtime.GOOS), err)
+}
+
+func (a *application) leaveEditorPreview() {
+	if !a.previewMode() {
+		return
+	}
+	a.form, a.target = a.editorLocalForm, a.editorLocalTarget
+	a.editorLocalForm = nil
+	a.editor = nil
+	a.closeDropdown()
+	a.keyboardFocus, a.scroll = -1, 0
+	a.status, a.dirty = i18n.Tr("editor.disconnected"), true
+}
+
 func (a *application) connectEditor() {
 	if a.startEditorBridge() {
 		a.copyEditorAddress()
@@ -30,16 +101,25 @@ func (a *application) startEditorBridge() bool {
 	if a.editorBridge != nil {
 		return true
 	}
+	if a.editorProjects == nil {
+		a.editorProjects = make(chan editorProjectRequest)
+	}
 	for _, template := range a.templates {
 		if template.OS != runtime.GOOS || template.Arch != runtime.GOARCH {
 			continue
 		}
 		server, err := editorbridge.Start(a.ctx, func(ctx context.Context, path string, options editorbridge.Options) (<-chan error, error) {
-			p, err := project.Load(path)
-			if err != nil {
-				return nil, err
+			if options.Settings == nil {
+				return nil, fmt.Errorf("connect the editor project first")
 			}
-			settings := editorPreviewSettings(path, p, options)
+			settings := *options.Settings
+			settings.Project = path
+			if options.ClickStart {
+				settings.Player.AutoStart = false
+			}
+			if options.Display == "embedded" {
+				settings.Player.Controls = false
+			}
 			preview, err := startPreview(ctx, ctx, template, path, settings, "GOWARP_EDITOR="+options.RuntimeURL, "GOWARP_EDITOR_DISPLAY="+options.Display)
 			if err != nil {
 				return nil, err
@@ -52,6 +132,20 @@ func (a *application) startEditorBridge() bool {
 			return false
 		}
 		a.editorBridge = server
+		server.SetProjectHandler(func(ctx context.Context, p *project.Project, options editorbridge.Options) error {
+			r := editorProjectRequest{ctx: ctx, server: server, project: p, options: options, done: make(chan error, 1)}
+			select {
+			case a.editorProjects <- r:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			select {
+			case err := <-r.done:
+				return err
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		})
 		return true
 	}
 	a.status = i18n.Tr("status.no_preview_runtime")
@@ -60,10 +154,18 @@ func (a *application) startEditorBridge() bool {
 }
 
 func (a *application) openTurboWarp() {
-	if !a.startEditorBridge() {
+	if a.busy {
 		return
 	}
-	server := a.editorBridge
+	if a.editorBrowser == nil {
+		server, err := editorbridge.Start(a.ctx, nil)
+		if err != nil {
+			a.errorText, a.dirty = err.Error(), true
+			return
+		}
+		a.editorBrowser = server
+	}
+	server := a.editorBrowser
 	a.job(i18n.Tr("editor.opening"), func(context.Context) result {
 		address, err := server.TurboWarpURL()
 		if err == nil {
@@ -83,6 +185,15 @@ func editorPreviewSettings(path string, p *project.Project, options editorbridge
 	settings.Window.Width, settings.Window.Height = options.Width, options.Height
 	settings.Turbo = options.Turbo
 	settings.Interpolation = options.Interpolation
+	if options.HighQualityPen != nil {
+		settings.HighQualityPen = options.HighQualityPen
+	}
+	if options.RemoveFencing != nil {
+		settings.RemoveFencing = options.RemoveFencing
+	}
+	if options.RemoveMiscLimits != nil {
+		settings.RemoveMiscLimits = options.RemoveMiscLimits
+	}
 	name := strings.TrimSpace(options.Name)
 	if name == "" {
 		name = "TurboWarp"
@@ -90,9 +201,6 @@ func editorPreviewSettings(path string, p *project.Project, options editorbridge
 	settings.Player.Title = name
 	settings.Player.Username = name
 	settings.Player.AutoStart = !options.ClickStart
-	if options.Display == "embedded" {
-		settings.Player.Controls = false
-	}
 	return settings
 }
 

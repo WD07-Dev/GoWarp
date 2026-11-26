@@ -21,28 +21,38 @@ import (
 	"time"
 
 	"gowarp/app/assets"
+	"gowarp/app/config"
+	"gowarp/core/project"
 )
 
 const maxProjectSize = 512 << 20
 
 type Options struct {
-	Snapshot      string  `json:"snapshot,omitempty"`
-	ClickStart    bool    `json:"clickStart"`
-	Display       string  `json:"display"`
-	RuntimeURL    string  `json:"-"`
-	Name          string  `json:"name"`
-	FPS           float64 `json:"fps"`
-	Width         int     `json:"width"`
-	Height        int     `json:"height"`
-	Turbo         bool    `json:"turbo"`
-	Interpolation bool    `json:"interpolation"`
+	Snapshot         string           `json:"snapshot,omitempty"`
+	ClickStart       bool             `json:"clickStart"`
+	Display          string           `json:"display"`
+	RuntimeURL       string           `json:"-"`
+	Settings         *config.Settings `json:"-"`
+	Name             string           `json:"name"`
+	FPS              float64          `json:"fps"`
+	Width            int              `json:"width"`
+	Height           int              `json:"height"`
+	Turbo            bool             `json:"turbo"`
+	Interpolation    bool             `json:"interpolation"`
+	HighQualityPen   *bool            `json:"highQualityPen,omitempty"`
+	RemoveFencing    *bool            `json:"removeFencing,omitempty"`
+	RemoveMiscLimits *bool            `json:"removeMiscLimits,omitempty"`
 }
 
 type Status struct {
-	Snapshot string `json:"snapshot,omitempty"`
-	Phase    string `json:"phase"`
-	Error    string `json:"error,omitempty"`
-	Display  string `json:"display,omitempty"`
+	Connected        bool   `json:"connected"`
+	Connecting       bool   `json:"connecting"`
+	SettingsRevision string `json:"settingsRevision,omitempty"`
+	MultiWindow      bool   `json:"multiWindow"`
+	Snapshot         string `json:"snapshot,omitempty"`
+	Phase            string `json:"phase"`
+	Error            string `json:"error,omitempty"`
+	Display          string `json:"display,omitempty"`
 }
 
 type job struct {
@@ -56,18 +66,23 @@ type job struct {
 }
 
 type Server struct {
-	mu             sync.Mutex
-	ctx            context.Context
-	cancel         context.CancelFunc
-	http           *http.Server
-	extensions     *http.Server
-	address, token string
-	launch         func(context.Context, string, Options) (<-chan error, error)
-	status         Status
-	active         *job
-	closed         bool
-	cacheDir       string
-	snapshot       string
+	mu                              sync.Mutex
+	ctx                             context.Context
+	cancel                          context.CancelFunc
+	http                            *http.Server
+	extensions                      *http.Server
+	address, token                  string
+	launch                          func(context.Context, string, Options) (<-chan error, error)
+	status                          Status
+	active                          *job
+	closed                          bool
+	cacheDir                        string
+	snapshot                        string
+	connected, connecting           bool
+	connectCancel                   context.CancelFunc
+	projectHandler                  func(context.Context, *project.Project, Options) error
+	settings                        *config.Settings
+	settingsRevision, settingsError string
 }
 
 func Start(parent context.Context, launch func(context.Context, string, Options) (<-chan error, error)) (*Server, error) {
@@ -122,6 +137,10 @@ func (s *Server) Status() Status {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	status := s.status
+	status.Connected = s.connected
+	status.Connecting = s.connecting
+	status.SettingsRevision = s.settingsRevision
+	status.MultiWindow = s.settings != nil && s.settings.Platform.MultiWindow
 	status.Snapshot = s.snapshot
 	if s.active != nil {
 		status.Display = s.active.display
@@ -207,6 +226,24 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(s.Status())
 	case r.Method == http.MethodPost && r.URL.Path == "/run":
 		s.receive(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/connect":
+		s.connect(w, r)
+	case r.Method == http.MethodPost && r.URL.Path == "/disconnect":
+		s.mu.Lock()
+		if s.active != nil {
+			s.status = Status{Phase: "stopping"}
+			s.active.cancel()
+		} else {
+			s.status = Status{Phase: "ready"}
+		}
+		s.connected = false
+		if s.connectCancel != nil {
+			s.connectCancel()
+		}
+		s.settings = nil
+		s.settingsRevision, s.settingsError = "", ""
+		s.mu.Unlock()
+		w.WriteHeader(http.StatusAccepted)
 	case r.Method == http.MethodPost && r.URL.Path == "/stop":
 		s.Stop()
 		w.WriteHeader(http.StatusAccepted)
@@ -216,19 +253,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) receive(w http.ResponseWriter, r *http.Request) {
-	var options Options
-	raw := r.Header.Get("X-GoWarp-Options")
-	decoded, decodeErr := url.PathUnescape(raw)
-	if len(raw) > 4096 || decodeErr != nil || json.Unmarshal([]byte(decoded), &options) != nil || len(options.Name) > 256 || options.FPS < 0 || options.FPS > 1000 || options.Width < 1 || options.Height < 1 || options.Width > 4096 || options.Height > 4096 {
-		http.Error(w, "Invalid project settings", http.StatusBadRequest)
+	options, err := readOptions(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-	if options.Display != "" && options.Display != "native" && options.Display != "embedded" {
-		http.Error(w, "Invalid display mode", http.StatusBadRequest)
-		return
-	}
-	if options.Display == "" {
-		options.Display = "native"
 	}
 	var secret [32]byte
 	if _, err := rand.Read(secret[:]); err != nil {
@@ -240,6 +268,22 @@ func (s *Server) receive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	if s.projectHandler != nil && !s.connected {
+		s.mu.Unlock()
+		http.Error(w, "Connect the editor project first", http.StatusConflict)
+		return
+	}
+	if s.settingsError != "" {
+		message := s.settingsError
+		s.mu.Unlock()
+		http.Error(w, message, http.StatusBadRequest)
+		return
+	}
+	options.Settings = s.settings
+	settingsRevision := s.settingsRevision
+	if s.settings != nil && s.settings.Platform.MultiWindow {
+		options.Display = "native"
+	}
 	if s.closed || s.ctx.Err() != nil {
 		s.mu.Unlock()
 		http.Error(w, "Connection closed", http.StatusServiceUnavailable)
@@ -319,7 +363,7 @@ func (s *Server) receive(w http.ResponseWriter, r *http.Request) {
 	}()
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]string{"snapshot": j.snapshot})
+	json.NewEncoder(w).Encode(map[string]string{"snapshot": j.snapshot, "settingsRevision": settingsRevision, "display": options.Display})
 }
 
 func (s *Server) receiveProject(r *http.Request, path, snapshot string) (string, error) {

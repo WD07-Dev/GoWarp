@@ -174,6 +174,9 @@ func (e *extensionEditor) addGoHeader() {
 }
 
 func (a *application) openExtensionEditor() {
+	if a.blockProjectChange() {
+		return
+	}
 	path := ""
 	for _, field := range a.form.fields {
 		if field.key == "project" {

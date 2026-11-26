@@ -65,39 +65,43 @@ type browser struct {
 }
 
 type application struct {
-	editorBridge    *editorbridge.Server
-	editorScreen    bool
-	editorStatus    editorbridge.Status
-	quit            bool
-	extensions      *extensionEditor
-	scale           float64
-	ctx             context.Context
-	cancel          context.CancelFunc
-	form            *form
-	section, scroll int
-	face, title     font.Face
-	pixels          *image.RGBA
-	canvas          *ebiten.Image
-	width, height   int
-	dirty           bool
-	hits            []hit
-	editor          *string
-	cursor          int
-	selectAll       bool
-	keyboardFocus   int
-	status          string
-	busy            bool
-	jobStarted      time.Time
-	jobCancel       context.CancelFunc
-	results         chan result
-	clipboard       chan clipboardResult
-	templates       []compiler.Template
-	target          int
-	browser         *browser
-	lastDir         string
-	errorText       string
-	dropdown        *dropdown
-	languagePath    string
+	editorBrowser     *editorbridge.Server
+	editorProjects    chan editorProjectRequest
+	editorLocalForm   *form
+	editorLocalTarget int
+	editorBridge      *editorbridge.Server
+	editorScreen      bool
+	editorStatus      editorbridge.Status
+	quit              bool
+	extensions        *extensionEditor
+	scale             float64
+	ctx               context.Context
+	cancel            context.CancelFunc
+	form              *form
+	section, scroll   int
+	face, title       font.Face
+	pixels            *image.RGBA
+	canvas            *ebiten.Image
+	width, height     int
+	dirty             bool
+	hits              []hit
+	editor            *string
+	cursor            int
+	selectAll         bool
+	keyboardFocus     int
+	status            string
+	busy              bool
+	jobStarted        time.Time
+	jobCancel         context.CancelFunc
+	results           chan result
+	clipboard         chan clipboardResult
+	templates         []compiler.Template
+	target            int
+	browser           *browser
+	lastDir           string
+	errorText         string
+	dropdown          *dropdown
+	languagePath      string
 }
 
 func Main() {
@@ -108,6 +112,9 @@ func Main() {
 	}
 	defer a.cancel()
 	defer func() {
+		if a.editorBrowser != nil {
+			a.editorBrowser.Close()
+		}
 		if a.editorBridge != nil {
 			a.editorBridge.Close()
 		}
@@ -209,6 +216,9 @@ func (a *application) job(label string, work func(context.Context) result) {
 }
 
 func (a *application) openProject(path string) {
+	if a.blockProjectChange() {
+		return
+	}
 	a.job(i18n.Tr("job.open_project"), func(ctx context.Context) result {
 		path, err := filepath.Abs(path)
 		if err != nil {
@@ -238,6 +248,9 @@ func variableNames(p *project.Project) map[string]string {
 }
 
 func (a *application) loadSettings(path string) {
+	if a.blockProjectChange() {
+		return
+	}
 	a.job(i18n.Tr("job.open_settings"), func(ctx context.Context) result {
 		if err := ctx.Err(); err != nil {
 			return result{err: err}
@@ -321,6 +334,9 @@ func (a *application) requireProject() bool {
 }
 
 func (a *application) choose(mode string) {
+	if (mode == "project" || mode == "open" || mode == "extension") && a.blockProjectChange() {
+		return
+	}
 	if a.busy {
 		return
 	}
@@ -483,12 +499,25 @@ func (a *application) acceptFile() {
 }
 
 func (a *application) Update() error {
+	defer func() {
+		if a.dirty && !a.busy {
+			a.syncEditorSettings()
+		}
+	}()
 	if a.quit || (ebiten.IsWindowBeingClosed() && a.requestWindowClose()) {
 		return ebiten.Termination
 	}
 	a.pollClipboard()
+	select {
+	case r := <-a.editorProjects:
+		r.done <- a.importEditorProject(r)
+	default:
+	}
 	if a.editorBridge != nil {
 		status := a.editorBridge.Status()
+		if a.previewMode() && !status.Connected && !status.Connecting {
+			a.leaveEditorPreview()
+		}
 		if status != a.editorStatus {
 			a.editorStatus = status
 			a.dirty = true
@@ -509,7 +538,9 @@ func (a *application) Update() error {
 			}
 		} else {
 			if r.closedEditor != nil && a.editorBridge == r.closedEditor {
+				a.leaveEditorPreview()
 				a.editorBridge = nil
+				a.editorStatus = editorbridge.Status{}
 			}
 			a.status = r.status
 			a.applyExtensionImport(r.importedExtension)
@@ -849,6 +880,11 @@ func (a *application) button(x, y, w int, text string, action func()) {
 
 func (a *application) coloredButton(x, y, w int, text string, background color.Color, action func()) {
 	rect := image.Rect(x, y, x+w, y+34)
+	if action == nil {
+		a.fill(rect, ui.Field)
+		a.label(x+10, y+23, a.fitText(text, w-20), ui.Muted)
+		return
+	}
 	a.fill(rect, background)
 	a.label(x+10, y+23, a.fitText(text, w-20), ui.Text)
 	a.hits = append(a.hits, hit{rect: rect, action: action})
@@ -935,33 +971,46 @@ func (a *application) render() {
 
 func (a *application) renderPackager() {
 	ui.Label(a.pixels, a.title, int(24*a.scale), int(42*a.scale), "GoWarp", ui.Text)
-	a.label(150, 40, "Packager", ui.Accent)
-	a.coloredButton(a.width-424, 18, 124, i18n.Tr("action.open_project"), color.RGBA{111, 48, 55, 255}, func() {
-		a.choose("project")
-	})
-	a.coloredButton(a.width-290, 18, 128, i18n.Tr("action.open_settings"), color.RGBA{42, 77, 105, 255}, func() {
-		a.choose("open")
-	})
+	label := "Packager"
+	var openProject, openSettings func()
+	if a.previewMode() {
+		label = i18n.Tr("editor.preview_mode")
+	} else {
+		openProject = func() { a.choose("project") }
+		openSettings = func() { a.choose("open") }
+	}
+	a.label(150, 40, a.fitText(label, a.width-590), ui.Accent)
+	a.coloredButton(a.width-424, 18, 124, i18n.Tr("action.open_project"), color.RGBA{111, 48, 55, 255}, openProject)
+	a.coloredButton(a.width-290, 18, 128, i18n.Tr("action.open_settings"), color.RGBA{42, 77, 105, 255}, openSettings)
 	a.coloredButton(a.width-152, 18, 128, i18n.Tr("action.save_settings"), color.RGBA{40, 88, 65, 255}, func() {
 		a.choose("save")
 	})
 	a.renderSettings()
 	a.fill(image.Rect(0, a.height-112, a.width, a.height), color.RGBA{24, 24, 24, 255})
 	status := a.status
+	if a.previewMode() {
+		status = i18n.Tr("editor.preview_settings")
+	}
 	for a.textWidth(status) > a.width-48 && len(status) > 0 {
 		_, n := utf8.DecodeLastRuneInString(status)
 		status = status[:len(status)-n]
 	}
 	a.label(24, a.height-82, status, ui.Muted)
 	a.button(24, a.height-56, 146, i18n.Tr("action.open_turbowarp"), a.openTurboWarp)
-	a.button(180, a.height-56, 146, i18n.Tr("action.connect_turbowarp"), func() {
-		a.editorScreen = true
-		a.editor = nil
-		a.keyboardFocus = -1
-	})
-	a.button(a.width-190, a.height-56, 166, i18n.Tr("action.export"), func() {
-		a.choose("export")
-	})
+	if a.previewMode() {
+		a.button(180, a.height-56, 146, i18n.Tr("editor.disconnect"), a.disconnectEditor)
+	} else {
+		a.button(180, a.height-56, 146, i18n.Tr("action.connect_turbowarp"), func() {
+			a.editorScreen = true
+			a.editor = nil
+			a.keyboardFocus = -1
+		})
+	}
+	var export func()
+	if !a.previewMode() {
+		export = func() { a.choose("export") }
+	}
+	a.button(a.width-190, a.height-56, 166, i18n.Tr("action.export"), export)
 	a.renderLanguage()
 }
 

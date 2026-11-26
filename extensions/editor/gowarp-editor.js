@@ -54,6 +54,10 @@
     let archiveCache = null;
     let lastUpload = null;
     let serverSnapshot = "";
+    let settingsRevision = "";
+    let previewSettingsRevision = "";
+    let multiWindow = false;
+    let activeDisplay = "native";
     let pendingFrames = 0;
     let mouseRequest = 0;
     let pendingMouse = null;
@@ -167,9 +171,10 @@
         stopButton.disabled = !connection || phase === "stopping" || (!busy && !active);
         const menuStop = document.getElementById("gowarp-editor-stop");
         if(menuStop) menuStop.disabled = stopButton.disabled;
-        connectButton.disabled = busy || active;
-        address.disabled = busy || active;
-        displayMode.disabled = busy || active;
+        connectButton.disabled = Boolean(connection) || busy || active;
+        address.disabled = Boolean(connection) || busy || active;
+        displayMode.disabled = busy || active || multiWindow;
+        displayMode.children[1].disabled = multiWindow;
         disconnectButton.disabled = !connection || busy;
         const button = document.getElementById("gowarp-editor-button");
         if(button) button.title = active ? `${tr("GoWarp Run", "GoWarp 실행")} · ${messages[phase]}` : tr("Run this project in GoWarp", "현재 프로젝트를 GoWarp에서 실행");
@@ -211,7 +216,7 @@
         try {
             const headers = {Authorization: `Bearer ${target.token}`};
             if (body) {
-                headers["Content-Type"] = "application/x.scratch.sb3";
+                headers["Content-Type"] = path === "/connect" ? "application/json" : "application/x.scratch.sb3";
                 headers["X-GoWarp-Options"] = encodeURIComponent(JSON.stringify(options));
             }
             const response = await fetch(target.base + path, {
@@ -220,7 +225,7 @@
                 targetAddressSpace
             });
             if(!response.ok) throw new Error(await response.text());
-            return path === "/status" || path === "/run" ? await response.json() : null;
+            return path === "/status" || path === "/run" || path === "/connect" ? await response.json() : null;
         } catch (error) {
             if(error instanceof TypeError) {
                 throw new Error(tr(
@@ -235,10 +240,23 @@
     }
 
     function applyStatus(value) {
+        if (!value.connected) {
+            clearTimeout(polling);
+            connection = null;
+            phase = "ready";
+            status.textContent = tr("Disconnected", "연결 해제됨");
+            restoreEditor();
+            refresh();
+            return;
+        }
         serverSnapshot = value.snapshot || "";
+        settingsRevision = value.settingsRevision || "";
+        multiWindow = Boolean(value.multiWindow);
         const wasRunning = phase === "running";
         phase = value.phase;
-        if(value.display) displayMode.value = value.display;
+        if (value.display) activeDisplay = value.display;
+        if (multiWindow) displayMode.value = "native";
+        else if (value.display) displayMode.value = value.display;
         status.textContent = value.error || messages[phase] || phase;
         refresh();
         if(phase === "running") {
@@ -258,25 +276,37 @@
             const value = await request(target, "/status");
             if(connection !== target || disposed) return;
             applyStatus(value);
-            if(["receiving", "building", "running", "stopping"].includes(phase)) {
-                polling = setTimeout(poll, 500);
-            }
+            if (connection) polling = setTimeout(poll, phase === "ready" ? 1000 : 500);
         } catch (error) {
             if (connection === target && !disposed) showError(error);
         }
     }
 
+    function projectOptions() {
+        return {
+            name: document.title.replace(/\s*[-–|]\s*TurboWarp.*$/i, "").slice(0, 80),
+            fps: runtime.frameLoop.framerate,
+            width: runtime.stageWidth, height: runtime.stageHeight,
+            turbo: runtime.turboMode, interpolation: runtime.interpolationEnabled,
+            highQualityPen: runtime.renderer?.useHighQualityRender,
+            removeFencing: runtime.runtimeOptions?.fencing === undefined ? undefined : !runtime.runtimeOptions.fencing,
+            removeMiscLimits: runtime.runtimeOptions?.miscLimits === undefined ? undefined : !runtime.runtimeOptions.miscLimits,
+            display: multiWindow ? "native" : displayMode.value
+        };
+    }
+
     async function connect() {
         const target = parseAddress(address.value);
-        const value = await request(target, "/status");
+        const project = JSON.parse(vm.toJSON(undefined, {allowOptimization: false}));
+        const targets = project.targets.map(({isStage, name, variables, comments}) => ({isStage, name, variables, comments}));
+        const body = new Blob([JSON.stringify({targets})], {type: "application/json"});
+        const value = await request(target, "/connect", "POST", body, projectOptions());
         if (disposed) return;
         connection = target;
         applyStatus(value);
-        if (["receiving", "building", "running", "stopping"].includes(phase)) {
-            polling = setTimeout(poll, 500);
-        }
+        if (connection) polling = setTimeout(poll, 1000);
     }
-    
+
     function snapshot() {
         const project = JSON.parse(vm.toJSON(undefined, {allowOptimization: false}));
         const targets = runtime.targets.filter(target => target.isOriginal);
@@ -330,12 +360,17 @@
         busy = true;
         refresh();
         try {
-            if(!connection) await connect();
-            if(!connection || disposed) return;
+            if (!connection) { open(); return; }
+            if (!connection || disposed) return;
+            const connected = connection;
+            const state = await request(connected, "/status");
+            if (connection !== connected || disposed) return;
+            applyStatus(state);
+            if (!connection) { open(); return; }
             if(phase === "running") {
                 const currentRevision = revision;
                 const current = previewRevision === revision ? previewSnapshot : snapshot();
-                if(previewSnapshot && current.structure === previewSnapshot.structure) {
+                if(previewSettingsRevision === settingsRevision && previewSnapshot && current.structure === previewSnapshot.structure) {
                     const edits = current.graphs.filter((graph, index) => JSON.stringify(graph) !== JSON.stringify(previewSnapshot.graphs[index]));
                     const size = new TextEncoder().encode(JSON.stringify({action: "edit", edits})).byteLength;
                     if(size < 4 * 1024 * 1024 - 256) {
@@ -375,16 +410,7 @@
             previewRevision = revision;
             previewTargets = new Map(runtime.targets.filter(target => target.isOriginal).map((target, index) => [target.id, index]));
             initialCommand = clicked;
-            const options = {
-                name: document.title.replace(/\s*[-–|]\s*TurboWarp.*$/i, "").slice(0, 80),
-                fps: runtime.frameLoop.framerate,
-                width: runtime.stageWidth,
-                height: runtime.stageHeight,
-                turbo: runtime.turboMode,
-                interpolation: runtime.interpolationEnabled,
-                display: displayMode.value,
-                clickStart: Boolean(clicked)
-            };
+            const options = {...projectOptions(), clickStart: Boolean(clicked)};
             // Keep editor IDs; the normal SB3 exporter renames them.
             const json = vm.toJSON(undefined, {allowOptimization: false});
             const assets = vm.serializeAssets();
@@ -413,6 +439,9 @@
             status.textContent = messages[phase];
             refresh();
             const receipt = await request(target, "/run", "POST", project, options, upload);
+            previewSettingsRevision = receipt.settingsRevision || "";
+            activeDisplay = receipt.display || options.display;
+            displayMode.value = activeDisplay;
             lastUpload = {target, json, assets, snapshot: receipt.snapshot};
             phase = "building";
             status.textContent = messages[phase];
@@ -458,7 +487,10 @@
     runButton.onclick = () => run();
     stopButton.onclick = stop;
     disconnectButton.onclick = async () => {
-        await stop();
+        if (upload) upload.abort();
+        try {
+            if (connection) await request(connection, "/disconnect", "POST");
+        } catch (error) { showError(error); return; }
         clearTimeout(polling);
         connection = null;
         address.value = "";
@@ -530,7 +562,7 @@
         ws.onopen = () => {
             if(socket !== ws) return;
             ws.send(JSON.stringify({token: connection.token}));
-            if(displayMode.value === "embedded") {
+            if(activeDisplay === "embedded") {
                 attachPreview();
                 requestFrame();
             }
@@ -656,7 +688,7 @@
     }
     
     function requestFrame() {
-        if (document.hidden || !overlay || phase !== "running" || displayMode.value !== "embedded" || pendingFrames >= 2) return;
+        if (document.hidden || !overlay || phase !== "running" || activeDisplay !== "embedded" || pendingFrames >= 2) return;
         const bounds = overlay.getBoundingClientRect();
         const ratio = window.devicePixelRatio || 1;
         const width = Math.max(1, Math.ceil(bounds.width * ratio));
@@ -732,18 +764,6 @@
                 return;
             }
             if (busy || ["receiving", "building", "stopping"].includes(phase)) return;
-            const target = connection;
-            try {
-                const value = await request(target, "/status");
-                if (disposed || connection !== target) return;
-                applyStatus(value);
-            } catch (error) {
-                if (disposed || connection !== target) return;
-                connection = null;
-                showError(error);
-                open();
-                return;
-            }
             if (dialog.open) dialog.close();
             await run();
         };
@@ -761,7 +781,15 @@
     attachButton();
     refresh();
     const dispose = () => {
+        if (disposed) return;
         disposed = true;
+        if (connection) {
+            fetch(connection.base + "/disconnect", {
+                method: "POST", headers: {Authorization: `Bearer ${connection.token}`},
+                credentials: "omit", keepalive: true, targetAddressSpace
+            }).catch(() => {});
+            connection = null;
+        }
         clearTimeout(polling);
         if (upload) upload.abort();
         observer.disconnect();

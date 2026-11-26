@@ -60,7 +60,7 @@ class Events extends EventTarget {
     emit(name) { this.dispatchEvent(new Event(name)); }
 }
 const runtime = Object.assign(new Events(), {
-    targets: [], stageWidth: 640, stageHeight: 480,
+    targets: [{id: "stage", isOriginal: true, blocks: {getScripts: () => []}}], stageWidth: 640, stageHeight: 480,
     turboMode: true, interpolationEnabled: true,
     frameLoop: {framerate: 60, running: false},
     extensionManager: {getExtensionURLs: () => ({})},
@@ -68,7 +68,7 @@ const runtime = Object.assign(new Events(), {
 });
 const vm = Object.assign(new Events(), {
     runtime,
-    toJSON: () => JSON.stringify({targets: [], extensions: []}),
+    toJSON: () => JSON.stringify({targets: [{isStage: true, name: "Stage", blocks: {}}], extensions: []}),
     serializeAssets: () => [],
     exports: {JSZip: class {
         file() {}

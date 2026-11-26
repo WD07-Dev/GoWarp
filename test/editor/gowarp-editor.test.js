@@ -107,6 +107,11 @@ function editor(t, language = "en") {
     const uploadSizes = [];
     let snapshot = "";
     let phase = "ready";
+    let connected = false;
+    let settingsRevision = "initial";
+    let multiWindow = false;
+    let metadata;
+    let runSettings;
     const commands = [];
     const sockets = [];
     let stops = 0;
@@ -138,9 +143,15 @@ function editor(t, language = "en") {
         Scratch: {vm: scratchVM, translate: {language}, BlockType: {BUTTON: "button", REPORTER: "reporter"},
         extensions: {unsandboxed: true, register() {}}},
         fetch: async (url, options) => {
+            if (url.endsWith("/connect")) {
+                connected = true;
+                metadata = JSON.parse(await options.body.text());
+            }
+            if (url.endsWith("/disconnect")) { connected = false; phase = "ready"; }
             if (url.endsWith("/run")) {
                 uploadSizes.push(options.body.size);
                 const settings = JSON.parse(decodeURIComponent(options.headers["X-GoWarp-Options"]));
+                runSettings = settings;
                 if (settings.snapshot) {
                     assert.equal(settings.snapshot, snapshot);
                     assert.equal(options.body.size, 0);
@@ -152,7 +163,7 @@ function editor(t, language = "en") {
                 phase = "running";
             }
             if (url.endsWith("/stop")) { stops++; phase = "ready"; }
-            return {ok: true, json: async () => ({phase, snapshot})};
+            return {ok: true, json: async () => ({phase, snapshot, connected, settingsRevision, multiWindow})};
         }
     };
     const source = fs.readFileSync(path.resolve(__dirname, "../../extensions/editor/gowarp-editor.js"), "utf8");
@@ -163,6 +174,13 @@ function editor(t, language = "en") {
         project, runtime, scratchVM, order, commands, uploads: () => uploads,
         extensionURLs, originalToJSON, dispose: () => window.__gowarpEditor.dispose(),
         uploadSizes,
+        metadata: () => metadata,
+        runSettings: () => runSettings,
+        settingsChanged: () => { settingsRevision += "-changed"; },
+        setMultiWindow: value => { multiWindow = value; },
+        displayMode: () => nodes.find(node => node.tagName === "select"),
+        dialog: () => nodes.find(node => node.tagName === "dialog"),
+        disconnect: () => nodes.find(node => node.textContent === "Disconnect").onclick(),
         uploadedFiles: () => uploadedFiles,
         loading: () => document.getElementById("gowarp-preview-loading"),
         holdZip: () => { holdZip = true; },
@@ -369,4 +387,41 @@ test("existing clicks, workspace moves and block edits reuse the player", async 
     await e.run();
     await settle();
     assert.equal(e.uploads(), 2, "asset changes must rebuild the preview");
+});
+
+test("opening the extension does not connect or show settings", async t => {
+    const e = editor(t);
+    assert.ok(!e.dialog().open);
+    assert.equal(e.metadata(), undefined);
+    await e.connect();
+    assert.equal(e.metadata().targets[0].name, "Stage");
+    assert.equal(e.metadata().targets[0].blocks, undefined);
+    assert.equal(e.uploads(), 0);
+});
+
+test("packager settings restart the next run without reuploading assets", async t => {
+    const e = editor(t);
+    await e.connect();
+    await e.run();
+    await new Promise(resolve => setImmediate(resolve));
+    e.settingsChanged();
+    await e.run();
+    assert.equal(e.stops(), 1);
+    assert.equal(e.uploads(), 2);
+    assert.equal(e.uploadSizes[1], 0);
+});
+
+test("multi-window disables embedded preview and forces a native run", async t => {
+    const e = editor(t);
+    e.embedded();
+    e.setMultiWindow(true);
+    await e.connect();
+    assert.equal(e.displayMode().value, "native");
+    assert.equal(e.displayMode().disabled, true);
+    await e.run();
+    assert.equal(e.runSettings().display, "native");
+    await e.disconnect();
+    await e.run();
+    assert.equal(e.dialog().open, true);
+    assert.equal(e.uploads(), 1);
 });

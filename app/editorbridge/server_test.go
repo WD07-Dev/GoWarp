@@ -67,6 +67,34 @@ func TestBrowserAccessRequiresConnectionToken(t *testing.T) {
 	}
 }
 
+func TestEditorConnectionIsExplicit(t *testing.T) {
+	s, err := Start(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Close)
+	readConnected := func() bool {
+		res := request(t, s, "GET", "/status", "https://turbowarp.org", s.token, nil)
+		var status struct{ Connected bool }
+		if err := json.NewDecoder(res.Body).Decode(&status); err != nil {
+			t.Fatal(err)
+		}
+		return status.Connected
+	}
+	if readConnected() {
+		t.Fatal("starting the local server connected a project")
+	}
+	res := request(t, s, "POST", "/connect", "https://turbowarp.org", s.token,
+		strings.NewReader(`{"targets":[{"isStage":true,"name":"Stage"}]}`))
+	if res.StatusCode != http.StatusOK || !readConnected() {
+		t.Fatalf("connect did not establish a session: %d", res.StatusCode)
+	}
+	res = request(t, s, "POST", "/disconnect", "https://turbowarp.org", s.token, nil)
+	if res.StatusCode != http.StatusAccepted || readConnected() {
+		t.Fatal("disconnect left the editor session active")
+	}
+}
+
 func TestExtensionManagerCanLoadWithoutConnectionToken(t *testing.T) {
 	s, err := Start(context.Background(), nil)
 	if err != nil {

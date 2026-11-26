@@ -40,6 +40,10 @@ func (a *application) renderSettings() {
 	for i, name := range sections {
 		y := 94 + i*sectionSpacing
 		r := image.Rect(24, y, 168, y+38)
+		if i == 7 && a.previewMode() {
+			a.label(40, y+25, a.fitText(i18n.Tr(name), 120), ui.Muted)
+			continue
+		}
 		if a.section == i {
 			a.fill(r, ui.Background)
 			a.fill(image.Rect(r.Min.X, y, r.Min.X+3, y+38), ui.Accent)
@@ -158,7 +162,9 @@ func (a *application) renderSettings() {
 		a.label(r.Min.X+12, r.Min.Y+24, a.fitText(label, r.Dx()-24), ui.Muted)
 		input := image.Rect(r.Min.X+12, r.Min.Y+36, r.Max.X-12, r.Min.Y+70)
 		start := len(a.hits)
-		if f.kind == "icon" {
+		if f.key == "project" && a.previewMode() {
+			a.label(input.Min.X, input.Min.Y+23, a.fitText(i18n.Tr("editor.connected_project"), input.Dx()), ui.Muted)
+		} else if f.kind == "icon" {
 			a.renderIcon(r)
 		} else if f.kind == "loadingImage" {
 			a.renderLoadingImage(r, f.key)
@@ -204,11 +210,17 @@ func (a *application) renderSettings() {
 		for i, t := range a.templates {
 			choices[i] = t.OS + " / " + t.Arch
 		}
-		a.choice(left+12, 184, right-left-24, choices, a.target, func(i int) {
-			a.target = i
-			a.scroll = 0
-			a.editor = nil
-			a.keyboardFocus = -1
-		})
+		if a.previewMode() {
+			if a.target >= 0 && a.target < len(choices) {
+				a.label(left+12, 207, choices[a.target], ui.Muted)
+			}
+		} else {
+			a.choice(left+12, 184, right-left-24, choices, a.target, func(i int) {
+				a.target = i
+				a.scroll = 0
+				a.editor = nil
+				a.keyboardFocus = -1
+			})
+		}
 	}
 }
