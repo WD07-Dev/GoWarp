@@ -972,14 +972,16 @@ func (a *application) render() {
 func (a *application) renderPackager() {
 	ui.Label(a.pixels, a.title, int(24*a.scale), int(42*a.scale), "GoWarp", ui.Text)
 	label := "Packager"
+	labelX, labelY, labelWidth := 150, 40, 88
 	var openProject, openSettings func()
 	if a.previewMode() {
 		label = i18n.Tr("editor.preview_mode")
+		labelX, labelY, labelWidth = 24, 74, a.width-48
 	} else {
 		openProject = func() { a.choose("project") }
 		openSettings = func() { a.choose("open") }
 	}
-	a.label(150, 40, a.fitText(label, a.width-590), ui.Accent)
+	a.label(labelX, labelY, a.fitText(label, labelWidth), ui.Accent)
 	a.coloredButton(a.width-424, 18, 124, i18n.Tr("action.open_project"), color.RGBA{111, 48, 55, 255}, openProject)
 	a.coloredButton(a.width-290, 18, 128, i18n.Tr("action.open_settings"), color.RGBA{42, 77, 105, 255}, openSettings)
 	a.coloredButton(a.width-152, 18, 128, i18n.Tr("action.save_settings"), color.RGBA{40, 88, 65, 255}, func() {
