@@ -259,7 +259,7 @@ func (f *calculationFrame) bindVariable(slot uint8, id string) {
 }
 
 func (p *calculation) run(ctx context.Context, r *Runtime, th *thread) error {
-	f := calculationFrame{nativeFrame: nativeFrame{ctx: ctx, r: r, t: th.target}}
+	f := calculationFrame{ctx: ctx, r: r, t: th.target}
 	var arguments [calculationArgumentLimit]calculationValue
 	for i, name := range p.arguments {
 		arguments[i] = nativeArgument(th, name)

@@ -14,10 +14,6 @@ func anyRunning(threads []*thread) bool {
 	return false
 }
 
-/*
-Restarting replaces the scheduled thread, preserving waiters' references to
-the old instance. An instance currently executing can finish its current slice.
-*/
 func (r *Runtime) startHat(t *target, id string, restart bool) *thread {
 	old := t.hatThreads[id]
 	running := old != nil && !old.done && !old.replaced
@@ -40,7 +36,6 @@ func (r *Runtime) startHat(t *target, id string, restart bool) *thread {
 	} else {
 		r.threads = append(r.threads, fresh)
 	}
-	// Search only this clone's running hats.
 	if t.hatThreads == nil {
 		t.hatThreads = make(map[string]*thread)
 	}

@@ -22,12 +22,7 @@ type State struct {
 	Minimized, Maximized, Focused bool
 }
 
-/*
-Desktop coordinates are physical pixels relative to the primary monitor.
-Stage coordinates start at the stage's top-left, independently of window position.
-*/
 type View struct {
-	// Pending frame edits preserve the client origin on axes without an explicit position.
 	KeepClientX     bool     `json:"-"`
 	KeepClientY     bool     `json:"-"`
 	State           State    `json:"-"`

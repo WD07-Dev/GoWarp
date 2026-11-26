@@ -12,7 +12,6 @@ func TestCenterGroupKeepsSpacingAndUsesOuterBorders(t *testing.T) {
 		{ID: "bottom", X: 60, Y: 400, Width: 400, Height: 300, StageY: 180, StageWidth: 240, StageHeight: 180},
 		{ID: "hidden", X: 9999, Y: 9999, Width: 10, Height: 10, StageWidth: 10, StageHeight: 10, Hidden: true},
 	}
-	// Include 16px horizontal and 39px vertical non-client decoration.
 	outer := []image.Rectangle{image.Rect(60, 60, 476, 399), image.Rect(480, 60, 896, 399), image.Rect(60, 400, 476, 739), image.Rect(9999, 9999, 10009, 10009)}
 	work := image.Rect(-1920, 40, 0, 1080)
 	got, err := Center(views, outer, work, "main", true)
@@ -36,7 +35,6 @@ func TestCenterGroupKeepsSpacingAndUsesOuterBorders(t *testing.T) {
 	if err != nil || got[1].X != -1168 || got[1].Y != 390 || got[0] != views[0] {
 		t.Fatalf("individual: %v %v", got, err)
 	}
-	// Oversized groups stay top/left aligned rather than losing their title bars.
 	got, err = Center(views, outer, image.Rect(20, 40, 320, 240), "main", true)
 	if err != nil || got[0].X != 20 || got[0].Y != 40 || got[1].X != 440 {
 		t.Fatalf("oversized: %v %v", got, err)

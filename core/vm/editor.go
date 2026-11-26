@@ -16,7 +16,6 @@ type EditorBlocks struct {
 	ScriptOrder []string       `json:"scriptOrder"`
 }
 
-// UpdateEditorBlocks applies edits on the VM thread without restarting the player.
 func (r *Runtime) UpdateEditorBlocks(edits []EditorBlocks) error {
 	if len(edits) == 0 {
 		return nil
@@ -74,8 +73,6 @@ func (r *Runtime) UpdateEditorBlocks(edits []EditorBlocks) error {
 	return nil
 }
 
-// ToggleScript follows editor stack clicks without restarting the project.
-// Call it on the VM's execution thread, like Tick and GreenFlag.
 func (r *Runtime) ToggleScript(source int, id string, reporter bool, report func(string, error)) (bool, error) {
 	var owner *target
 	for _, t := range r.targets {

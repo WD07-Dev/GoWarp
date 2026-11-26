@@ -77,7 +77,6 @@ func (r *Runtime) evalBlock(ctx context.Context, th *thread, id string, b *proje
 	}
 	if plan := r.numericExpression(t, b, 0); plan != nil && plan.blocks-1 <= *budget && depth+plan.height-1 <= 128 {
 		if plan.conditional {
-			// readConditional counts the root and only the branches it visits.
 			*budget++
 			return plan.readConditional(ctx, r, th, budget)
 		}

@@ -17,7 +17,6 @@ type Monitor struct {
 	WorkHeight int `json:"workHeight"`
 }
 
-// Center translates outer window bounds together, leaving viewports and client sizes unchanged.
 func Center(views []View, outer []image.Rectangle, work image.Rectangle, id string, all bool) ([]View, error) {
 	if len(outer) != len(views) || work.Empty() {
 		return nil, fmt.Errorf("invalid window or monitor bounds")

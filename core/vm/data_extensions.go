@@ -211,7 +211,6 @@ func (r *Runtime) loadSavedData() bool {
 		r.data.status = "error: saved data exceeds 16 MiB"
 		return false
 	}
-	// The read limit also protects against files growing after Stat.
 	raw, err := io.ReadAll(io.LimitReader(f, maxGeneratedText+1))
 	if err != nil {
 		r.data.status = "error: could not read " + r.data.savePath
@@ -229,7 +228,6 @@ func (r *Runtime) loadSavedData() bool {
 	return true
 }
 
-// Use a sibling temporary file so a failed write cannot truncate an existing save.
 func writeSavedData(path string, data []byte) error {
 	if len(data) > maxGeneratedText {
 		return fmt.Errorf("saved data exceeds 16 MiB")
@@ -291,7 +289,6 @@ func (out *jsonOutput) value(value any) {
 	// Scratch's numeric values include infinities; JSON.stringify emits null.
 	switch value := value.(type) {
 	case string:
-		// Escaping can only expand strings; reject this lower bound before copying.
 		if len(value) > maxGeneratedText-out.text.Len()-2 {
 			out.err = fmt.Errorf("generated JSON exceeds 16 MiB")
 			return
