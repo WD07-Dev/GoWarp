@@ -16,7 +16,6 @@ import (
 	"weak"
 
 	"github.com/hajimehoshi/ebiten/v2/audio"
-	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 	"golang.org/x/image/font/opentype"
 
@@ -218,7 +217,7 @@ func DecodeSound(format string, data []byte) (*Sound, error) {
 	case "wav":
 		return decodeWAV(data)
 	case "mp3":
-		decoded, err = mp3.DecodeF32(bytes.NewReader(data))
+		decoded, err = decodeMP3(data)
 	case "ogg":
 		decoded, err = vorbis.DecodeF32(bytes.NewReader(data))
 	default:

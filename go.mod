@@ -1,11 +1,12 @@
 module gowarp
 
-go 1.25.0
+go 1.27
 
 require (
 	github.com/hajimehoshi/ebiten/v2 v2.10.5
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e
 	github.com/ncruces/zenity v0.10.15
+	github.com/nicholas-fedor/mp3-decoder v0.2.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef
@@ -30,7 +31,6 @@ require (
 	github.com/ebitengine/hideconsole v1.0.0 // indirect
 	github.com/ebitengine/oto/v3 v3.5.0 // indirect
 	github.com/ebitengine/purego v0.11.0
-	github.com/hajimehoshi/go-mp3 v0.3.4 // indirect
 	github.com/jfreymuth/pulse v0.1.3 // indirect
 	golang.org/x/net v0.0.0-20211118161319-6a13c67c3ce4
 	golang.org/x/sync v0.22.0 // indirect

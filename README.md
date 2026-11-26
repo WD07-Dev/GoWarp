@@ -78,7 +78,7 @@ Supported TurboWarp settings saved in the SB3 are imported when you open the pro
 | Running an exported game | Not required |
 | Building GoWarp from source | Required |
 
-Install Go, make sure `go` is available on `PATH`, then restart GoWarp.
+Install Go 1.27 or later, make sure `go` is available on `PATH`, then restart GoWarp.
 
 GoWarp compiles supported event scripts, custom blocks and calculations into resumable Go code. Waits and loop yields retain their Scratch scheduling behavior; unsupported operations use the shared VM. The first compilation may require an internet connection to download dependencies.
 

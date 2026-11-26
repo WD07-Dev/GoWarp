@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 	"gowarp/core/project"
 	"io"
@@ -268,7 +267,7 @@ func TestCompressedMusicMatchesDecodedPCM(t *testing.T) {
 				var decoder io.ReadSeeker
 				switch soundFormat("wav", data) {
 				case "mp3":
-					decoder, err = mp3.DecodeF32(bytes.NewReader(data))
+					decoder, err = decodeMP3(data)
 				case "ogg":
 					decoder, err = vorbis.DecodeF32(bytes.NewReader(data))
 				}

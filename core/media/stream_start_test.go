@@ -189,8 +189,8 @@ func TestShortMP3WithTruncatedLastFrame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(decoded.Samples)/2 >= lib.Sounds[0][0].frames {
-		t.Fatal("fixture did not overestimate the final frame")
+	if len(decoded.Samples)/2 > lib.Sounds[0][0].frames {
+		t.Fatal("decoded samples exceeded inspected length")
 	}
 	stream, err := lib.Stream(0, 0, 44100)
 	if err != nil {
@@ -211,12 +211,14 @@ func TestShortMP3WithTruncatedLastFrame(t *testing.T) {
 		t.Fatal("truncated MP3 changed playable samples")
 	}
 	pending := &soundDecode{done: make(chan struct{})}
-	looped, err := pending.stream(lib.Sounds[0][0], 44100)
+	// The pending stream must also handle metadata that overestimates a damaged tail.
+	meta := &Sound{Rate: decoded.Rate, frames: len(decoded.Samples)/2 + 1152}
+	looped, err := pending.stream(meta, 44100)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer looped.Close()
-	start := lib.Sounds[0][0].Duration()
+	start := meta.Duration()
 	looped.Playback(start, 0, true)
 	eager.Playback(start, 0, true)
 	pending.sound = decoded

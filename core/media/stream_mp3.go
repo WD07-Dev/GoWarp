@@ -1,11 +1,6 @@
 package media
 
-import (
-	"bytes"
-	"fmt"
-
-	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
-)
+import "fmt"
 
 /*
 streamMP3 defers frame indexing until the audio reader needs the decoder.
@@ -15,7 +10,7 @@ type streamMP3 struct {
 	data    []byte
 	rate    int
 	length  int64
-	decoder *mp3.Stream
+	decoder *mp3PCM
 	err     error
 }
 
@@ -28,7 +23,7 @@ func (s *streamMP3) Length() int64 {
 
 func (s *streamMP3) prepare() error {
 	if s.decoder == nil && s.err == nil {
-		s.decoder, s.err = mp3.DecodeF32(bytes.NewReader(s.data))
+		s.decoder, s.err = decodeMP3(s.data)
 		s.data = nil
 		if s.err != nil {
 			// Initialization EOF is invalid input, not successful playback EOF.

@@ -15,7 +15,6 @@ import (
 	"strings"
 	"weak"
 
-	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 
 	"gowarp/core/project"
@@ -59,7 +58,7 @@ type cachedAsset struct {
 	sound       *Sound
 	soundDecode *soundDecode
 	data        []byte
-	prepared    *mp3.Stream
+	prepared    *mp3PCM
 }
 
 /*
@@ -168,7 +167,7 @@ func LoadRuntime(ctx context.Context, path string, p *project.Project, progress 
 				if e != nil {
 					return nil, e
 				}
-				var prepared *mp3.Stream
+				var prepared *mp3PCM
 				s, prepared, e = inspectSoundWithMP3(meta.DataFormat, data)
 				if e != nil {
 					return nil, fmt.Errorf("%s sound %q: %w", target.Name, meta.Name, e)
@@ -421,7 +420,7 @@ func inspectSound(format string, data []byte) (*Sound, error) {
 	return sound, err
 }
 
-func inspectSoundWithMP3(format string, data []byte) (*Sound, *mp3.Stream, error) {
+func inspectSoundWithMP3(format string, data []byte) (*Sound, *mp3PCM, error) {
 	format = soundFormat(format, data)
 	switch format {
 	case "wav":
@@ -448,11 +447,11 @@ func inspectSoundWithMP3(format string, data []byte) (*Sound, *mp3.Stream, error
 			SampleRate() int
 		}
 		var err error
-		var prepared *mp3.Stream
+		var prepared *mp3PCM
 		if format == "ogg" {
 			stream, err = vorbis.DecodeF32(bytes.NewReader(data))
 		} else {
-			prepared, err = mp3.DecodeF32(bytes.NewReader(data))
+			prepared, err = decodeMP3(data)
 			stream = prepared
 		}
 		if err != nil {
