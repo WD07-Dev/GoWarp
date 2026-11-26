@@ -13,7 +13,6 @@ import (
 	"gowarp/core/window"
 )
 
-// SourceTitle identifies the render-only GLFW window within this process.
 var SourceTitle = fmt.Sprintf("GoWarp render source %d", os.Getpid())
 
 type Backend struct {
@@ -54,8 +53,6 @@ func Open(views []window.View, centerMain bool) (*Backend, error) {
 	return b, nil
 }
 
-// Prepare must run on Ebitengine's main thread after GLFW creates its HWND.
-// Call it again after the first Draw, when Ebitengine has applied queued icons.
 func (b *Backend) Prepare() error {
 	if b.prepared {
 		return b.manager.copySourceIcons(b.sourceWindow)
@@ -92,8 +89,6 @@ func (b *Backend) SetViews(views []window.View) error {
 	return nil
 }
 
-// Publish is paired with DrawFinalScreen, never with Update: the copy rectangles
-// must describe the pixels being submitted to this particular source Present.
 func (b *Backend) Publish(ready bool) {
 	if ready {
 		b.bridge.frame.Store(b.frame)
@@ -146,7 +141,6 @@ func (b *Backend) Poll() (window.Input, error) {
 			updated.State = v.State
 			updated.Width, updated.Height = v.Width, v.Height
 			if updated != previous {
-				// Published frames may still reference the previous views.
 				if !copied {
 					views = slices.Clone(views)
 					copied = true
@@ -174,12 +168,8 @@ func (b *Backend) Poll() (window.Input, error) {
 			return in, err
 		}
 		b.views = layout.Views
-		// Do not post a new SetViews during interactive resizing: that could apply
-		// an older snapshot over a newer HWND size. Publish immutable GPU metadata
-		// only when DrawFinalScreen submits the corresponding resized source atlas.
 		b.frame = &frame{layout: layout, handles: slices.Clone(b.frame.handles), revision: b.frame.revision}
 	} else {
-		// Position and state changes do not affect atlas resources.
 		b.views = views
 	}
 	count := b.bridge.presents.Load()
@@ -193,7 +183,6 @@ func (b *Backend) Poll() (window.Input, error) {
 	return in, nil
 }
 
-// Close is called after RunGame returns, when there can be no more Present callbacks.
 func (b *Backend) Close() error {
 	err := b.bridge.close()
 	if b.manager != nil {

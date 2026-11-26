@@ -86,7 +86,6 @@ func (a *application) applyClipboard(r clipboardResult) {
 		a.dirty = true
 		return
 	}
-	// Clipboard tools run off the UI thread. Ignore results if the user moved on.
 	if a.busy || a.editor != r.target || *r.target != r.original ||
 		a.cursor != r.cursor || a.selectAll != r.selected {
 		return

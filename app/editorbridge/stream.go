@@ -58,6 +58,19 @@ type relay struct {
 	once            sync.Once
 }
 
+type Peer struct {
+	Commands  chan Command
+	frames    chan []byte
+	replies   chan []byte
+	free      chan []byte
+	wanted    atomic.Int32
+	frameSize atomic.Uint32
+	done      chan struct{}
+	once      sync.Once
+	ws        *websocket.Conn
+	Embedded  bool
+}
+
 func newRelay() *relay {
 	r := &relay{
 		commands: make(chan []byte, 64), replies: make(chan []byte, 32),
@@ -301,21 +314,6 @@ func validFrame(data []byte) bool {
 	return w > 0 && h > 0 && w <= 960 && h <= 960 && len(data) == 9+w*h*4
 }
 
-// Peer exists only in editor previews. Two reusable buffers keep network writes
-// off the GPU thread and bound memory even when the browser stops receiving.
-type Peer struct {
-	Commands  chan Command
-	frames    chan []byte
-	replies   chan []byte
-	free      chan []byte
-	wanted    atomic.Int32
-	frameSize atomic.Uint32
-	done      chan struct{}
-	once      sync.Once
-	ws        *websocket.Conn
-	Embedded  bool
-}
-
 func ConnectRuntime(ctx context.Context, address string, embedded bool) (*Peer, error) {
 	u, err := url.Parse(address)
 	if err != nil || u.Scheme != "ws" || u.Hostname() != "127.0.0.1" || u.Port() == "" || len(u.Fragment) != 64 {
@@ -359,8 +357,16 @@ func ConnectRuntime(ctx context.Context, address string, embedded bool) (*Peer, 
 	return p, nil
 }
 
-func (p *Peer) Close()                { p.once.Do(func() { close(p.done); p.ws.Close() }) }
-func (p *Peer) Done() <-chan struct{} { return p.done }
+func (p *Peer) Close() {
+	p.once.Do(func() {
+		close(p.done)
+		p.ws.Close()
+	})
+}
+
+func (p *Peer) Done() <-chan struct{} {
+	return p.done
+}
 
 func (p *Peer) read() {
 	defer p.Close()
@@ -436,7 +442,9 @@ func (p *Peer) Reply(reply Reply) {
 	}
 }
 
-func (p *Peer) WantsFrame() bool { return p.Embedded && p.wanted.Load() > 0 }
+func (p *Peer) WantsFrame() bool {
+	return p.Embedded && p.wanted.Load() > 0
+}
 
 func (p *Peer) FrameSize(width, height int) (int, int) {
 	if width <= 0 || height <= 0 {

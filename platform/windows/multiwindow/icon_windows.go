@@ -4,6 +4,7 @@ package multiwindow
 
 import (
 	"fmt"
+
 	"github.com/lxn/win"
 )
 
@@ -21,9 +22,6 @@ func destroyIcons(icons [2]uintptr) {
 	}
 }
 
-// copySourceIcons runs on the source's main thread, so GLFW cannot replace or
-// destroy the originals between WM_GETICON and CopyIcon. The native windows own
-// independent copies because GLFW destroys its icons when RunGame returns.
 func (m *windowManager) copySourceIcons(hwnd uintptr) error {
 	var source, copies [2]uintptr
 	for kind, classIndex := range []uintptr{^uintptr(33), ^uintptr(13)} { // GCLP_HICONSM / GCLP_HICON

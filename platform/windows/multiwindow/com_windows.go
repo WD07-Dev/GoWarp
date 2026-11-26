@@ -27,6 +27,29 @@ type comObject struct {
 	vtable unsafe.Pointer
 }
 
+type patch struct {
+	slot        *uintptr
+	original    uintptr
+	replacement uintptr
+}
+
+type swapDesc struct {
+	Width, Height, Format                                     uint32
+	Stereo                                                    int32
+	SampleCount, SampleQuality                                uint32
+	Usage, BufferCount, Scaling, SwapEffect, AlphaMode, Flags uint32
+}
+
+type textureDesc struct {
+	Width, Height, MipLevels, ArraySize, Format uint32
+	SampleCount, SampleQuality                  uint32
+	Usage, BindFlags, CPUAccessFlags, MiscFlags uint32
+}
+
+type box struct {
+	Left, Top, Front, Right, Bottom, Back uint32
+}
+
 func method(object *comObject, index int) uintptr {
 	return *(*uintptr)(unsafe.Add(object.vtable, uintptr(index)*unsafe.Sizeof(uintptr(0))))
 }
@@ -64,15 +87,6 @@ func release(object *comObject) {
 	}
 }
 
-// A factory vtable can be shared by DXGI instances. Factory hooks are installed
-// before RunGame; the Present hook is installed while capturing its source.
-// Slots change atomically, and all hooks are removed after RunGame returns.
-type patch struct {
-	slot        *uintptr
-	original    uintptr
-	replacement uintptr
-}
-
 func (p *patch) install(object *comObject, index int, callback uintptr) error {
 	p.slot = (*uintptr)(unsafe.Add(object.vtable, uintptr(index)*unsafe.Sizeof(uintptr(0))))
 	p.original = atomic.LoadUintptr(p.slot)
@@ -100,23 +114,6 @@ func (p *patch) restore() error {
 		return nil
 	}
 	return p.exchange(p.replacement, p.original)
-}
-
-type swapDesc struct {
-	Width, Height, Format                                     uint32
-	Stereo                                                    int32
-	SampleCount, SampleQuality                                uint32
-	Usage, BufferCount, Scaling, SwapEffect, AlphaMode, Flags uint32
-}
-
-type textureDesc struct {
-	Width, Height, MipLevels, ArraySize, Format uint32
-	SampleCount, SampleQuality                  uint32
-	Usage, BindFlags, CPUAccessFlags, MiscFlags uint32
-}
-
-type box struct {
-	Left, Top, Front, Right, Bottom, Back uint32
 }
 
 func buffer(swap *comObject) (*comObject, error) {

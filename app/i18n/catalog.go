@@ -114,7 +114,6 @@ func SetLanguage(code string) bool {
 	return false
 }
 
-// Tr translates a key using the selected language and formats optional arguments.
 func Tr(key string, args ...any) string {
 	text := messages.text(LanguageCode(), key)
 	if len(args) > 0 {

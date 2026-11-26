@@ -22,6 +22,7 @@ var getAsyncKeyState = user32.NewProc("GetAsyncKeyState")
 
 type nativeWindow struct {
 	ready, pendingBounds bool
+	pendingFrame         bool
 	handle               uintptr
 	view                 window.View
 	restore              window.View // Last windowed geometry, owned by the window thread.
@@ -634,38 +635,17 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 			}
 			// Store policy before SetWindowPos dispatches synchronous messages.
 			w.view = v
-			if styleChanged {
-				// Keep visibility/minimized/maximized state bits owned by Windows.
-				current := win.GetWindowLongPtr(win.HWND(w.handle), win.GWL_STYLE)
-				style |= current & (win.WS_VISIBLE | win.WS_MINIMIZE | win.WS_MAXIMIZE)
-				win.SetWindowLongPtr(win.HWND(w.handle), win.GWL_STYLE, style)
-				win.SetWindowLongPtr(win.HWND(w.handle), win.GWL_EXSTYLE, ex)
+			if created || styleChanged || old.DisableClose != v.DisableClose || old.Frame != v.Frame {
+				w.pendingFrame = true
+			}
+			if w.pendingFrame && !w.pendingBounds {
+				if err := w.applyFrame(); err != nil {
+					result = err
+					return
+				}
 			}
 			if old.Title != v.Title {
 				user32.NewProc("SetWindowTextW").Call(w.handle, uintptr(unsafe.Pointer(title)))
-			}
-			if created || old.DisableClose != v.DisableClose || old.Frame != v.Frame || styleChanged {
-				menu := win.GetSystemMenu(win.HWND(w.handle), false)
-				if menu != 0 {
-					flags := uint32(win.MF_ENABLED)
-					if v.DisableClose {
-						flags = win.MF_GRAYED
-					}
-					win.EnableMenuItem(menu, win.SC_CLOSE, flags)
-					flags = win.MF_ENABLED
-					if v.Frame == window.BorderedLocked {
-						flags = win.MF_GRAYED
-					}
-					win.EnableMenuItem(menu, win.SC_MOVE, flags)
-					win.DrawMenuBar(win.HWND(w.handle))
-				}
-			}
-			if v.Passthrough && (created || !old.Passthrough) {
-				ok, _, err := user32.NewProc("SetLayeredWindowAttributes").Call(w.handle, 0, 255, 2)
-				if ok == 0 {
-					result = fmt.Errorf("SetLayeredWindowAttributes: %w", err)
-					return
-				}
 			}
 			if created || old.X != v.X || old.Y != v.Y || old.Width != v.Width || old.Height != v.Height || styleChanged || old.Topmost != v.Topmost {
 				z := uintptr(win.HWND_NOTOPMOST)
@@ -731,6 +711,42 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 	return handles, actual, result
 }
 
+// Apply frame changes with their bounds, after the replacement image is ready.
+func (w *nativeWindow) applyFrame() error {
+	v := w.view
+	hwnd := win.HWND(w.handle)
+	style, ex := styles(v)
+	current := win.GetWindowLongPtr(hwnd, win.GWL_STYLE)
+	style |= current & (win.WS_VISIBLE | win.WS_MINIMIZE | win.WS_MAXIMIZE)
+	if current != style {
+		win.SetWindowLongPtr(hwnd, win.GWL_STYLE, style)
+	}
+	if win.GetWindowLongPtr(hwnd, win.GWL_EXSTYLE) != ex {
+		win.SetWindowLongPtr(hwnd, win.GWL_EXSTYLE, ex)
+	}
+	if menu := win.GetSystemMenu(hwnd, false); menu != 0 {
+		flags := uint32(win.MF_ENABLED)
+		if v.DisableClose {
+			flags = win.MF_GRAYED
+		}
+		win.EnableMenuItem(menu, win.SC_CLOSE, flags)
+		flags = win.MF_ENABLED
+		if v.Frame == window.BorderedLocked {
+			flags = win.MF_GRAYED
+		}
+		win.EnableMenuItem(menu, win.SC_MOVE, flags)
+		win.DrawMenuBar(hwnd)
+	}
+	if v.Passthrough {
+		ok, _, err := user32.NewProc("SetLayeredWindowAttributes").Call(w.handle, 0, 255, 2)
+		if ok == 0 {
+			return fmt.Errorf("SetLayeredWindowAttributes: %w", err)
+		}
+	}
+	w.pendingFrame = false
+	return nil
+}
+
 // Keep old coverage until the replacement windows have reached the desktop.
 func (m *windowManager) presented(revision uint64, flush func() error) (bool, error) {
 	applied := false
@@ -756,6 +772,11 @@ func (m *windowManager) presented(revision uint64, flush func() error) (bool, er
 			z := win.HWND_NOTOPMOST
 			if v.Topmost {
 				z = win.HWND_TOPMOST
+			}
+			if w.pendingFrame {
+				if err := w.applyFrame(); err != nil {
+					return err
+				}
 			}
 			if !win.SetWindowPos(win.HWND(w.handle), z, int32(v.X), int32(v.Y), bounds.Right-bounds.Left, bounds.Bottom-bounds.Top, win.SWP_NOACTIVATE|win.SWP_FRAMECHANGED) {
 				return fmt.Errorf("cannot apply prepared window bounds for %q", v.ID)

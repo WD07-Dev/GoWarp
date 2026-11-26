@@ -233,8 +233,6 @@ func (b *bridge) copyFrame(source *comObject) error {
 		if err != nil {
 			return err
 		}
-		// Preserve coverage outside a shrinking viewport until HWND bounds catch
-		// up. All copies stay on the existing D3D11 device.
 		if transition && o.last != nil && o.last != destination {
 			previous := box{Right: uint32(o.capacity.X), Bottom: uint32(o.capacity.Y), Back: 1}
 			call(b.context, 46, uintptr(unsafe.Pointer(destination)), 0, 0, 0, 0, uintptr(unsafe.Pointer(o.last)), 0, uintptr(unsafe.Pointer(&previous)))

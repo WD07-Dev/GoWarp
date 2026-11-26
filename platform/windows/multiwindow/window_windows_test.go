@@ -440,12 +440,27 @@ func TestFrameChangeKeepsClientOrigin(t *testing.T) {
 			}
 			want := origin()
 			for _, frame := range []string{window.Bordered, window.BorderedLocked, window.Borderless, window.Bordered, window.Borderless} {
+				var previousStyle uintptr
+				m.do(func() {
+					previousStyle = win.GetWindowLongPtr(win.HWND(m.items["main"].handle), win.GWL_STYLE)
+				})
 				v = views[0]
 				v.Frame, v.KeepClientX, v.KeepClientY = frame, true, true
 				v.Width, v.Height = 800, 600
 				_, views, err = m.setViews([]window.View{v})
 				if err != nil {
 					t.Fatal(err)
+				}
+				if !hidden {
+					m.do(func() {
+						w := m.items["main"]
+						if w.pendingBounds && win.GetWindowLongPtr(win.HWND(w.handle), win.GWL_STYLE) != previousStyle {
+							t.Error("frame changed before the replacement image and bounds were ready")
+						}
+					})
+					if got := origin(); got != want {
+						t.Fatalf("client origin changed before presentation: %+v, want %+v", got, want)
+					}
 				}
 				present()
 				if got := origin(); got != want {
