@@ -14,6 +14,19 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+func TestPreviewFrameSizeUsesBrowserPixels(t *testing.T) {
+	peer := &Peer{Embedded: true}
+	for _, size := range [][2]int{{960, 720}, {480, 360}, {600, 450}} {
+		peer.frameSize.Store(uint32(size[0])<<16 | uint32(size[1]))
+		for _, window := range [][2]int{{480, 360}, {320, 240}, {1920, 1080}} {
+			w, h := peer.FrameSize(window[0], window[1])
+			if w != size[0] || h != size[1] {
+				t.Fatalf("browser=%v native=%v: rendered %dx%d", size, window, w, h)
+			}
+		}
+	}
+}
+
 func TestReadPlayerPacketReusesStorage(t *testing.T) {
 	want := []byte("first frame")
 	packet := make([]byte, 4+len(want))
@@ -137,7 +150,7 @@ func TestPreviewStreamsFramesAndCommandsWithoutRebuilding(t *testing.T) {
 	for !peer.WantsFrame() && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}
-	if width, height := peer.FrameSize(1920, 1080); width != 480 || height != 270 {
+	if width, height := peer.FrameSize(1920, 1080); width != 480 || height != 360 {
 		t.Fatalf("preview did not fit the browser stage: %dx%d", width, height)
 	}
 	peer.Frame(2, 1, func(pixels []byte) { copy(pixels, []byte{255, 0, 0, 255, 0, 255, 0, 255}) })

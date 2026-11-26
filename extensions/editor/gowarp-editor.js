@@ -241,12 +241,7 @@
 
     function applyStatus(value) {
         if (!value.connected) {
-            clearTimeout(polling);
-            connection = null;
-            phase = "ready";
-            status.textContent = tr("Disconnected", "연결 해제됨");
-            restoreEditor();
-            refresh();
+            resetConnection();
             return;
         }
         serverSnapshot = value.snapshot || "";
@@ -278,7 +273,10 @@
             applyStatus(value);
             if (connection) polling = setTimeout(poll, phase === "ready" ? 1000 : 500);
         } catch (error) {
-            if (connection === target && !disposed) showError(error);
+            if (connection === target && !disposed) {
+                resetConnection();
+                showError(error);
+            }
         }
     }
 
@@ -488,17 +486,26 @@
     stopButton.onclick = stop;
     disconnectButton.onclick = async () => {
         if (upload) upload.abort();
+        const target = connection;
+        resetConnection();
+        address.value = "";
+        address.focus();
         try {
-            if (connection) await request(connection, "/disconnect", "POST");
-        } catch (error) { showError(error); return; }
+            if (target) await request(target, "/disconnect", "POST");
+        } catch (error) {
+            if (!connection && !busy && !disposed) showError(error);
+        }
+    };
+
+    function resetConnection() {
         clearTimeout(polling);
         connection = null;
-        address.value = "";
+        multiWindow = false;
         phase = "ready";
         status.textContent = tr("Disconnected", "연결 해제됨");
-        refresh();
         restoreEditor();
-    };
+        refresh();
+    }
     
     function suspendEditor() {
         if(!suspendedLoop && runtime.frameLoop.running) {

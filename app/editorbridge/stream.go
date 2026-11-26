@@ -450,11 +450,10 @@ func (p *Peer) FrameSize(width, height int) (int, int) {
 	if width <= 0 || height <= 0 {
 		return 0, 0
 	}
-	w, h := 960, 960
 	if size := p.frameSize.Load(); size != 0 {
-		w, h = int(size>>16), int(size&0xffff)
+		return int(size >> 16), int(size & 0xffff)
 	}
-	scale := min(1, float64(w)/float64(width), float64(h)/float64(height))
+	scale := min(1, 960/float64(width), 960/float64(height))
 	return max(1, int(float64(width)*scale)), max(1, int(float64(height)*scale))
 }
 

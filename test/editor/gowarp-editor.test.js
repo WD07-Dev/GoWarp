@@ -112,6 +112,8 @@ function editor(t, language = "en") {
     let multiWindow = false;
     let metadata;
     let runSettings;
+    let offline = false;
+    let extension;
     const commands = [];
     const sockets = [];
     let stops = 0;
@@ -141,8 +143,9 @@ function editor(t, language = "en") {
         MutationObserver: class { observe() {} disconnect() {} },
         WebSocket: Socket,
         Scratch: {vm: scratchVM, translate: {language}, BlockType: {BUTTON: "button", REPORTER: "reporter"},
-        extensions: {unsandboxed: true, register() {}}},
+        extensions: {unsandboxed: true, register(value) { extension = value; }}},
         fetch: async (url, options) => {
+            if (offline) throw new Error("Connection refused");
             if (url.endsWith("/connect")) {
                 connected = true;
                 metadata = JSON.parse(await options.body.text());
@@ -180,6 +183,10 @@ function editor(t, language = "en") {
         setMultiWindow: value => { multiWindow = value; },
         displayMode: () => nodes.find(node => node.tagName === "select"),
         dialog: () => nodes.find(node => node.tagName === "dialog"),
+        address: () => nodes.find(node => node.tagName === "input"),
+        open: () => extension.open(),
+        offline: value => { offline = value; },
+        pixelRatio: value => { window.devicePixelRatio = value; },
         disconnect: () => nodes.find(node => node.textContent === "Disconnect").onclick(),
         uploadedFiles: () => uploadedFiles,
         loading: () => document.getElementById("gowarp-preview-loading"),
@@ -288,6 +295,18 @@ test("embedded frames keep two requests in flight, and pause when hidden", async
     assert.equal(e.commands.at(-1).frames, 2);
     e.hidden(false);
     assert.equal(count(), 3, "visibility events must not accumulate frame requests");
+});
+
+test("embedded preview requests physical pixels on high-DPI screens", async t => {
+    const e = editor(t);
+    e.pixelRatio(2);
+    e.embedded();
+    await e.connect();
+    await e.run();
+    await settle();
+    const frame = e.commands.find(command => command.action === "frame");
+    assert.equal(frame.width, 960);
+    assert.equal(frame.height, 720);
 });
 
 async function settle() {
@@ -421,7 +440,37 @@ test("multi-window disables embedded preview and forces a native run", async t =
     await e.run();
     assert.equal(e.runSettings().display, "native");
     await e.disconnect();
+    assert.equal(e.displayMode().disabled, false);
     await e.run();
     assert.equal(e.dialog().open, true);
     assert.equal(e.uploads(), 1);
+});
+
+test("disconnecting an unreachable packager unlocks the address for reconnecting", async t => {
+    const e = editor(t);
+    await e.connect();
+    await e.run();
+    await settle();
+    e.offline(true);
+    await e.disconnect();
+    assert.equal(e.address().disabled, false);
+    assert.equal(e.runtime.frameLoop.running, true);
+    e.offline(false);
+    await e.connect();
+    assert.equal(e.address().disabled, true);
+    await e.run();
+    await settle();
+    assert.equal(e.commands.at(-1).action, "flag");
+});
+
+test("opening settings after the packager closes unlocks the connection address", async t => {
+    const e = editor(t);
+    await e.connect();
+    await e.run();
+    await settle();
+    e.offline(true);
+    e.open();
+    await settle();
+    assert.equal(e.address().disabled, false);
+    assert.equal(e.runtime.frameLoop.running, true);
 });
