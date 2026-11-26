@@ -64,6 +64,9 @@ func Pack(views []View) (Layout, error) {
 	if len(views) > 16 {
 		return l, fmt.Errorf("at most 16 native windows are supported")
 	}
+	if len(views) > 0 {
+		l.Tiles = make([]image.Rectangle, 0, len(views))
+	}
 	ids := make(map[string]bool, len(views))
 	x, y, row := 0, 0, 0
 	for i, v := range views {

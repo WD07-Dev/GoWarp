@@ -475,3 +475,35 @@ func TestFrameChangeKeepsClientOrigin(t *testing.T) {
 		})
 	}
 }
+
+func TestPollUnchangedWindowsDoesNotAllocate(t *testing.T) {
+	views := []window.View{
+		{ID: "main", Width: 320, Height: 240, StageWidth: 480, StageHeight: 360},
+		{ID: "other", Width: 320, Height: 240, StageWidth: 480, StageHeight: 360},
+	}
+	layout, err := window.Pack(views)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := &frame{layout: layout, handles: []uintptr{1, 2}}
+	b := &Backend{manager: &windowManager{positions: views}, views: layout.Views, frame: old}
+	allocs := testing.AllocsPerRun(100, func() {
+		if _, err := b.Poll(); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if allocs != 0 {
+		t.Fatalf("unchanged windows allocated %g times", allocs)
+	}
+	views[1].X = 100
+	views[1].State.Focused = true
+	if _, err := b.Poll(); err != nil {
+		t.Fatal(err)
+	}
+	if b.views[1].X != 100 || !b.views[1].State.Focused || b.frame != old {
+		t.Fatal("window movement or focus was not retained")
+	}
+	if old.layout.Views[1].X != 0 || old.layout.Views[1].State.Focused {
+		t.Fatal("poll mutated the published frame")
+	}
+}

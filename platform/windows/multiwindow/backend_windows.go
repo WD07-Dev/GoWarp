@@ -133,21 +133,34 @@ func (b *Backend) Poll() (window.Input, error) {
 		return window.Input{}, err
 	}
 	in, closed, current := b.manager.poll()
-	views := b.Views()
+	views := b.views
+	copied := false
 	resized := false
-	for i := range views {
+	for i, previous := range views {
 		for _, v := range current {
-			if views[i].ID == v.ID {
-				views[i].X, views[i].Y = v.X, v.Y
-				views[i].State = v.State
-				if views[i].Width != v.Width || views[i].Height != v.Height {
-					views[i].Width, views[i].Height = v.Width, v.Height
-					resized = true
-				}
+			if previous.ID != v.ID {
+				continue
 			}
+			updated := previous
+			updated.X, updated.Y = v.X, v.Y
+			updated.State = v.State
+			updated.Width, updated.Height = v.Width, v.Height
+			if updated != previous {
+				// Published frames may still reference the previous views.
+				if !copied {
+					views = slices.Clone(views)
+					copied = true
+				}
+				views[i] = updated
+				resized = resized || previous.Width != v.Width || previous.Height != v.Height
+			}
+			break
 		}
 	}
 	if len(closed) > 0 {
+		if !copied {
+			views = slices.Clone(views)
+		}
 		views = slices.DeleteFunc(views, func(v window.View) bool { return slices.Contains(closed, v.ID) })
 		if len(views) == 0 {
 			return in, window.ErrClosed

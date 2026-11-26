@@ -2,6 +2,7 @@ package window
 
 import (
 	"image"
+	"strconv"
 	"testing"
 )
 
@@ -48,5 +49,22 @@ func TestInvalidViews(t *testing.T) {
 	}
 	if _, err := Pack([]View{valid, valid}); err == nil {
 		t.Fatal("accepted duplicate ID")
+	}
+}
+
+func BenchmarkPack(b *testing.B) {
+	for _, count := range []int{1, 4, 16} {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			views := make([]View, count)
+			for i := range views {
+				views[i] = View{ID: strconv.Itoa(i), Width: 480, Height: 360, StageWidth: 480, StageHeight: 360}
+			}
+			b.ReportAllocs()
+			for b.Loop() {
+				if _, err := Pack(views); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
