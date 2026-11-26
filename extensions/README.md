@@ -84,7 +84,7 @@ Only register `Prepare` when a block-graph transformation is necessary. Ordinary
 math, input, audio, and rendering blocks use handlers and host operations.
 Keep extension-specific parsing, formulas, state, and policy in the Go comment.
 Use the shared host API for access to targets, scheduling, audio, and rendering;
-do not import VM internals. See [project preparation](API.md#project-preparation-and-live-loop-conditions)
+do not import VM internals. See [project preparation](API.md#project-preparation)
 for the restrictions on transforms.
 
 The files in `test/extensions` mirror the embedded implementations for testing.
