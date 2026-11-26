@@ -99,85 +99,43 @@ func New() e.Extension {
 }
 
 func touchingCloneWithVar(c *e.Context) (e.Result, error) {
-	source, err := c.Call("target.get", "source")
+	targets, err := c.Call("target.query", e.TargetQuery{
+		Source: "_myself_", Variable: c.Field("INPUTA"), Value: c.Args["INPUTB"],
+	})
 	if err != nil {
 		return e.Result{}, err
 	}
-	records, err := c.Call("target.list")
-	if err != nil {
-		return e.Result{}, err
+	ids := targets.([]string)
+	if len(ids) == 0 {
+		return e.Result{Value: false}, nil
 	}
-	// Unlike getVariableOfClone, the original touching block includes the
-	// original sprite in its candidates. The host excludes the caller itself.
-	for _, record := range records.([]any) {
-		target := record.(map[string]any)
-		if e.Number(target["source"]) != e.Number(source) {
-			continue
-		}
-		ref := e.String(target["id"])
-		value, found, err := variableValue(c, c.Field("INPUTA"), ref)
-		if err != nil {
-			return e.Result{}, err
-		}
-		if !found || e.Compare(value, c.Args["INPUTB"]) != 0 {
-			continue
-		}
-		value, err = c.Call("target.touchingTarget", ref)
-		if err != nil || e.Bool(value) {
-			return e.Result{Value: e.Bool(value)}, err
-		}
-	}
-	return e.Result{Value: false}, nil
+	value, err := c.Call("target.touchingTargets", ids)
+	return e.Result{Value: value}, err
 }
 
 func getVariableOfClone(c *e.Context) (e.Result, error) {
-	source, err := c.Call("target.get", "source")
-	if err != nil {
-		return e.Result{}, err
-	}
-	records, err := c.Call("target.list")
-	if err != nil {
-		return e.Result{}, err
-	}
-	targets := records.([]any)
-	// sprite.clones is in creation order, independently of the draw order.
-	sort.SliceStable(targets, func(i, j int) bool {
-		return e.Number(targets[i].(map[string]any)["cloneId"]) < e.Number(targets[j].(map[string]any)["cloneId"])
+	targets, err := c.Call("target.query", e.TargetQuery{
+		Source: "_myself_", ClonesOnly: true, Variable: c.Field("INPUTB"), Value: c.Args["INPUTC"], First: true,
 	})
-	for _, record := range targets {
-		target := record.(map[string]any)
-		if e.Number(target["source"]) != e.Number(source) || e.Number(target["cloneId"]) == 0 {
-			continue
-		}
-		ref := e.String(target["id"])
-		value, found, err := variableValue(c, c.Field("INPUTB"), ref)
-		if err != nil {
-			return e.Result{}, err
-		}
-		if !found || e.Compare(value, c.Args["INPUTC"]) != 0 {
-			continue
-		}
-		value, found, err = variableValue(c, c.Field("INPUTA"), ref)
-		if !found {
-			value = ""
-		}
-		return e.Result{Value: value}, err
+	if err != nil {
+		return e.Result{}, err
 	}
-	return e.Result{Value: ""}, nil
+	ids := targets.([]string)
+	if len(ids) == 0 {
+		return e.Result{Value: ""}, nil
+	}
+	value, found, err := variableValue(c, c.Field("INPUTA"), ids[0])
+	if !found {
+		value = ""
+	}
+	return e.Result{Value: value}, err
 }
 
 func variableValue(c *e.Context, id, ref string) (any, bool, error) {
-	for _, target := range []string{ref, "_stage_"} {
-		records, err := c.Call("variable.list", target)
-		if err != nil {
-			return nil, false, err
-		}
-		for _, record := range records.([]any) {
-			if e.String(record.(map[string]any)["id"]) == id {
-				v, err := c.Call("variable.get", id, target)
-				return v, true, err
-			}
-		}
+	found, err := c.Call("variable.exists", id, ref)
+	if err != nil || !e.Bool(found) {
+		return nil, false, err
 	}
-	return nil, false, nil
+	value, err := c.Call("variable.get", id, ref)
+	return value, true, err
 }

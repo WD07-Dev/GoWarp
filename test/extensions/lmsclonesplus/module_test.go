@@ -2,6 +2,7 @@ package extension
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 
 	e "gowarp/core/extension"
@@ -22,18 +23,54 @@ func (h *cloneHost) Call(op string, args ...any) (any, error) {
 		}
 	case "target.list":
 		return append([]any{}, h.targets...), nil
-	case "variable.list":
-		out := []any{}
-		for id := range h.variables[args[0].(string)] {
-			out = append(out, map[string]any{"id": id, "name": "display name is not an ID"})
+	case "variable.exists", "variable.get":
+		id, ref := args[0].(string), args[1].(string)
+		value, found := h.variables[ref][id]
+		if !found {
+			value, found = h.variables["_stage_"][id]
 		}
-		return out, nil
-	case "variable.get":
-		return h.variables[args[1].(string)][args[0].(string)], nil
-	case "target.touchingTarget":
-		ref := args[0].(string)
-		h.checked = append(h.checked, ref)
-		return h.touching[ref], nil
+		if op == "variable.exists" {
+			return found, nil
+		}
+		return value, nil
+	case "target.query":
+		q := args[0].(e.TargetQuery)
+		if q.Source != "_myself_" {
+			return nil, fmt.Errorf("unexpected query family %q", q.Source)
+		}
+		targets := append([]any(nil), h.targets...)
+		sort.SliceStable(targets, func(i, j int) bool {
+			return e.Number(targets[i].(map[string]any)["cloneId"]) < e.Number(targets[j].(map[string]any)["cloneId"])
+		})
+		var ids []string
+		for _, item := range targets {
+			target := item.(map[string]any)
+			if e.Number(target["source"]) != 1 || (q.ClonesOnly && e.Number(target["cloneId"]) == 0) {
+				continue
+			}
+			ref := target["id"].(string)
+			value, found := h.variables[ref][q.Variable]
+			if !found {
+				value, found = h.variables["_stage_"][q.Variable]
+			}
+			if q.Variable != "" && (!found || e.Compare(value, q.Value) != 0) {
+				continue
+			}
+			ids = append(ids, ref)
+			if q.First {
+				break
+			}
+		}
+		return ids, nil
+	case "target.touchingTargets":
+		ids := args[0].([]string)
+		h.checked = append(h.checked, ids...)
+		for _, id := range ids {
+			if h.touching[id] {
+				return true, nil
+			}
+		}
+		return false, nil
 	}
 	return nil, fmt.Errorf("unexpected operation %s %v", op, args)
 }
@@ -51,7 +88,7 @@ func TestTouchingCloneOnlyQueriesMatchingFamilyTargets(t *testing.T) {
 	if err != nil || result.Value != true {
 		t.Fatal(result, err)
 	}
-	if len(h.checked) != 2 || h.checked[0] != "match" || h.checked[1] != "main" {
+	if len(h.checked) != 2 || h.checked[0] != "main" || h.checked[1] != "match" {
 		t.Fatal("wrong collision candidates", h.checked)
 	}
 	h.checked = nil

@@ -178,3 +178,41 @@ func TestSensingCandidatesFollowCloneChanges(t *testing.T) {
 	want = nil
 	query()
 }
+
+func TestExtensionTouchingTargetsBatchesCandidates(t *testing.T) {
+	r := eventProject(t, `[{"isStage":true},{"name":"Probe","visible":true},{"name":"_edge_","visible":true},{"name":"Hidden","visible":false}]`)
+	r.createClone(r.targets[2])
+	clone := r.targets[len(r.targets)-1]
+	c := &extensionContext{r: r, th: &thread{target: r.targets[1]}}
+	refs := []string{"Probe", "_stage_", "Hidden", logicTargetID(r.targets[2]), logicTargetID(clone)}
+	calls := 0
+	r.graphics = &extensionTouchGraphics{inspect: func(scene []DisplayTarget) {
+		calls++
+		if len(scene) != 2 || scene[0].State.CloneID != 0 || scene[1].State.CloneID != clone.state.CloneID {
+			t.Fatalf("candidates=%v", scene)
+		}
+		for _, d := range scene {
+			if d.State.Name != "" || d.State.Variables != nil || d.State.Lists != nil {
+				t.Fatal("unfiltered candidate data")
+			}
+		}
+	}}
+	if got, err := c.Call("target.touchingTargets", refs); err != nil || got != true {
+		t.Fatal(got, err)
+	}
+	if calls != 1 {
+		t.Fatalf("geometry calls=%d", calls)
+	}
+	if got, err := c.Call("target.touchingTargets", []string{"Probe", "Hidden"}); err != nil || got != false {
+		t.Fatal(got, err)
+	}
+	if calls != 1 {
+		t.Fatal("empty candidate set reached geometry")
+	}
+	if _, err := c.Call("target.touchingTargets", []string{"missing"}); err == nil {
+		t.Fatal("invalid target accepted")
+	}
+	if _, err := c.Call("target.touchingTargets", "Probe"); err == nil {
+		t.Fatal("invalid list accepted")
+	}
+}

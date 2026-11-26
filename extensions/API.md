@@ -419,6 +419,8 @@ runtime installation.
 | Operation and arguments | Result or action |
 | --- | --- |
 | `target.list()` | `[]any` of `map[string]any` target records with `id`, `name`, `source`, `cloneId`, and `isStage`. |
+| `target.query(query)` | Accepts `extension.TargetQuery` and returns an owned `[]string` of live target IDs in creation order. `Source` selects the sprite family of a target reference (empty means all targets); `ClonesOnly` excludes originals. A nonempty `Variable` filters by variable ID using Scratch equality against `Value`, including stage fallback. Missing variables do not match. `First` stops at the first match. Results reflect current values, independently of draw order. |
+| `target.touchingTargets(ids, ref?)` | Tests the target against an explicit `[]string` of candidate IDs in one collision query. Excludes itself, the stage, and hidden candidates; returns false for no eligible candidates. Unknown IDs and unavailable geometry return errors. |
 | `target.get(property, ref?)` | Read a target property. |
 | `target.set(property, value, ref?)` | Set a supported property. |
 | `target.setXY(x, y, ref?)` | Move both coordinates together, with one pen segment and one fencing operation. |
@@ -444,6 +446,7 @@ explicitly changes the target; sampling a costume as a triangle texture does not
 | Operation and arguments | Result or action |
 | --- | --- |
 | `variable.list(ref?)` | Sorted `[]any` of `{id, name}` maps owned by this target only; no stage fallback. |
+| `variable.exists(id, ref?)` | Whether a variable ID exists on the target or stage. Does not build a variable list; an unknown target still returns an error. |
 | `variable.get(id, ref?)` | Read a variable. |
 | `variable.set(id, value, ref?)`, `variable.change(id, amount, ref?)` | Write or increment a variable. |
 | `variable.create(id, name, value, ref?)`, `variable.delete(id, ref?)` | Create or remove a variable. |

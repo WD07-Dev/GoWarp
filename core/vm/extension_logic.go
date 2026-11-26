@@ -3,6 +3,7 @@ package vm
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"gowarp/core/extension"
@@ -15,7 +16,7 @@ func (c *extensionContext) logicCall(operation string, args []any) (any, error) 
 	*/
 	if c.event == "clone-deleted" {
 		switch operation {
-		case "target.get", "target.costumes", "target.costumeSize", "variable.get", "list.get", "list.length", "list.item":
+		case "target.get", "target.costumes", "target.costumeSize", "variable.get", "variable.exists", "list.get", "list.length", "list.item":
 			copy := *c
 			copy.readDeletedTarget = true
 			c = &copy
@@ -157,6 +158,72 @@ func (c *extensionContext) logicCall(operation string, args []any) (any, error) 
 			out = append(out, map[string]any{"id": logicTargetID(t), "name": t.state.Name, "source": float64(t.sourceIndex), "cloneId": float64(t.state.CloneID), "isStage": t.state.IsStage})
 		}
 		return out, nil
+	case "target.query":
+		q, ok := a.get(0).(extension.TargetQuery)
+		if len(args) != 1 || !ok {
+			return nil, fmt.Errorf("target.query requires extension.TargetQuery")
+		}
+		source := -1
+		if q.Source != "" {
+			t, err := c.logicTarget(current, q.Source)
+			if err != nil {
+				return nil, err
+			}
+			source = t.sourceIndex
+		}
+		var ids []string
+		for _, t := range r.targets {
+			if t.dead || (source >= 0 && t.sourceIndex != source) || (q.ClonesOnly && t.state.CloneID == 0) {
+				continue
+			}
+			if q.Variable != "" {
+				v, found := t.variables[q.Variable]
+				if !found && r.stage != nil {
+					v, found = r.stage.variables[q.Variable]
+				}
+				if !found || extension.Compare(v.Value, q.Value) != 0 {
+					continue
+				}
+			}
+			ids = append(ids, logicTargetID(t))
+			if q.First {
+				break
+			}
+		}
+		return ids, nil
+	case "target.touchingTargets":
+		ids, ok := a.get(0).([]string)
+		if !ok || len(args) > 2 {
+			return nil, fmt.Errorf("target.touchingTargets requires []string and an optional target")
+		}
+		t, err := resolve(1)
+		if err != nil {
+			return nil, err
+		}
+		if r.graphics == nil {
+			return nil, fmt.Errorf("target.touchingTargets requires costume geometry")
+		}
+		scene := r.sensingScene[:0]
+		r.sensingScene = nil
+		defer func() { r.releaseSensingScene(scene) }()
+		for _, id := range ids {
+			candidate, err := c.logicTarget(current, id)
+			if err != nil {
+				return nil, err
+			}
+			if candidate == t || candidate.state.IsStage || !candidate.state.Visible {
+				continue
+			}
+			d := display(candidate)
+			d.State.Variables, d.State.Lists = nil, nil
+			d.State.Name = ""
+			scene = append(scene, d)
+		}
+		if len(scene) == 0 {
+			return false, nil
+		}
+		x, y := r.mousePosition()
+		return r.graphics.Touching(scene, display(t), "", x, y), nil
 	case "target.get":
 		t, err := resolve(1)
 		if err != nil {
@@ -354,6 +421,13 @@ func (c *extensionContext) logicCall(operation string, args []any) (any, error) 
 			r.refreshNativeVariables()
 			return nil, nil
 		}
+		if operation == "variable.exists" {
+			_, found := t.variables[id]
+			if !found && r.stage != nil {
+				_, found = r.stage.variables[id]
+			}
+			return found, nil
+		}
 		owner, v, err := r.variable(t, id)
 		if err != nil {
 			return nil, err
@@ -454,7 +528,7 @@ func (c *extensionContext) logicCall(operation string, args []any) (any, error) 
 }
 
 func logicTargetID(t *target) string {
-	return fmt.Sprintf("%d:%d", t.sourceIndex, t.state.CloneID)
+	return strconv.Itoa(t.sourceIndex) + ":" + strconv.Itoa(t.state.CloneID)
 }
 
 func (c *extensionContext) logicTarget(current *target, ref any) (*target, error) {
@@ -465,18 +539,36 @@ func (c *extensionContext) logicTarget(current *target, ref any) (*target, error
 		}
 		return nil, fmt.Errorf("operation requires a current target")
 	}
+	sourceText, cloneText, hasID := strings.Cut(name, ":")
+	var source, clone int
+	if hasID {
+		var sourceErr, cloneErr error
+		source, sourceErr = strconv.Atoi(sourceText)
+		clone, cloneErr = strconv.Atoi(cloneText)
+		hasID = sourceErr == nil && cloneErr == nil && source >= 0 && clone >= 0 &&
+			sourceText == strconv.Itoa(source) && cloneText == strconv.Itoa(clone)
+	}
+	// Original names retain precedence over clone handles.
 	for _, t := range c.r.targets {
+		if t.state.CloneID != 0 {
+			break
+		}
 		if t.dead && !(c.readDeletedTarget && t == current) {
 			continue
 		}
-		if logicTargetID(t) == name {
+		if (hasID && clone == 0 && t.sourceIndex == source) ||
+			t.state.Name == name || (name == "_stage_" && t.state.IsStage) {
 			return t, nil
 		}
-		if t.state.CloneID != 0 {
-			continue
-		}
-		if t.state.Name == name || (name == "_stage_" && t.state.IsStage) {
-			return t, nil
+	}
+	if hasID && clone > 0 {
+		// Targets keep creation order; deleting a clone preserves this ordering.
+		i := sort.Search(len(c.r.targets), func(i int) bool { return c.r.targets[i].state.CloneID >= clone })
+		if i < len(c.r.targets) {
+			t := c.r.targets[i]
+			if t.state.CloneID == clone && t.sourceIndex == source && (!t.dead || (c.readDeletedTarget && t == current)) {
+				return t, nil
+			}
 		}
 	}
 	return nil, fmt.Errorf("unknown target %q", name)

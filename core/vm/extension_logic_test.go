@@ -1,6 +1,8 @@
 package vm
 
 import (
+	"gowarp/core/extension"
+	"slices"
 	"testing"
 
 	"gowarp/core/project"
@@ -182,5 +184,114 @@ func TestExtensionLogicAcceptsGoIntegerArguments(t *testing.T) {
 	call("list.replace", "items", int64(1), "changed")
 	if got := call("list.item", "items", 1); got != "changed" {
 		t.Fatalf("integer list replacement=%v", got)
+	}
+}
+
+func TestExtensionVariableExists(t *testing.T) {
+	r := eventProject(t, `[{"isStage":true,"name":"Stage","variables":{"global":["global",3]}},{"name":"Sprite","variables":{"local":["local",""]}}]`)
+	c := &extensionContext{r: r, th: &thread{target: r.targets[1]}}
+	for _, id := range []string{"local", "global", "missing"} {
+		got, err := c.Call("variable.exists", id)
+		if err != nil || got != (id != "missing") {
+			t.Fatalf("exists(%s) = %v, %v", id, got, err)
+		}
+	}
+	hostResult(t, c, "variable.create", "nil", "nil", nil)
+	if hostResult(t, c, "variable.exists", "nil") != true {
+		t.Fatal("nil-valued variable was treated as absent")
+	}
+	hostResult(t, c, "variable.delete", "nil")
+	if hostResult(t, c, "variable.exists", "nil") != false {
+		t.Fatal("deleted variable still exists")
+	}
+	if _, err := c.Call("variable.exists", "local", "missing-target"); err == nil {
+		t.Fatal("unknown target was treated as a missing variable")
+	}
+}
+
+func TestExtensionTargetHandleResolution(t *testing.T) {
+	r := eventProject(t, `[{"isStage":true,"name":"Stage"},{"name":"Sprite"},{"name":"1:1"}]`)
+	c := &extensionContext{r: r, th: &thread{target: r.targets[1]}}
+	first := hostResult(t, c, "target.clone").(string)
+	second := hostResult(t, c, "target.clone").(string)
+	// Names of originals are checked before clone IDs, as in the linear lookup.
+	if got, err := c.logicTarget(c.th.target, first); err != nil || got != r.targets[2] {
+		t.Fatal("numeric sprite name precedence changed", got, err)
+	}
+	clone, err := c.logicTarget(c.th.target, second)
+	if err != nil || clone.state.CloneID != 2 || clone.sourceIndex != 1 {
+		t.Fatal("clone handle did not resolve", err)
+	}
+	for _, ref := range []string{"01:2", "1:02", "+1:2", "2:2", "1:999", "1:-2"} {
+		if _, err := c.logicTarget(c.th.target, ref); err == nil {
+			t.Fatalf("invalid handle accepted: %s", ref)
+		}
+	}
+	clone.dead = true
+	deleted := &extensionContext{r: r, th: &thread{target: clone}, event: "clone-deleted"}
+	clone.variables["value"] = &Variable{Name: "value", Value: nil}
+	if hostResult(t, deleted, "variable.exists", "value", second) != true {
+		t.Fatal("cleanup handler could not inspect its departing clone")
+	}
+	if _, err := c.Call("variable.exists", "value", second); err == nil {
+		t.Fatal("ordinary caller could read a dead clone")
+	}
+	clone.dead = false
+	r.deleteClone(clone)
+	if _, err := c.logicTarget(c.th.target, second); err == nil {
+		t.Fatal("removed clone handle resolved")
+	}
+	third := hostResult(t, c, "target.clone").(string)
+	if _, err := c.logicTarget(c.th.target, third); err != nil {
+		t.Fatal("clone lookup failed after deletion", err)
+	}
+}
+
+func TestExtensionTargetQuery(t *testing.T) {
+	r := eventProject(t, `[{"isStage":true,"variables":{"global":["global",5]}},{"name":"A","variables":{"tag":["tag","02"]}},{"name":"B","variables":{"tag":["tag",2]}}]`)
+	c := &extensionContext{r: r, th: &thread{target: r.targets[1]}}
+	first := hostResult(t, c, "target.clone").(string)
+	second := hostResult(t, c, "target.clone").(string)
+	hostResult(t, c, "target.clone", "B")
+	q := extension.TargetQuery{Source: "_myself_", ClonesOnly: true, Variable: "tag", Value: 2.0}
+	check := func(want ...string) {
+		t.Helper()
+		got, err := c.Call("target.query", q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(got.([]string), want) {
+			t.Fatalf("query=%v want=%v", got, want)
+		}
+	}
+	check(first, second)
+	q.First = true
+	check(first)
+	hostResult(t, c, "variable.set", "tag", "different", first)
+	check(second)
+	q.First = false
+	q.Variable = "global"
+	q.Value = 5.0
+	check(first, second)
+	q.Variable = "missing"
+	q.Value = ""
+	check()
+	hostResult(t, c, "variable.set", "tag", nil, second)
+	q.Variable = "tag"
+	q.Value = nil
+	check(second)
+	hostResult(t, c, "target.delete", second)
+	check()
+	q.Variable = ""
+	q.ClonesOnly = false
+	check("1:0", first)
+	q.Source = first
+	check("1:0", first)
+	q.Source = "missing"
+	if _, err := c.Call("target.query", q); err == nil {
+		t.Fatal("unknown family accepted")
+	}
+	if _, err := c.Call("target.query", true); err == nil {
+		t.Fatal("invalid query accepted")
 	}
 }

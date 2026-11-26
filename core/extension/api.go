@@ -10,6 +10,15 @@ type Host interface {
 	Call(operation string, args ...any) (any, error)
 }
 
+// TargetQuery selects live targets in creation order without building property maps.
+type TargetQuery struct {
+	Source     string // Empty selects all targets; otherwise select this target's sprite family.
+	ClonesOnly bool
+	Variable   string // Optional variable ID compared with Value using Scratch equality.
+	Value      any
+	First      bool
+}
+
 type Context struct {
 	Args   map[string]any
 	Fields map[string]string
