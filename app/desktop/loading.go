@@ -210,12 +210,12 @@ func (g *game) updateLoading() error {
 				return err
 			}
 			started := time.Now()
-			warmup := ebiten.NewImage(6, 1)
+			warmup := ebiten.NewImage(7, 1)
 			if err := g.gpu.drawShaderWarmup(warmup); err != nil {
 				warmup.Deallocate()
 				return err
 			}
-			var pixels [24]byte
+			var pixels [28]byte
 			/*
 				Readback flushes the driver commands, including lazy shader
 				compilation, before the first VM tick or music playback.
@@ -224,7 +224,7 @@ func (g *game) updateLoading() error {
 			warmup.Deallocate()
 			projectShaders := g.gpu.canvas.warmupPrograms(g.controller.vm.StageShaderSources())
 			if g.options.Diagnostic != nil {
-				g.options.Diagnostic(fmt.Sprintf("graphics warmup elapsed=%s shaders=6 project_shaders=%d", time.Since(started), projectShaders))
+				g.options.Diagnostic(fmt.Sprintf("graphics warmup elapsed=%s shaders=7 project_shaders=%d", time.Since(started), projectShaders))
 			}
 			graphics.keepHistory = g.controller.vm.UsesColorSensing()
 			g.controller.graphics = newGraphicsPipeline(deferredPen{graphics}, graphics.replayCommands)

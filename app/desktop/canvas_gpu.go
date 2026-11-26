@@ -18,6 +18,9 @@ import (
 //go:embed canvas_gpu.kage
 var canvasShaderSource []byte
 
+//go:embed canvas_blur.kage
+var canvasBlurSource []byte
+
 //go:embed canvas_copy.kage
 var canvasCopySource []byte
 
@@ -39,12 +42,14 @@ type canvasGPU struct {
 	frame, work, blur                      *ebiten.Image
 	frameBacking, workBacking, blurBacking *ebiten.Image
 	filter                                 *ebiten.Shader
+	blurFilter                             *ebiten.Shader
 	copy                                   *ebiten.Shader
 	split                                  *ebiten.Shader
 	programs                               map[[2]string]compiledStageShader
 	programUse                             uint64
 	programSourceBytes                     int
 	uniforms                               map[string]any
+	blurAmount                             float32
 }
 
 func (p *canvasGPU) compileProgram(source extension.ShaderSource) (compiledStageShader, error) {
@@ -118,13 +123,19 @@ func (compiled compiledStageShader) values(values map[string]any, w, h int, shad
 func (p *canvasGPU) uniformValues(w, h int, c vm.CanvasEffects) map[string]any {
 	if p.uniforms == nil {
 		p.uniforms = map[string]any{
-			"SourceSize": make([]float32, 2),
-			"Filters":    make([]float32, 4),
-			"Filters2":   make([]float32, 4),
-			"Blur":       make([]float32, 2),
+			"SourceSize":  make([]float32, 2),
+			"Filters":     make([]float32, 4),
+			"Filters2":    make([]float32, 4),
+			"Blur":        make([]float32, 2),
+			"BlurWeights": make([]float32, 16),
+			"BlurRadius":  0,
 		}
 	}
 	u := p.uniforms
+	if blur := float32(c.Blur); blur != p.blurAmount {
+		p.blurAmount = blur
+		u["BlurRadius"] = canvasBlurKernel(blur, u["BlurWeights"].([]float32))
+	}
 	size := u["SourceSize"].([]float32)
 	size[0], size[1] = float32(w), float32(h)
 	filters := u["Filters"].([]float32)
@@ -140,6 +151,36 @@ func (p *canvasGPU) uniformValues(w, h int, c vm.CanvasEffects) map[string]any {
 	clear(u["Blur"].([]float32))
 	u["Nearest"] = boolInt(c.Nearest)
 	return u
+}
+
+// Combine overlapping bilinear taps without changing the Gaussian filter.
+func canvasBlurKernel(blur float32, weights []float32) int {
+	clear(weights)
+	if !(blur >= 1.0/6 && blur <= 5) {
+		return 0
+	}
+	weights[0] = 1
+	total := float32(1)
+	for i := 1; i <= 12; i++ {
+		x := float32(i) * .25
+		w := float32(math.Exp(-float64(x*x) / 2))
+		offset := blur * x
+		n := int(offset)
+		fraction := offset - float32(n)
+		weight := w * (1 - fraction)
+		if n == 0 {
+			weight *= 2
+		}
+		weights[n] += weight
+		if fraction > 0 {
+			weights[n+1] += w * fraction
+		}
+		total += 2 * w
+	}
+	for i := range weights {
+		weights[i] /= total
+	}
+	return int(math.Ceil(float64(blur) * 3))
 }
 
 // Use the real driver path before playback; NewShader alone defers native compilation.
@@ -189,6 +230,9 @@ func (p *canvasGPU) close() {
 	}
 	if p.filter != nil {
 		p.filter.Deallocate()
+	}
+	if p.blurFilter != nil {
+		p.blurFilter.Deallocate()
 	}
 	if p.copy != nil {
 		p.copy.Deallocate()
@@ -291,6 +335,17 @@ func (g *stageGPU) Draw(dst *ebiten.Image, r *render.Renderer, scene []vm.Displa
 	}
 	uniforms := p.uniformValues(w, h, c)
 	if c.Blur >= 0x1p-126 {
+		filter := p.filter
+		if uniforms["BlurRadius"].(int) > 0 {
+			if p.blurFilter == nil {
+				var err error
+				p.blurFilter, err = ebiten.NewShader(canvasBlurSource)
+				if err != nil {
+					return err
+				}
+			}
+			filter = p.blurFilter
+		}
 		canvasImage(&p.blur, &p.blurBacking, w, h)
 		other := p.frame
 		if src == other {
@@ -303,7 +358,7 @@ func (g *stageGPU) Draw(dst *ebiten.Image, r *render.Renderer, scene []vm.Displa
 			clear(b)
 			b[i] = float32(c.Blur)
 			pass.Clear()
-			pass.DrawRectShader(w, h, p.filter, &ebiten.DrawRectShaderOptions{Images: [4]*ebiten.Image{src}, Uniforms: uniforms})
+			pass.DrawRectShader(w, h, filter, &ebiten.DrawRectShaderOptions{Images: [4]*ebiten.Image{src}, Uniforms: uniforms})
 			src = pass
 		}
 		clear(uniforms["Blur"].([]float32))

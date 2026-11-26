@@ -921,6 +921,7 @@ func (g *stageGPU) drawShaderWarmup(dst *ebiten.Image) error {
 	}{
 		{&g.canvas.copy, canvasCopySource},
 		{&g.canvas.filter, canvasShaderSource},
+		{&g.canvas.blurFilter, canvasBlurSource},
 		{&g.canvas.split, splitShaderSource},
 	} {
 		if *program.shader == nil {
@@ -934,9 +935,10 @@ func (g *stageGPU) drawShaderWarmup(dst *ebiten.Image) error {
 	src := ebiten.NewImage(1, 1)
 	defer src.Deallocate()
 	src.WritePixels([]byte{255, 0, 0, 255})
-	shaders := [6]*ebiten.Shader{
+	shaders := [7]*ebiten.Shader{
 		g.shader, g.nativePen.stampShader, g.nativePen.shader,
 		g.canvas.copy, g.canvas.filter, g.canvas.split,
+		g.canvas.blurFilter,
 	}
 	indices := []uint16{0, 1, 2, 0, 2, 3}
 	for i, shader := range shaders {
@@ -967,6 +969,10 @@ func (g *stageGPU) drawShaderWarmup(dst *ebiten.Image) error {
 			}
 		case 5:
 			options.Uniforms = map[string]any{"OutputSize": []float32{1, 1}}
+		case 6:
+			weights := make([]float32, 16)
+			weights[0] = 1
+			options.Uniforms = map[string]any{"SourceSize": []float32{1, 1}, "BlurWeights": weights}
 		}
 		dst.DrawTrianglesShader(vertices[:], indices, shader, &options)
 	}

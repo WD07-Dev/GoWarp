@@ -4,6 +4,7 @@ import (
 	penplus "gowarp/test/extensions/penP"
 	"image"
 	"image/color"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -489,6 +490,41 @@ func TestCanvasFadingBlurAppliesColorEffectsOnce(t *testing.T) {
 	})
 }
 
+func TestCanvasBlurKernel(t *testing.T) {
+	var canvas canvasGPU
+	for _, blur := range []float64{1, 2, 5, .2, .75, 1.5, 4.3, 0, 12, math.NaN(), 1} {
+		u := canvas.uniformValues(63, 47, vm.CanvasEffects{Blur: blur})
+		weights, ok := u["BlurWeights"].([]float32)
+		if !ok {
+			t.Fatal("blur still samples the overlapping taps separately")
+		}
+		radius := u["BlurRadius"].(int)
+		if !(blur >= 1.0/6 && blur <= 5) {
+			if radius != 0 {
+				t.Fatalf("unsupported blur %g used a compact kernel", blur)
+			}
+			continue
+		}
+		if radius != int(math.Ceil(3*float64(float32(blur)))) {
+			t.Fatalf("blur %g: kernel radius %d", blur, radius)
+		}
+		var total float64
+		for i, weight := range weights {
+			if weight < 0 || (i > radius && weight != 0) {
+				t.Fatalf("blur %g: invalid weight %d=%g", blur, i, weight)
+			}
+			if i == 0 {
+				total += float64(weight)
+			} else {
+				total += 2 * float64(weight)
+			}
+		}
+		if math.Abs(total-1) > 1e-6 {
+			t.Fatalf("blur %g changes brightness: total=%g", blur, total)
+		}
+	}
+}
+
 func TestCanvasBlurMatchesReference(t *testing.T) {
 	runGPUFrame(t, func() {
 		path, err := filepath.Abs("../../test/fixtures/render/canvas_filter_reference.kage")
@@ -509,6 +545,12 @@ func TestCanvasBlurMatchesReference(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer current.Deallocate()
+		var canvas canvasGPU
+		compact, err := ebiten.NewShader(canvasBlurSource)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer compact.Deallocate()
 		for _, size := range []image.Point{{1, 1}, {16, 12}, {63, 47}} {
 			backing := ebiten.NewImage(size.X+7, size.Y+9)
 			src := backing.SubImage(image.Rect(3, 4, 3+size.X, 4+size.Y)).(*ebiten.Image)
@@ -519,17 +561,22 @@ func TestCanvasBlurMatchesReference(t *testing.T) {
 			src.WritePixels(pixels)
 			got, want := ebiten.NewImage(size.X, size.Y), ebiten.NewImage(size.X, size.Y)
 			actual, expected := make([]byte, len(pixels)), make([]byte, len(pixels))
-			for _, radius := range []float32{1e-6, .001, .05, .16, 1.0 / 6, .2, .75, 1, 1.5, 2, 4, 5, 12} {
+			for _, radius := range []float32{1e-6, .001, .05, .16, 1.0 / 6, .2, .75, 1, 1.5, 2, 4, 4.3, 5, 12} {
 				for axis := range 2 {
 					blur := []float32{0, 0}
 					blur[axis] = radius
 					for _, nearest := range []int{0, 1} {
+						u := canvas.uniformValues(size.X, size.Y, vm.CanvasEffects{Blur: float64(radius), Nearest: nearest != 0})
+						copy(u["Blur"].([]float32), blur)
 						options := &ebiten.DrawRectShaderOptions{
 							Images: [4]*ebiten.Image{src}, Blend: ebiten.BlendCopy,
-							Uniforms: map[string]any{"SourceSize": []float32{float32(size.X), float32(size.Y)},
-								"Blur": blur, "Nearest": nearest},
+							Uniforms: u,
 						}
-						got.DrawRectShader(size.X, size.Y, current, options)
+						shader := current
+						if nearest == 0 && u["BlurRadius"].(int) > 0 {
+							shader = compact
+						}
+						got.DrawRectShader(size.X, size.Y, shader, options)
 						want.DrawRectShader(size.X, size.Y, reference, options)
 						got.ReadPixels(actual)
 						want.ReadPixels(expected)

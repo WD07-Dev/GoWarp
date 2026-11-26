@@ -228,19 +228,20 @@ func TestShaderWarmupExecutesEveryPlayerShader(t *testing.T) {
 		if _, err := gpu.enablePen(render.New(&media.Library{})); err != nil {
 			t.Fatal(err)
 		}
-		dst := ebiten.NewImage(6, 1)
+		dst := ebiten.NewImage(7, 1)
 		defer dst.Deallocate()
 		if err := gpu.drawShaderWarmup(dst); err != nil {
 			t.Fatal(err)
 		}
-		var pixels [24]byte
+		var pixels [28]byte
 		dst.ReadPixels(pixels[:])
-		want := [24]byte{
+		want := [28]byte{
 			255, 255, 255, 255, 255, 0, 0, 255, 0, 0, 255, 255,
 			255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255,
+			255, 0, 0, 255,
 		}
 		if pixels != want {
-			t.Fatalf("stage/stamp/line/copy/filter/split warmup pixels=%v, want %v", pixels, want)
+			t.Fatalf("stage/stamp/line/copy/filter/split/blur warmup pixels=%v, want %v", pixels, want)
 		}
 		if gpu.nativePen.image != nil || len(gpu.textures) != 0 {
 			t.Fatal("shader warmup modified game graphics")
