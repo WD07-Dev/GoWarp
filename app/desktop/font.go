@@ -29,7 +29,6 @@ func loadFont() font.Face {
 		if err != nil {
 			continue
 		}
-		// Noto Sans CJK collections use Korean at index 1; other fonts use index 0.
 		index := 0
 		if filepath.Base(path) == "NotoSansCJK-Regular.ttc" && collection.NumFonts() > 1 {
 			index = 1

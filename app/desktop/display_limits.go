@@ -28,7 +28,6 @@ func (g *game) logDisplaySize(size image.Point) {
 	g.options.Diagnostic(fmt.Sprintf("display render_fps_limit=%d render_size=%dx%d stage_size=%dx%d", g.displayFPS(), width, height, stage.Dx(), stage.Dy()))
 }
 
-// Limit composition only; clocks, VM ticks and audio keep running.
 func (g *game) shouldPresent(now time.Time, size image.Point) bool {
 	fps := g.displayFPS()
 	if fps == 0 {

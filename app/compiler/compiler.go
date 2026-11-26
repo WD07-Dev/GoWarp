@@ -36,7 +36,11 @@ type Options struct {
 	Args            []string
 }
 
-// ReadEmbedded returns nil when the executable has no attached project.
+type contextReader struct {
+	ctx    context.Context
+	reader io.Reader
+}
+
 func ReadEmbedded(path string) (*Embedded, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -247,11 +251,6 @@ func pack(ctx context.Context, executable, input, output string, args []string) 
 	return out.Close()
 }
 
-type contextReader struct {
-	ctx    context.Context
-	reader io.Reader
-}
-
 func (r *contextReader) Read(p []byte) (int, error) {
 	if err := r.ctx.Err(); err != nil {
 		return 0, err
@@ -288,7 +287,6 @@ func sourceRoot() (string, error) {
 	return "", fmt.Errorf("GoWarp source tree not found")
 }
 
-// Unpacked inputs acquire an SB3 suffix while retaining their save-file stem.
 func archiveName(path string) string {
 	name := filepath.Base(path)
 	if strings.EqualFold(filepath.Ext(name), ".sb3") {

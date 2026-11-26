@@ -131,10 +131,7 @@ func (a *audioOutput) apply(r *vm.Runtime, commands []vm.AudioCommand) error {
 			delete(a.pendingURLs, cmd.ID)
 			if p, ok := a.players[cmd.ID]; ok {
 				p.stream.Close()
-				err := p.player.Close()
-				if err != nil {
-					return err
-				}
+				p.player.PauseAndStopReading()
 				delete(a.players, cmd.ID)
 			}
 			r.AudioFinished(cmd.ID)
@@ -201,7 +198,7 @@ func (a *audioOutput) poll(r *vm.Runtime) error {
 		}
 		if !p.player.IsPlaying() {
 			p.stream.Close()
-			p.player.Close()
+			p.player.PauseAndStopReading()
 			delete(a.players, id)
 			r.AudioFinished(id)
 		}
@@ -217,7 +214,7 @@ func (a *audioOutput) close() {
 	clear(a.pendingURLs)
 	for id, p := range a.players {
 		p.stream.Close()
-		p.player.Close()
+		p.player.PauseAndStopReading()
 		delete(a.players, id)
 	}
 }

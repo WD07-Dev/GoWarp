@@ -43,8 +43,7 @@ func GenerateNative(p *project.Project) ([]byte, error) {
 }`
 	files["app/player/main.go"] = `package player
 import ("fmt"; "gowarp/core/extension"; "gowarp/core/vm")
-func MainWithExtensions(extension.Bundle) { fmt.Println(vm.NativeValue) }
-`
+func MainWithExtensions(extension.Bundle) { fmt.Println(vm.NativeValue) }`
 	sdk := writePreparationSDK(t, files)
 	tpl := Template{Version: config.Version, OS: runtime.GOOS, Arch: runtime.GOARCH}
 	cache := t.TempDir()
@@ -161,7 +160,6 @@ func TestExtensionPreparationNativeRuntimeParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Use the real generator and VM; only the desktop player is replaced.
 	paths, err := filepath.Glob(filepath.Join(root, "core", "vm", "*.go"))
 	if err != nil {
 		t.Fatal(err)
@@ -191,8 +189,7 @@ func RunPreparationFixture(p *project.Project, b extension.Bundle, interpreted b
  r.GreenFlag()
  if err := r.Run(context.Background(),10,60,false); err != nil { return nil,err }
  return r.Snapshot()[0].Variables["score"].Value,nil
-}
-`
+}`
 	manifest := `{"targets":[{"isStage":true,"name":"Stage","variables":{"score":["score",0]},"blocks":{"hat":{"opcode":"event_whenflagclicked","topLevel":true,"next":"set"},"set":{"opcode":"data_setvariableto","next":"add","fields":{"VARIABLE":["score","score"]},"inputs":{"VALUE":[1,[4,"1"]]}},"add":{"opcode":"data_changevariableby","fields":{"VARIABLE":["score","score"]},"inputs":{"VALUE":[1,[4,"1"]]}}}}],"extensions":["fresh"]}`
 	files["app/player/main.go"] = `package player
 import ("encoding/json"; "fmt"; "gowarp/core/extension"; "gowarp/core/project"; "gowarp/core/vm")
@@ -204,16 +201,14 @@ func MainWithExtensions(b extension.Bundle) {
   if err != nil {panic(err)}
   fmt.Println(value)
  }
-}
-`
+}`
 	sdk := writePreparationSDK(t, files)
 	sources := []extensionSource{{ID: "fresh", Go: []byte(`package fresh
 import ("gowarp/core/extension"; "gowarp/core/project")
 func New() extension.Extension { return extension.Extension{ID:"fresh", Prepare:func(p *project.Project) error {
  p.Targets[0].Blocks["set"].Inputs["VALUE"] = []any{1,[]any{4,"41"}}
  return nil
-} } }
-`)}}
+} } }`)}}
 	var p project.Project
 	if err := json.Unmarshal([]byte(manifest), &p); err != nil {
 		t.Fatal(err)

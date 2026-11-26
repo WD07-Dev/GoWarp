@@ -117,10 +117,6 @@ func TestNativeMonitorGeometryAndTextDetail(t *testing.T) {
 	if frame.RGBAAt(20, 20) != monitorOrange || frame.RGBAAt(19, 20).A != 0 || frame.RGBAAt(20, 64).A != 0 {
 		t.Fatal("monitor no longer follows logical stage coordinates")
 	}
-	/*
-		Native font edges contain per-pixel detail within a logical 2x2 cell;
-		stretching a completed logical overlay repeats every 2x2 block.
-	*/
 	for y := 22; y < 60; y += 2 {
 		for x := 22; x < 96; x += 2 {
 			pixel := frame.RGBAAt(x, y)

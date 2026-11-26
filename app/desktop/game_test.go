@@ -39,10 +39,6 @@ func TestHostFrameReportsCombinedFullscreen(t *testing.T) {
 				if got := c.vm.Snapshot()[0].Variables["score"].Value; got != (host || project) {
 					t.Fatalf("host=%t project=%t: fullscreen reporter = %v", host, project, got)
 				}
-				/*
-					A disconnected monitor can restore the native window without
-					a player shortcut or project command.
-				*/
 				ebiten.SetFullscreen(false)
 				g.sampleHostFrame()
 				c.vm.GreenFlag()

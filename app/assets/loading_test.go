@@ -166,7 +166,6 @@ func TestLoadingImagesCombinedMemoryLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	data := encoded.Bytes()
-	// Only the header is needed to reject oversized decoded buffers before allocation.
 	binary.BigEndian.PutUint32(data[16:20], 4096)
 	binary.BigEndian.PutUint32(data[20:24], 4096)
 	binary.BigEndian.PutUint32(data[29:33], crc32.ChecksumIEEE(data[12:29]))

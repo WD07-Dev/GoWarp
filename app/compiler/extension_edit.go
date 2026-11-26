@@ -97,7 +97,6 @@ func OpenExtensionDocument(ctx context.Context, path string) (*ExtensionDocument
 	return doc, nil
 }
 
-// Save accepts drafts, including JS without Go; compilation validates them on export.
 func (d *ExtensionDocument) Save(ctx context.Context, edits map[string]string) error {
 	revision, err := extensionArchiveHash(ctx, d.Path)
 	if err != nil {

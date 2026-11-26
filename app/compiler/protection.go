@@ -9,7 +9,6 @@ import (
 	"gowarp/core/project"
 )
 
-// ValidateOutputs rejects destinations which alias project sources or this executable.
 func ValidateOutputs(input string, p *project.Project, outputs ...string) error {
 	var destinations []string
 	for _, output := range outputs {
@@ -49,7 +48,6 @@ func ValidateOutputs(input string, p *project.Project, outputs ...string) error 
 	return nil
 }
 
-// Resolve parent symlinks even when the output file does not exist yet.
 func resolvedPath(path string) (string, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
@@ -132,7 +130,6 @@ func protectOutput(output string, sources []string) error {
 	return nil
 }
 
-// Keep extension build work outside the runtime source trees and module files.
 func overlapsRuntimeSources(root, destination string) bool {
 	for _, name := range []string{"app", "core", "platform", "test"} {
 		source := filepath.Join(root, name)

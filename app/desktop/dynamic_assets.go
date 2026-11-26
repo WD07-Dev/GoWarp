@@ -5,11 +5,11 @@ import (
 	"image"
 	"image/png"
 
-	"github.com/hajimehoshi/ebiten/v2"
 	"gowarp/core/vm"
+
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// Capture the current scene, including pending pen commands and stage shaders, as an importable PNG.
 func (p *penGPU) Snapshot(scene []vm.DisplayTarget) ([]byte, error) {
 	width, height := p.Renderer.Size()
 	frame := ebiten.NewImage(width, height)

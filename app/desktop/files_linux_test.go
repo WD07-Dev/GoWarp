@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// Exercise the real dialog adapter and file reading without opening a modal UI.
 func TestFilePickerReadsSelectedFile(t *testing.T) {
 	dir := t.TempDir()
 	helper := filepath.Join(dir, "zenity")

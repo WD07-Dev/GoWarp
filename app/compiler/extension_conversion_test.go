@@ -112,8 +112,7 @@ func TestConvertExtensionsPreservesOriginalAndManifest(t *testing.T) {
 			t.Fatalf("compressed bytes changed for asset %s", entry.Name)
 		}
 		if original.CRC32 != entry.CRC32 || original.Method != entry.Method {
-			t.Fatalf("ZIP metadata changed for asset %s: CRC32=%x, method=%d; want CRC32=%x, method=%d",
-				entry.Name, entry.CRC32, entry.Method, original.CRC32, original.Method)
+			t.Fatalf("ZIP metadata changed for asset %s: CRC32=%x, method=%d; want CRC32=%x, method=%d", entry.Name, entry.CRC32, entry.Method, original.CRC32, original.Method)
 		}
 	}
 	delete(oldManifest, "extensionURLs")

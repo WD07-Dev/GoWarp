@@ -12,7 +12,6 @@ import (
 const MaxLoadingImageSize = 8 << 20
 const MaxLoadingImageMemory = 64 << 20
 
-// LoadLoadingImage keeps the original encoded image in the settings.
 func LoadLoadingImage(path string) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -57,7 +56,6 @@ func DecodeLoadingImage(data []byte) (*LoadingImage, error) {
 	return &LoadingImage{Image: decoded}, nil
 }
 
-// ValidateLoadingImage checks bounds before a renderer allocates decoded pixels.
 func ValidateLoadingImage(data []byte) error {
 	_, _, err := inspectLoadingImage(data)
 	return err

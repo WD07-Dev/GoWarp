@@ -47,6 +47,10 @@ type Package struct {
 	Project  []byte          `json:"-"`
 }
 
+type packageArchiveBuffer struct {
+	bytes.Buffer
+}
+
 /*
 Compressed media gains little from ZIP deflate, but inflating it again can
 stall the first playback or costume change. Only the packaged copy changes.
@@ -61,10 +65,6 @@ func packageArchive(ctx context.Context, input string) ([]byte, error) {
 	}
 	archive, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		/*
-			Low-level packaging also accepts opaque payloads. Project validation
-			stays with their callers; this pass only prepares readable ZIPs.
-		*/
 		return data, ctx.Err()
 	}
 	store := make([]bool, len(archive.File))
@@ -83,10 +83,6 @@ func packageArchive(ctx context.Context, input string) ([]byte, error) {
 		case ".png", ".jpg", ".jpeg", ".mp3", ".ogg":
 			store[i] = true
 			changed = true
-			/*
-				Allow for timestamp extras in both headers and a data descriptor
-				without triggering a second large buffer allocation.
-			*/
 			size += 64
 			if entry.UncompressedSize64 > entry.CompressedSize64 {
 				size += int64(entry.UncompressedSize64 - entry.CompressedSize64)
@@ -212,10 +208,6 @@ func compressPackageManifest(ctx context.Context, entry *zip.File) ([]byte, erro
 		return nil, nil
 	}
 	return compressed.Bytes(), ctx.Err()
-}
-
-type packageArchiveBuffer struct {
-	bytes.Buffer
 }
 
 func (b *packageArchiveBuffer) Write(data []byte) (int, error) {

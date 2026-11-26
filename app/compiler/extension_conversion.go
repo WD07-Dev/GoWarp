@@ -14,6 +14,11 @@ import (
 	"gowarp/core/project"
 )
 
+type extensionContextWriter struct {
+	ctx    context.Context
+	writer io.Writer
+}
+
 /*
 ConvertExtensions atomically embeds annotated JS, preserving blocks, assets and unknown fields.
 Failed or canceled conversions leave the destination intact.
@@ -149,9 +154,7 @@ func rewriteExtensions(ctx context.Context, input, output string, sources map[st
 		}
 		header := entry.FileHeader
 		header.CRC32 = 0
-		header.CompressedSize = 0
 		header.CompressedSize64 = 0
-		header.UncompressedSize = 0
 		header.UncompressedSize64 = 0
 		target, err := writer.CreateHeader(&header)
 		if err != nil {
@@ -174,11 +177,6 @@ func rewriteExtensions(ctx context.Context, input, output string, sources map[st
 		return err
 	}
 	return replaceExtensionArchive(ctx, staged.Name(), output, revision)
-}
-
-type extensionContextWriter struct {
-	ctx    context.Context
-	writer io.Writer
 }
 
 func (w *extensionContextWriter) Write(data []byte) (int, error) {

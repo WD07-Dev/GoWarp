@@ -169,7 +169,6 @@ func (p *canvasGPU) warmupPrograms(sources []extension.ShaderSource) int {
 		bytes += len(source.Code)
 		compiled, err := p.compileProgram(source)
 		if err != nil {
-			// Keep unused invalid programs lazy: report errors only if selected.
 			continue
 		}
 		dst.DrawRectShader(1, 1, compiled.shader, &ebiten.DrawRectShaderOptions{
@@ -208,7 +207,6 @@ func canvasImage(im, backing **ebiten.Image, w, h int) {
 	if *im != nil && (*im).Bounds() == bounds {
 		return
 	}
-	// Reuse small buffers across size changes; release oversized backings.
 	const reuseLimit = 2048
 	if *backing == nil || !bounds.In((*backing).Bounds()) ||
 		(*backing).Bounds().Dx() > reuseLimit || (*backing).Bounds().Dy() > reuseLimit {
@@ -246,7 +244,6 @@ func (g *stageGPU) Draw(dst *ebiten.Image, r *render.Renderer, scene []vm.Displa
 	}
 	direct := c.RenderWidth <= 0 && c.RenderHeight <= 0
 	if !direct && w == dst.Bounds().Dx() && h == dst.Bounds().Dy() {
-		// Transparent stages still need background composition, even at matching dimensions.
 		direct = v.Color != "transparent" && vm.ParseColor(v.Color).A == 255
 	}
 	if v.Shader == nil && !filtered && direct && v.Split == nil {
@@ -393,18 +390,18 @@ func drawCanvasBorder(dst *ebiten.Image, c vm.CanvasEffects) {
 		for x := size / 2; x < w; x += step {
 			for _, y := range []float32{size / 2, h - size/2} {
 				if c.BorderStyle == "dotted" {
-					vector.DrawFilledCircle(dst, x, y, size/2, col, false)
+					vector.FillCircle(dst, x, y, size/2, col, false)
 				} else {
-					vector.DrawFilledRect(dst, x-size/2, y-size/2, size*3, size, col, false)
+					vector.FillRect(dst, x-size/2, y-size/2, size*3, size, col, false)
 				}
 			}
 		}
 		for y := size / 2; y < h; y += step {
 			for _, x := range []float32{size / 2, w - size/2} {
 				if c.BorderStyle == "dotted" {
-					vector.DrawFilledCircle(dst, x, y, size/2, col, false)
+					vector.FillCircle(dst, x, y, size/2, col, false)
 				} else {
-					vector.DrawFilledRect(dst, x-size/2, y-size/2, size, size*3, col, false)
+					vector.FillRect(dst, x-size/2, y-size/2, size, size*3, col, false)
 				}
 			}
 		}

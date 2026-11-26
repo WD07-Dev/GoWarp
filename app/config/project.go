@@ -33,7 +33,6 @@ func storedProjectSettings(p *project.Project) map[string]json.RawMessage {
 			if !strings.Contains(text, "_twconfig_") {
 				continue
 			}
-			// Read the marked line first so unrelated braces cannot swallow settings; also accept multiline comments.
 			candidates := []string{}
 			for _, line := range strings.Split(text, "\n") {
 				if strings.Contains(line, "_twconfig_") {
@@ -67,7 +66,6 @@ func applyProjectSettings(s *Settings, p *project.Project) {
 	var fps *float64
 	if json.Unmarshal(fields["framerate"], &fps) == nil && fps != nil && *fps >= 0 && *fps <= 1000 {
 		s.FPS = *fps
-		// The native runtime uses 60 FPS for TurboWarp's screen-rate mode.
 		if s.FPS == 0 {
 			s.FPS = 60
 		}

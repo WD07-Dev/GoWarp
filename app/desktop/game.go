@@ -147,7 +147,6 @@ func Run(ctx context.Context, path string, p *project.Project, options Options, 
 	}
 	ebiten.SetTPS(60)
 	ebiten.SetRunnableOnUnfocused(true)
-	// Keep the last presented frame while background Draw calls are skipped.
 	cleared := ebiten.IsScreenClearedEveryFrame()
 	ebiten.SetScreenClearedEveryFrame(false)
 	defer ebiten.SetScreenClearedEveryFrame(cleared)
@@ -595,7 +594,6 @@ func (g *game) reportSlowPhase(phase string, elapsed time.Duration, ticks int) {
 	}
 	*last = now
 	message := fmt.Sprintf("slow phase=%s elapsed=%s ticks=%d frame=%d fps=%g pending_ticks=%.2f", phase, elapsed, ticks, c.vm.Frames(), c.vm.FPS(), c.credit)
-	// fps above is the project's setting; these are measured host rates.
 	message += fmt.Sprintf(" focused=%t minimized=%t actual_tps=%.1f actual_fps=%.1f", g.sampleWindowFocus(), g.windowMinimized, ebiten.ActualTPS(), ebiten.ActualFPS())
 	if phase == "host_gap" {
 		message += fmt.Sprintf(" draw_calls=%d host_draw_cpu=%s host_other_time=%s", g.hostDrawCalls, g.hostDrawTime, max(0, elapsed-g.hostDrawTime))
@@ -725,7 +723,6 @@ func (g *game) draw(screen *ebiten.Image, focused bool) {
 		g.gpu.uploadCount, g.gpu.uploadBytes, g.gpu.uploadTime, g.gpu.evictions = 0, 0, 0, 0
 		g.gpu.prepareTime, g.gpu.pixelTime, g.gpu.textureTime, g.gpu.writeTime = 0, 0, 0, 0
 		g.gpu.penSubmitTime = 0
-		// This measures CPU command submission, not deferred GPU execution.
 		defer func() {
 			g.gpu.measureUploads = false
 			g.reportSlowPhase("draw_cpu", time.Since(start), 1)
@@ -766,7 +763,6 @@ func (g *game) captureFrame(screen *ebiten.Image) {
 }
 
 func (g *game) Layout(outsideWidth, outsideHeight int) (int, int) {
-	// Layout starts each host frame, including frames without an Update.
 	g.windowFocusRead, g.windowFullscreenRead = false, false
 	g.windowDPI = 1
 	if peer := g.options.Editor; peer != nil && peer.Embedded {
@@ -786,12 +782,7 @@ func (g *game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return w, h + ToolbarHeight + AnswerHeight
 }
 
-/*
-LayoutF allocates packaged-player pixels at the monitor's native resolution.
-CursorPosition is expressed in this same canvas coordinate system.
-*/
 func (g *game) LayoutF(width, height float64) (float64, float64) {
-	// Layout starts each host frame, including frames without an Update.
 	g.windowFocusRead, g.windowFullscreenRead = false, false
 	return g.layoutScale(width, height, ebiten.Monitor().DeviceScaleFactor())
 }
@@ -866,7 +857,6 @@ func (g *game) inputPosition(x, y int) (float64, float64) {
 	stage := g.stageBounds(g.outsideWidth, g.outsideHeight)
 	sx := float64(x-stage.Min.X) * float64(w) / float64(stage.Dx())
 	sy := float64(y-stage.Min.Y) * float64(h) / float64(stage.Dy())
-	// The controller's input convention includes the legacy toolbar offset.
 	return sx, sy + ToolbarHeight
 }
 

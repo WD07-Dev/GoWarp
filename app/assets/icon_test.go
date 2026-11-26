@@ -12,8 +12,8 @@ import (
 
 func TestLoadIconNormalizesAndEmbedsImage(t *testing.T) {
 	source := image.NewNRGBA(image.Rect(0, 0, 40, 20))
-	for y := 0; y < 20; y++ {
-		for x := 0; x < 40; x++ {
+	for y := range 20 {
+		for x := range 40 {
 			source.SetNRGBA(x, y, color.NRGBA{R: 255, A: 255})
 		}
 	}

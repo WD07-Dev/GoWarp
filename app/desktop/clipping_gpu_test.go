@@ -1,7 +1,6 @@
 package desktop
 
 import (
-	"github.com/hajimehoshi/ebiten/v2"
 	e "gowarp/core/extension"
 	"gowarp/core/media"
 	"gowarp/core/render"
@@ -11,6 +10,8 @@ import (
 	"image"
 	"image/color"
 	"testing"
+
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 type capturePostShaders struct{ sources []e.ShaderSource }
@@ -87,7 +88,6 @@ func TestDusttrustClippingBlendMaskGPU(t *testing.T) {
 				}
 			}
 		}
-		// Dusttrust keeps battle//box shown with ghost=100 as its stencil.
 		top.State.BlendMode = "default"
 		lib.Costumes[0] = append(lib.Costumes[0], makeCostume(color.NRGBA{}))
 		for i, ghost := range []float64{100, 0} {
@@ -102,14 +102,12 @@ func TestDusttrustClippingBlendMaskGPU(t *testing.T) {
 				t.Fatalf("bone escaped invisible box: %v", c)
 			}
 		}
-		// A masked drawable earlier than its base has an empty stencil.
 		if err := g.Draw(dst, r, []vm.DisplayTarget{top, base}); err != nil {
 			t.Fatal(err)
 		}
 		if c := color.RGBAModel.Convert(dst.At(20, 12)).(color.RGBA); c != (color.RGBA{32, 48, 64, 255}) {
 			t.Fatalf("mask draw order: %v", c)
 		}
-		// Exact additive stamp RGB survives zero alpha, GPU readback and CPU draw.
 		graphics, err := g.enablePen(r)
 		if err != nil {
 			t.Fatal(err)

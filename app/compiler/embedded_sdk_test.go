@@ -39,10 +39,6 @@ func TestEmbeddedSDKPackagerExport(t *testing.T) {
 	t.Chdir(dir)
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(dir, "cache"))
 	t.Setenv("LocalAppData", filepath.Join(dir, "cache"))
-	/*
-		Go makes downloaded modules read-only. This isolated cache belongs to
-		the test, so make it removable before TempDir performs its cleanup.
-	*/
 	t.Cleanup(func() {
 		modules := filepath.Join(dir, "cache", "gowarp", "go", "pkg", "mod")
 		err := filepath.WalkDir(modules, func(path string, entry os.DirEntry, err error) error {

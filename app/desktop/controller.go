@@ -20,9 +20,8 @@ const ToolbarHeight = 36
 const AnswerHeight = 52
 
 type Options struct {
-	Editor     *editorbridge.Peer
-	Extensions extension.Bundle
-	// Prepare loads a project after the native window has drawn its first frame.
+	Editor      *editorbridge.Peer
+	Extensions  extension.Bundle
 	Prepare     func(context.Context) (*project.Project, error)
 	OnStart     func()
 	Diagnostic  func(string)
@@ -202,7 +201,6 @@ func (c *controller) advance(ctx context.Context, in Input) error {
 	if math.IsNaN(x) || math.IsInf(x, 0) || math.IsNaN(y) || math.IsInf(y, 0) {
 		x, y = 0, 0
 	}
-	// Coalesce mouse motion while cadence defers VM ticks; other input remains ordered.
 	c.pendingMouse = vm.InputEvent{
 		Frame: frame,
 		Kind:  "mouse",
@@ -365,7 +363,6 @@ func (c *controller) advanceCadence(ctx context.Context) error {
 		if c.tickCount >= max(1, c.tickLimit) {
 			break
 		}
-		// Reserve the measured tick cost before starting more work.
 		if !c.tickDeadline.IsZero() && time.Until(c.tickDeadline) <= time.Since(started) {
 			break
 		}
@@ -374,7 +371,6 @@ func (c *controller) advanceCadence(ctx context.Context) error {
 }
 
 func (c *controller) tick(ctx context.Context) error {
-	// Hooks and failed ticks can change pen pixels without advancing Frames.
 	c.paintedStage = nil
 	if c.options.Settings != nil && c.vm.Options().Interpolation {
 		c.previous = c.vm.SceneInto(c.previous)
@@ -386,7 +382,6 @@ func (c *controller) tick(ctx context.Context) error {
 		}
 	}
 	var err error
-	// Keep unseen catch-up drawing deferred so a later clear can discard it.
 	catchingUp := c.credit >= .5 && c.tickCount+1 < max(1, c.tickLimit)
 	if c.graphics != nil && !c.options.Replay && !catchingUp {
 		err = c.graphics.tick(ctx, c.tickVM)

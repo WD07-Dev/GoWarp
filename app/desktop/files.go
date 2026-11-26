@@ -11,7 +11,6 @@ import (
 	"gowarp/app/dialog"
 )
 
-// Called by the VM's file worker, never by the window or scheduler thread.
 func pickFile(ctx context.Context, encoding string) (string, error) {
 	directory, err := os.Getwd()
 	if err != nil {

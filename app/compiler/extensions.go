@@ -185,7 +185,6 @@ func readExtensionSource(ctx context.Context, input, location string) ([]byte, s
 	return data, path, err
 }
 
-// Preview and export invoke Go directly without a shell.
 func extensionRuntime(ctx context.Context, t Template, sources []extensionSource, output string, p *project.Project) (Template, error) {
 	work, err := os.MkdirTemp("", "gowarp-sdk-*")
 	if err != nil {
@@ -229,7 +228,6 @@ func findExtensionSDK(ctx context.Context, t Template, work, output string) (str
 		}
 		return work, nil
 	}
-	// Prefer the installed SDK over unrelated checkouts in the working directory.
 	roots := []string{filepath.Dir(filepath.Dir(t.Path)), filepath.Dir(filepath.Dir(filepath.Dir(t.Path)))}
 	if executable, err := os.Executable(); err == nil {
 		roots = append(roots, filepath.Dir(executable))
@@ -418,7 +416,6 @@ func writeExtensionMain(root string, sources []extensionSource) error {
 		if err = os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}
-		// Include the ID in compiler diagnostics without allowing paths or newlines.
 		label := labels.Replace(source.ID)
 		data := []byte("//line " + label + ".js-go:1\n" + code)
 		if err = os.WriteFile(filepath.Join(dir, "extension.go"), data, 0644); err != nil {
@@ -516,7 +513,6 @@ func compileExtensionRuntime(ctx context.Context, t Template, sources []extensio
 	if err = os.MkdirAll(cache, 0700); err != nil {
 		return t, err
 	}
-	// Serialize cache publication and eviction; waiting and compilation remain cancelable.
 	for !extensionBuildMu.TryLock() {
 		select {
 		case <-ctx.Done():
@@ -590,7 +586,6 @@ func compileExtensionRuntime(ctx context.Context, t Template, sources []extensio
 			return t, err
 		}
 	}
-	// Initial values and assets can change without changing compiled code.
 	fmt.Fprintf(hash, "\nnative:%d:", len(native))
 	hash.Write(native)
 	name := hex.EncodeToString(hash.Sum(nil))

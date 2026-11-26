@@ -222,8 +222,7 @@ func GenerateNative(p *project.Project) ([]byte,error) {
  return []byte(fmt.Sprintf("package vm\nfunc init() { NativeValue = %v }\n", p.Targets[0].Blocks["value"].Fields["VALUE"][0])),nil
 }
 
-var NativeValue int
-`
+var NativeValue int`
 	for name, data := range files {
 		path := filepath.Join(sdk, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {

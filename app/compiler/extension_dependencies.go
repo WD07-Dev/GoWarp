@@ -19,8 +19,7 @@ func collectExtensionModules(sources []extensionSource) ([]extension.ModuleRequi
 	for _, source := range sources {
 		for _, requirement := range source.Requirements {
 			if previous, ok := modules[requirement.Path]; ok && previous.Version != requirement.Version {
-				return nil, fmt.Errorf("Go extension dependencies: %s requires %s %s, but %s requires %s",
-					source.ID, requirement.Path, requirement.Version, owners[requirement.Path], previous.Version)
+				return nil, fmt.Errorf("Go extension dependencies: %s requires %s %s, but %s requires %s", source.ID, requirement.Path, requirement.Version, owners[requirement.Path], previous.Version)
 			}
 			modules[requirement.Path] = requirement
 			owners[requirement.Path] = source.ID
@@ -83,8 +82,7 @@ func prepareExtensionModules(ctx context.Context, goTool, work string, env []str
 	args := []string{"mod", "edit"}
 	for _, requirement := range requirements {
 		if previous, ok := pinned[requirement.Path]; ok && previous.Version != requirement.Version {
-			return fmt.Errorf("Go extension dependencies: %s %s conflicts with runtime version %s",
-				requirement.Path, requirement.Version, previous.Version)
+			return fmt.Errorf("Go extension dependencies: %s %s conflicts with runtime version %s", requirement.Path, requirement.Version, previous.Version)
 		}
 		pinned[requirement.Path] = moduleRequirement{Path: requirement.Path, Version: requirement.Version}
 		args = append(args, "-require="+requirement.Path+"@"+requirement.Version)
@@ -107,7 +105,6 @@ func prepareExtensionModules(ctx context.Context, goTool, work string, env []str
 		}
 		graph[module.Path] = module.Version
 	}
-	// Tidy covers platform-specific imports before either cross-compiled binary is built.
 	if _, err := run("mod", "tidy"); err != nil {
 		return err
 	}

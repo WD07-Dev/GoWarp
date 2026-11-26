@@ -69,13 +69,12 @@ type Cloud struct {
 }
 
 type Settings struct {
-	Version       int     `json:"version"`
-	AppID         string  `json:"appId"`
-	Project       string  `json:"project,omitempty"`
-	FPS           float64 `json:"fps"`
-	Turbo         bool    `json:"turbo"`
-	Interpolation bool    `json:"interpolation"`
-	// Missing optional values retain the project settings in older packages.
+	Version          int             `json:"version"`
+	AppID            string          `json:"appId"`
+	Project          string          `json:"project,omitempty"`
+	FPS              float64         `json:"fps"`
+	Turbo            bool            `json:"turbo"`
+	Interpolation    bool            `json:"interpolation"`
 	RemoveFencing    *bool           `json:"removeFencing,omitempty"`
 	RemoveMiscLimits *bool           `json:"removeMiscLimits,omitempty"`
 	HighQualityPen   *bool           `json:"highQualityPen,omitempty"`
@@ -135,7 +134,6 @@ func DefaultForProject(path string, p *project.Project) Settings {
 	return s
 }
 
-// DisplaySize returns the initial visible game area without changing stage coordinates.
 func (s Settings) DisplaySize() (int, int) {
 	width, height := s.Window.Width, s.Window.Height
 	if width == 0 {
@@ -272,7 +270,6 @@ func SaveContext(ctx context.Context, path string, s Settings) error {
 	if err := s.Validate(); err != nil {
 		return err
 	}
-	// Saved projects read stage dimensions from the SB3, not the settings file.
 	data, err := json.MarshalIndent(struct {
 		Settings
 		Width  *int `json:"width,omitempty"`

@@ -38,7 +38,6 @@ type loadingGIFAnimation struct {
 	frame            int
 }
 
-// Advance composites only the frames needed for the current playback time.
 func (im *LoadingImage) Advance(now time.Time) (bool, error) {
 	if im == nil || im.animation == nil || len(im.animation.frames) == 1 {
 		return false, nil
@@ -78,8 +77,7 @@ func (im *LoadingImage) Advance(now time.Time) (bool, error) {
 
 func (a *loadingGIFAnimation) drawFrame(index int) error {
 	f := a.frames[index]
-	reader := io.MultiReader(bytes.NewReader(a.data[:a.header]), bytes.NewReader(f.control),
-		bytes.NewReader(a.data[f.start:f.end]), bytes.NewReader([]byte{0x3b}))
+	reader := io.MultiReader(bytes.NewReader(a.data[:a.header]), bytes.NewReader(f.control), bytes.NewReader(a.data[f.start:f.end]), bytes.NewReader([]byte{0x3b}))
 	frame, err := gif.Decode(reader)
 	if err != nil {
 		return fmt.Errorf("loading GIF frame %d: %w", index+1, err)
@@ -162,7 +160,6 @@ func inspectLoadingGIF(data []byte, canvas image.Rectangle) (*loadingGIFAnimatio
 			if data[start+9]&0x80 != 0 {
 				offset += 3 * (1 << ((data[start+9] & 7) + 1))
 			}
-			// Skip the LZW code size, then scan the compressed data blocks.
 			end, err := gifBlocksEnd(data, offset+1)
 			if err != nil {
 				return nil, err

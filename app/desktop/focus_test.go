@@ -104,7 +104,6 @@ func TestUnfocusedPlayerResubmitsLastFrame(t *testing.T) {
 			g.draw(screen, false)
 			cached := g.backgroundFrame
 			for range 8 {
-				// A new back buffer must receive the cached frame, without running scene composition.
 				screen.Clear()
 				g.draw(screen, false)
 				if g.backgroundFrame != cached {

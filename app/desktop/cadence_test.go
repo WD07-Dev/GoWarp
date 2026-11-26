@@ -84,7 +84,6 @@ func TestPlayerSlowPhasesAreBoundedIndependently(t *testing.T) {
 	g := &game{controller: c, options: Options{
 		Diagnostic: func(message string) { messages = append(messages, message) },
 	}}
-	// Two 20 ms ticks are not the same as one 40 ms tick.
 	g.reportSlowPhase("vm", 40*time.Millisecond, 2)
 	if len(messages) != 0 {
 		t.Fatal("catch-up ticks were reported as one long tick")
@@ -138,10 +137,6 @@ func TestPlayerOverloadDoesNotRepeatTicksBeforeDrawing(t *testing.T) {
 	if err := g.advanceController(Input{}); err != nil {
 		t.Fatal(err)
 	}
-	/*
-		Ebitengine can request five updates before Draw after a slow frame.
-		Account for a 33 ms VM tick without sleeping or running the game.
-	*/
 	g.updateTime = 33 * time.Millisecond
 	for i := 0; i < 4; i++ {
 		in := Input{}

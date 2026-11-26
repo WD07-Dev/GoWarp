@@ -6,7 +6,6 @@ import (
 	"gowarp/app/assets"
 )
 
-// MaxSettingsSize accommodates two embedded loading images and their JSON encoding.
 const MaxSettingsSize = 24 << 20
 
 type LoadingSettings struct {

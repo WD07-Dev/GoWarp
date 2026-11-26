@@ -100,7 +100,6 @@ func TestExtensionDocumentEditsInPlace(t *testing.T) {
 	if p.ExtensionURLs["local"] != "extensions/local.js" {
 		t.Fatal("unedited source changed")
 	}
-	// A second save must use the updated archive revision.
 	if err = doc.Save(context.Background(), map[string]string{"local": "new local"}); err != nil {
 		t.Fatal(err)
 	}

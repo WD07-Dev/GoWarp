@@ -25,7 +25,6 @@ func ReadWithLimit(ctx context.Context, limit int) (string, error) {
 		if err := native.Init(); err != nil {
 			return "", err
 		}
-		// The library reads the payload before this adapter can check its size.
 		data, err := native.Read(ctx, native.FmtText)
 		if errors.Is(err, native.ErrNoData) {
 			return "", nil

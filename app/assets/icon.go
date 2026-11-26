@@ -12,7 +12,6 @@ import (
 	"golang.org/x/image/draw"
 )
 
-// LoadIcon embeds a bounded, square PNG rather than retaining an external path.
 func LoadIcon(path string) ([]byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -77,7 +76,6 @@ func IconImages(data []byte) ([]image.Image, error) {
 	return images, nil
 }
 
-// DefaultWindowIcon returns the bundled application icon at window icon sizes.
 func DefaultWindowIcon() []image.Image {
 	images, err := IconImages(DefaultIcon)
 	if err != nil {

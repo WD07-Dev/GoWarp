@@ -77,8 +77,7 @@ func projectExtensionRequirements(p *project.Project) extensionRequirements {
 
 type extensionPreparationRequest struct {
 	extensionRequirements
-	Project *project.Project
-	// ScriptOrder is not part of project JSON, but affects event dispatch.
+	Project     *project.Project
 	ScriptOrder [][]string
 	NativePath  string
 }
