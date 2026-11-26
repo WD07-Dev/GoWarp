@@ -20,9 +20,49 @@ func sample(p vec2) vec4 {
 	return mix(mix(a,c,f.x),mix(d,e,f.x),f.y)
 }
 
+// Blur passes preserve pixel centers on the perpendicular axis.
+func sampleAxis(p, axis vec2) vec4 {
+	if p.x < 0 || p.y < 0 || p.x >= SourceSize.x || p.y >= SourceSize.y { return vec4(0) }
+	p -= vec2(.5)
+	b := floor(p)
+	f := dot(fract(p), axis)
+	a := imageSrc0At(imageSrc0Origin()+clamp(b,vec2(0),SourceSize-1)+vec2(.5))
+	c := imageSrc0At(imageSrc0Origin()+clamp(b+axis,vec2(0),SourceSize-1)+vec2(.5))
+	return mix(a,c,f)
+}
+
 func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 	p := texCoord-imageSrc0Origin()
 	if Blur.x > 0 || Blur.y > 0 {
+		/*
+			Below 1/6 px, all 25 bilinear taps stay within the two adjacent
+			pixels. At pixel centers their weighted sum needs only three reads.
+			0.3945864966 = sum(x*exp(-x*x/2), x=.25..3) / sum(exp(-x*x/2), x=-3..3).
+		*/
+		if Nearest == 0 && min(Blur.x, Blur.y) == 0 && max(Blur.x, Blur.y) < 1.0/6 &&
+			p-floor(p) == vec2(.5) && p.x >= 0 && p.y >= 0 && p.x < SourceSize.x && p.y < SourceSize.y {
+			d := vec2(1, 0)
+			if Blur.y > 0 { d = vec2(0, 1) }
+			w := (Blur.x+Blur.y)*.3945864966210943
+			origin := imageSrc0Origin()
+			c := imageSrc0At(origin+p)
+			a := imageSrc0At(origin+clamp(p-d, vec2(.5), SourceSize-.5))
+			b := imageSrc0At(origin+clamp(p+d, vec2(.5), SourceSize-.5))
+			return c*(1-2*w)+(a+b)*w
+		}
+		if Nearest == 0 && min(Blur.x, Blur.y) == 0 && p-floor(p) == vec2(.5) {
+			axis := vec2(1, 0)
+			if Blur.y > 0 { axis = vec2(0, 1) }
+			c := vec4(0)
+			total := float(0)
+			for i := -12; i <= 12; i++ {
+				x := float(i)*.25
+				w := exp(-x*x/2)
+				c += sampleAxis(p+Blur*x, axis)*w
+				total += w
+			}
+			return c/total
+		}
 		c:=vec4(0)
 		total:=float(0)
 		for i:= -12; i<=12; i++ {

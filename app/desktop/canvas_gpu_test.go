@@ -488,3 +488,62 @@ func TestCanvasFadingBlurAppliesColorEffectsOnce(t *testing.T) {
 		}
 	})
 }
+
+func TestCanvasBlurMatchesReference(t *testing.T) {
+	runGPUFrame(t, func() {
+		path, err := filepath.Abs("../../test/fixtures/render/canvas_filter_reference.kage")
+		if err != nil {
+			t.Fatal(err)
+		}
+		source, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reference, err := ebiten.NewShader(source)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer reference.Deallocate()
+		current, err := ebiten.NewShader(canvasShaderSource)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer current.Deallocate()
+		for _, size := range []image.Point{{1, 1}, {16, 12}, {63, 47}} {
+			backing := ebiten.NewImage(size.X+7, size.Y+9)
+			src := backing.SubImage(image.Rect(3, 4, 3+size.X, 4+size.Y)).(*ebiten.Image)
+			pixels := make([]byte, size.X*size.Y*4)
+			for i := range pixels {
+				pixels[i] = uint8(i*73 + i/11)
+			}
+			src.WritePixels(pixels)
+			got, want := ebiten.NewImage(size.X, size.Y), ebiten.NewImage(size.X, size.Y)
+			actual, expected := make([]byte, len(pixels)), make([]byte, len(pixels))
+			for _, radius := range []float32{1e-6, .001, .05, .16, 1.0 / 6, .2, .75, 1, 1.5, 2, 4, 5, 12} {
+				for axis := range 2 {
+					blur := []float32{0, 0}
+					blur[axis] = radius
+					for _, nearest := range []int{0, 1} {
+						options := &ebiten.DrawRectShaderOptions{
+							Images: [4]*ebiten.Image{src}, Blend: ebiten.BlendCopy,
+							Uniforms: map[string]any{"SourceSize": []float32{float32(size.X), float32(size.Y)},
+								"Blur": blur, "Nearest": nearest},
+						}
+						got.DrawRectShader(size.X, size.Y, current, options)
+						want.DrawRectShader(size.X, size.Y, reference, options)
+						got.ReadPixels(actual)
+						want.ReadPixels(expected)
+						for i, value := range actual {
+							if delta := int(value) - int(expected[i]); delta < -1 || delta > 1 {
+								t.Fatalf("size=%v blur=%v nearest=%d: byte %d=%d, want %d", size, blur, nearest, i, value, expected[i])
+							}
+						}
+					}
+				}
+			}
+			backing.Deallocate()
+			got.Deallocate()
+			want.Deallocate()
+		}
+	})
+}
