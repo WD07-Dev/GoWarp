@@ -15,10 +15,16 @@ func (g *game) initMainWindow() {
 	v := window.View{
 		ID: "main", Title: "GoWarp — " + filepath.Base(g.path),
 		X: x, Y: y, Width: w, Height: h, StageWidth: 480, StageHeight: 360,
-		Border: ebiten.IsWindowDecorated(), Resizable: ebiten.WindowResizingMode() == ebiten.WindowResizingModeEnabled,
+		Frame: window.Borderless, Resizable: ebiten.WindowResizingMode() == ebiten.WindowResizingModeEnabled,
+	}
+	if ebiten.IsWindowDecorated() {
+		v.Frame = window.Bordered
 	}
 	if s := g.options.Settings; s != nil {
-		v.Title, v.Border, v.Resizable = s.Player.Title, s.Platform.Border, s.Platform.Resizable
+		v.Title, v.Frame, v.Resizable = s.Player.Title, window.Borderless, s.Platform.Resizable
+		if s.Platform.Border {
+			v.Frame = window.Bordered
+		}
 		v.Topmost = s.Platform.Topmost
 		v.DisableMinimize, v.DisableMaximize = s.Platform.DisableMinimize, s.Platform.DisableMaximize
 		v.DisableClose, v.Fullscreen = s.Platform.DisableClose, s.Platform.Fullscreen
@@ -46,7 +52,7 @@ func (g *game) windowCall(op string, args []any) (any, error) {
 	if g.native != nil {
 		return g.nativeWindowCall(op, args)
 	}
-	if op == "monitor" || op == "center" {
+	if op == "monitor" || op == "center" || op == "startDrag" {
 		return nil, fmt.Errorf("%s requires Windows multiwindow mode", op)
 	}
 	if op == "create" {
@@ -66,6 +72,10 @@ func (g *game) windowCall(op string, args []any) (any, error) {
 		return nil, nil
 	}
 	v := views[0]
+	v.KeepClientX, v.KeepClientY = false, false
+	if v.Frame == window.BorderedLocked {
+		return nil, fmt.Errorf("bordered-locked requires Windows multiwindow mode")
+	}
 	if v.StageX != current.StageX || v.StageY != current.StageY ||
 		v.StageWidth != current.StageWidth || v.StageHeight != current.StageHeight {
 		return nil, fmt.Errorf("stage viewport changes require Windows multiwindow mode")
@@ -88,8 +98,8 @@ func (g *game) applyWindowChanges() error {
 		return nil
 	}
 	v := g.mainWindow
-	if ebiten.IsWindowDecorated() != v.Border {
-		ebiten.SetWindowDecorated(v.Border)
+	if ebiten.IsWindowDecorated() != v.HasBorder() {
+		ebiten.SetWindowDecorated(v.HasBorder())
 	}
 	resizing := ebiten.WindowResizingModeDisabled
 	if v.Resizable {

@@ -14,7 +14,7 @@ func TestPreparedSourceIconsReachExistingAndNewWindows(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer m.close()
-	v := window.View{ID: "existing", Width: 64, Height: 64, StageWidth: 480, StageHeight: 360, Border: true, Hidden: true}
+	v := window.View{ID: "existing", Width: 64, Height: 64, StageWidth: 480, StageHeight: 360, Frame: window.Bordered, Hidden: true}
 	if _, _, err := m.setViews([]window.View{v}); err != nil {
 		t.Fatal(err)
 	}

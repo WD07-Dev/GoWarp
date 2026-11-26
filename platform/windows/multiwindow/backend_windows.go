@@ -86,8 +86,8 @@ func (b *Backend) SetViews(views []window.View) error {
 		return err
 	}
 	b.views = layout.Views
-	if b.frame == nil || !slices.Equal(b.frame.handles, handles) || !slices.Equal(b.frame.layout.Tiles, layout.Tiles) {
-		b.frame = &frame{layout: layout, handles: handles}
+	if b.frame == nil || !slices.Equal(b.frame.handles, handles) || !slices.Equal(b.frame.layout.Tiles, layout.Tiles) || b.frame.revision != b.manager.revision.Load() {
+		b.frame = &frame{layout: layout, handles: handles, revision: b.manager.revision.Load()}
 	}
 	return nil
 }
@@ -100,6 +100,10 @@ func (b *Backend) Publish(ready bool) {
 	} else {
 		b.bridge.frame.Store(nil)
 	}
+}
+
+func (b *Backend) StartDrag(id string) error {
+	return b.manager.startDrag(id)
 }
 
 func (b *Backend) Monitor(id string) (window.Monitor, error) {
@@ -117,7 +121,7 @@ func (b *Backend) Center(id string, all bool) error {
 	}
 	b.views = layout.Views
 	if b.frame != nil && !slices.Equal(b.frame.layout.Tiles, layout.Tiles) {
-		b.frame = &frame{layout: layout, handles: slices.Clone(b.frame.handles)}
+		b.frame = &frame{layout: layout, handles: slices.Clone(b.frame.handles), revision: b.frame.revision}
 	}
 	return nil
 }
@@ -160,7 +164,7 @@ func (b *Backend) Poll() (window.Input, error) {
 		// Do not post a new SetViews during interactive resizing: that could apply
 		// an older snapshot over a newer HWND size. Publish immutable GPU metadata
 		// only when DrawFinalScreen submits the corresponding resized source atlas.
-		b.frame = &frame{layout: layout, handles: slices.Clone(b.frame.handles)}
+		b.frame = &frame{layout: layout, handles: slices.Clone(b.frame.handles), revision: b.frame.revision}
 	} else {
 		// Position and state changes do not affect atlas resources.
 		b.views = views

@@ -37,7 +37,6 @@ func TestFieldMenusAndOpacity(t *testing.T) {
 		want           any
 	}{
 		{"setBoolean", "disableClose", map[string]any{"ID": "main", "PROPERTY": "wrong", "VALUE": "false"}, map[string]string{"PROPERTY": "disableClose", "VALUE": "true"}, true},
-		{"setBoolean", "border", map[string]any{"ID": "main"}, map[string]string{"PROPERTY": "border", "VALUE": "false"}, false},
 		{"topmost", "topmost", map[string]any{"ID": "main", "VALUE": "false"}, map[string]string{"VALUE": "true"}, true},
 		{"topmost", "topmost", map[string]any{"ID": "main"}, map[string]string{"VALUE": "false"}, false},
 		{"opacity", "opacity", map[string]any{"ID": "main", "PERCENT": 55}, nil, 0.55},
@@ -62,7 +61,7 @@ func TestFieldMenusAndOpacity(t *testing.T) {
 }
 func TestCreateDefaultsAndHostErrors(t *testing.T) {
 	host := &recordingHost{}
-	c := &e.Context{Host: host, Args: map[string]any{"ID": "second", "W": 480, "H": 360, "X": 20, "Y": 40}, Fields: map[string]string{"BORDER": "true"}}
+	c := &e.Context{Host: host, Args: map[string]any{"ID": "second", "W": 480, "H": 360, "X": 20, "Y": 40}, Fields: map[string]string{"FRAME": "bordered"}}
 	if _, err := runBlock(t, "create", c); err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +72,7 @@ func TestCreateDefaultsAndHostErrors(t *testing.T) {
 	if err := json.Unmarshal([]byte(host.args[0].(string)), &view); err != nil {
 		t.Fatal(err)
 	}
-	if view["border"] != true || view["resizable"] != true || view["opacity"] != float64(1) || view["stageWidth"] != float64(480) {
+	if view["frame"] != "bordered" || view["resizable"] != true || view["opacity"] != float64(1) || view["stageWidth"] != float64(480) {
 		t.Fatalf("view=%v", view)
 	}
 	host.err = errors.New("multiwindow is disabled")
@@ -156,5 +155,40 @@ func TestMonitorAndCenterBlocks(t *testing.T) {
 	}
 	if _, err := runBlock(t, "center", c); !errors.Is(err, host.err) {
 		t.Fatal(err)
+	}
+}
+
+func TestStartDrag(t *testing.T) {
+	host := &recordingHost{}
+	c := &e.Context{Host: host, Args: map[string]any{"ID": "second"}}
+	if _, err := runBlock(t, "startDrag", c); err != nil {
+		t.Fatal(err)
+	}
+	if host.operation != "window.startDrag" || len(host.args) != 1 || host.args[0] != "second" {
+		t.Fatalf("drag call: %+v", host)
+	}
+	host.err = errors.New("drag unavailable")
+	if _, err := runBlock(t, "startDrag", c); !errors.Is(err, host.err) {
+		t.Fatalf("lost host error: %v", err)
+	}
+}
+
+func TestFrameBlockUsesMenuField(t *testing.T) {
+	for _, frame := range []string{"bordered", "bordered-locked", "borderless"} {
+		host := &recordingHost{}
+		c := &e.Context{Host: host, Args: map[string]any{"ID": "second", "FRAME": "wrong"}, Fields: map[string]string{"FRAME": frame}}
+		if _, err := runBlock(t, "frame", c); err != nil {
+			t.Fatal(err)
+		}
+		if host.operation != "window.set" || len(host.args) != 2 || host.args[0] != "second" {
+			t.Fatalf("call: %+v", host)
+		}
+		var got map[string]any
+		if err := json.Unmarshal([]byte(host.args[1].(string)), &got); err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 1 || got["frame"] != frame {
+			t.Fatalf("frame: %v", got)
+		}
 	}
 }

@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+const (
+	Bordered       = "bordered"
+	BorderedLocked = "bordered-locked"
+	Borderless     = "borderless"
+)
+
 var ErrClosed = errors.New("all native windows were closed")
 
 // State is observed from the OS, not a requested window configuration.
@@ -21,6 +27,9 @@ Desktop coordinates are physical pixels relative to the primary monitor.
 Stage coordinates start at the stage's top-left, independently of window position.
 */
 type View struct {
+	// Pending frame edits preserve the client origin on axes without an explicit position.
+	KeepClientX     bool     `json:"-"`
+	KeepClientY     bool     `json:"-"`
 	State           State    `json:"-"`
 	ID              string   `json:"id"`
 	Title           string   `json:"title"`
@@ -32,7 +41,7 @@ type View struct {
 	StageY          float64  `json:"stageY"`
 	StageWidth      float64  `json:"stageWidth"`
 	StageHeight     float64  `json:"stageHeight"`
-	Border          bool     `json:"border"`
+	Frame           string   `json:"frame"`
 	Resizable       bool     `json:"resizable"`
 	DisableMinimize bool     `json:"disableMinimize"`
 	DisableMaximize bool     `json:"disableMaximize"`
@@ -57,7 +66,16 @@ func Pack(views []View) (Layout, error) {
 	}
 	ids := make(map[string]bool, len(views))
 	x, y, row := 0, 0, 0
-	for _, v := range views {
+	for i, v := range views {
+		if v.Frame == "" {
+			v.Frame = Borderless
+			l.Views[i].Frame = v.Frame
+		}
+		switch v.Frame {
+		case Bordered, BorderedLocked, Borderless:
+		default:
+			return l, fmt.Errorf("invalid window frame %q", v.Frame)
+		}
 		if v.ID == "" || len(v.ID) > 128 || ids[v.ID] || strings.ContainsRune(v.ID, 0) || strings.ContainsRune(v.Title, 0) {
 			return l, fmt.Errorf("invalid or duplicate native window ID/title %q", v.ID)
 		}
@@ -93,6 +111,10 @@ func Pack(views []View) (Layout, error) {
 	return l, nil
 }
 
+func (v View) HasBorder() bool {
+	return v.Frame == Bordered || v.Frame == BorderedLocked
+}
+
 func (v View) Alpha() float64 {
 	if v.Opacity == nil {
 		return 1
@@ -117,6 +139,7 @@ type Backend interface {
 	Prepare() error
 	Monitor(string) (Monitor, error)
 	Center(string, bool) error
+	StartDrag(string) error
 	SetViews([]View) error
 	Publish(bool)
 	Poll() (Input, error)

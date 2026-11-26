@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"encoding/json"
+	"errors"
 	"image"
 	"image/color"
 	"math"
@@ -100,7 +101,7 @@ func TestNativeWindowJSONRejectsTrailingData(t *testing.T) {
 
 func TestNativeWindowControls(t *testing.T) {
 	g := &game{native: &nativeViews{}}
-	_, err := g.nativeWindowCall("create", []any{`{"id":"main","width":480,"height":360,"stageWidth":480,"stageHeight":360,"border":false,"resizable":true,"disableClose":true,"disableMinimize":true,"disableMaximize":true,"fullscreen":false,"opacity":0.4}`})
+	_, err := g.nativeWindowCall("create", []any{`{"id":"main","width":480,"height":360,"stageWidth":480,"stageHeight":360,"frame":"borderless","resizable":true,"disableClose":true,"disableMinimize":true,"disableMaximize":true,"fullscreen":false,"opacity":0.4}`})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +113,7 @@ func TestNativeWindowControls(t *testing.T) {
 	if err := json.Unmarshal([]byte(value.(string)), &properties); err != nil {
 		t.Fatal(err)
 	}
-	if properties["disableClose"] != true || properties["border"] != false || properties["opacity"] != 0.4 {
+	if properties["disableClose"] != true || properties["frame"] != "borderless" || properties["opacity"] != 0.4 {
 		t.Fatal(properties)
 	}
 	// Explicit removal is allowed even when user closing is disabled.
@@ -126,11 +127,11 @@ func TestNativeWindowControls(t *testing.T) {
 
 func TestMainWindowAPIControlsWithoutMultiwindow(t *testing.T) {
 	alpha := 1.0
-	g := &game{windowReady: true, windowDirty: true, mainWindow: window.View{ID: "main", Width: 480, Height: 360, StageWidth: 480, StageHeight: 360, Opacity: &alpha, Border: true}}
-	if _, err := g.windowCall("set", []any{"main", `{"border":false,"disableClose":true,"opacity":0.5,"resizable":true,"disableMinimize":true,"disableMaximize":true,"fullscreen":true}`}); err != nil {
+	g := &game{windowReady: true, windowDirty: true, mainWindow: window.View{ID: "main", Width: 480, Height: 360, StageWidth: 480, StageHeight: 360, Opacity: &alpha, Frame: window.Bordered}}
+	if _, err := g.windowCall("set", []any{"main", `{"frame":"borderless","disableClose":true,"opacity":0.5,"resizable":true,"disableMinimize":true,"disableMaximize":true,"fullscreen":true}`}); err != nil {
 		t.Fatal(err)
 	}
-	if g.mainWindow.Border || !g.mainWindow.DisableClose || !g.mainWindow.Fullscreen || g.mainWindow.Alpha() != 0.5 {
+	if g.mainWindow.HasBorder() || !g.mainWindow.DisableClose || !g.mainWindow.Fullscreen || g.mainWindow.Alpha() != 0.5 {
 		t.Fatal(g.mainWindow)
 	}
 	if _, err := g.windowCall("set", []any{"main", `{"opacity":2}`}); err == nil {
@@ -138,6 +139,9 @@ func TestMainWindowAPIControlsWithoutMultiwindow(t *testing.T) {
 	}
 	if g.mainWindow.Alpha() != 0.5 {
 		t.Fatal("rejected edit changed live alpha")
+	}
+	if _, err := g.windowCall("set", []any{"main", `{"frame":"bordered-locked"}`}); err == nil || g.mainWindow.Frame == window.BorderedLocked {
+		t.Fatal("unsupported movement lock accepted or changed main window")
 	}
 	if _, err := g.windowCall("create", []any{`{"id":"extra"}`}); err == nil {
 		t.Fatal("additional window created without multiwindow")
@@ -170,8 +174,8 @@ func TestMainWindowPropertiesApplyAndRestore(t *testing.T) {
 			border   bool
 			resizing ebiten.WindowResizingModeType
 		}{
-			{`{"border":false,"resizable":false,"disableMinimize":true,"disableMaximize":true,"disableClose":true,"opacity":0.5}`, false, ebiten.WindowResizingModeDisabled},
-			{`{"border":true,"resizable":true,"disableMinimize":false,"disableMaximize":false,"disableClose":false,"opacity":1}`, true, ebiten.WindowResizingModeEnabled},
+			{`{"frame":"borderless","resizable":false,"disableMinimize":true,"disableMaximize":true,"disableClose":true,"opacity":0.5}`, false, ebiten.WindowResizingModeDisabled},
+			{`{"frame":"bordered","resizable":true,"disableMinimize":false,"disableMaximize":false,"disableClose":false,"opacity":1}`, true, ebiten.WindowResizingModeEnabled},
 		} {
 			if _, err := g.windowCall("set", []any{"main", edit.patch}); err != nil {
 				t.Fatal(err)
@@ -242,6 +246,7 @@ func TestNativeViewPolling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	backend.views = slices.Clone(layout.Views)
 	g := &game{native: &nativeViews{backend: backend, layout: layout, prepared: true, iconsReady: true}}
 	allocs := testing.AllocsPerRun(100, func() {
 		if err := g.pollNativeViews(); err != nil {
@@ -541,4 +546,151 @@ func TestNativeCenterFlushesPendingWindowsAndUpdatesQueries(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestNativeMovementLockAllowsScriptMoves(t *testing.T) {
+	views, _, err := editWindows(nil, "create", []any{`{"id":"main","width":100,"height":100,"stageWidth":100,"stageHeight":100}`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if views[0].Frame == window.BorderedLocked {
+		t.Fatal("new windows must allow user movement by default")
+	}
+	views, _, err = editWindows(views, "set", []any{"main", `{"frame":"bordered-locked"}`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = editWindows(views, "set", []any{"main", `{"frame":"bordered","width":0}`})
+	if err == nil {
+		t.Fatal("accepted invalid edit")
+	}
+	views, _, err = editWindows(views, "move", []any{"main", 120, 80})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, value, err := editWindows(views, "get", []any{"main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal([]byte(value.(string)), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["frame"] != "bordered-locked" || got["x"] != float64(120) || got["y"] != float64(80) {
+		t.Fatalf("script move or rejected edit changed movement policy: %s", value)
+	}
+}
+
+type draggingWindowBackend struct {
+	centeringWindowBackend
+	dragged string
+}
+
+func (b *draggingWindowBackend) StartDrag(id string) error {
+	b.dragged = id
+	if !slices.ContainsFunc(b.views, func(v window.View) bool { return v.ID == id }) {
+		return errors.New("window not applied before dragging")
+	}
+	return nil
+}
+func TestStartDragAppliesPendingWindows(t *testing.T) {
+	runGPUFrame(t, func() {
+		layout, err := window.Pack([]window.View{{ID: "main", Width: 400, Height: 300, StageWidth: 240, StageHeight: 180}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		backend := &draggingWindowBackend{}
+		g := &game{native: &nativeViews{layout: layout, backend: backend}}
+		if _, err := g.nativeWindowCall("create", []any{`{"id":"second","width":400,"height":300,"stageWidth":240,"stageHeight":180}`}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := g.nativeWindowCall("set", []any{"second", `{"frame":"bordered-locked"}`}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := g.nativeWindowCall("startDrag", []any{"second"}); err != nil {
+			t.Fatal(err)
+		}
+		if backend.dragged != "second" || g.native.dirty {
+			t.Fatal("drag did not use updated windows")
+		}
+		for _, args := range [][]any{nil, {"missing"}, {"main", 1}} {
+			if _, err := g.nativeWindowCall("startDrag", args); err == nil {
+				t.Fatalf("accepted invalid drag: %v", args)
+			}
+		}
+		if _, err := (&game{}).windowCall("startDrag", []any{"main"}); err == nil {
+			t.Fatal("accepted drag without native backend")
+		}
+	})
+}
+
+func TestWindowFrameModes(t *testing.T) {
+	for _, frame := range []string{"bordered", "bordered-locked", "borderless"} {
+		t.Run(frame, func(t *testing.T) {
+			views, _, err := editWindows(nil, "create", []any{`{"id":"main","width":100,"height":100,"stageWidth":100,"stageHeight":100,"frame":"` + frame + `"}`})
+			if err != nil {
+				t.Fatal(err)
+			}
+			views, _, err = editWindows(views, "move", []any{"main", 50, 60})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, patch := range []string{`{"frame":"invalid"}`, `{"frame":"borderless-locked"}`, `{"frame":true}`} {
+				if _, _, err := editWindows(views, "set", []any{"main", patch}); err == nil {
+					t.Fatalf("accepted %s", patch)
+				}
+			}
+			_, value, err := editWindows(views, "get", []any{"main"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got map[string]any
+			if err := json.Unmarshal([]byte(value.(string)), &got); err != nil {
+				t.Fatal(err)
+			}
+			if got["frame"] != frame || got["x"] != float64(50) || got["y"] != float64(60) {
+				t.Fatalf("frame or move changed: %v", got)
+			}
+		})
+	}
+}
+
+func TestFrameEditPreservesOnlyUnspecifiedClientCoordinates(t *testing.T) {
+	initial := window.View{ID: "main", X: 500, Y: 300, Width: 400, Height: 300,
+		StageWidth: 240, StageHeight: 180, Frame: window.Borderless}
+	for _, tt := range []struct {
+		name, patch string
+		x, y        bool
+	}{
+		{"frame only", `{"frame":"bordered"}`, true, true},
+		{"explicit same x", `{"frame":"bordered","x":500}`, false, true},
+		{"explicit same y", `{"frame":"bordered","y":300}`, true, false},
+		{"explicit position", `{"frame":"bordered","x":500,"y":300}`, false, false},
+		{"no frame change", `{"width":800}`, false, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			views, _, err := editWindows([]window.View{initial}, "set", []any{"main", tt.patch})
+			if err != nil {
+				t.Fatal(err)
+			}
+			v := views[0]
+			if v.KeepClientX != tt.x || v.KeepClientY != tt.y {
+				t.Fatalf("client position preservation = %t,%t; want %t,%t", v.KeepClientX, v.KeepClientY, tt.x, tt.y)
+			}
+			views, _, err = editWindows(views, "set", []any{"main", `{"title":"new"}`})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if views[0].KeepClientX != tt.x || views[0].KeepClientY != tt.y {
+				t.Fatal("unrelated edit lost pending frame adjustment")
+			}
+			views, _, err = editWindows(views, "move", []any{"main", 500, 300})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if views[0].KeepClientX || views[0].KeepClientY {
+				t.Fatal("explicit move kept pending frame adjustment")
+			}
+		})
+	}
 }

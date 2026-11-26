@@ -19,7 +19,7 @@ func (g *game) applyWindowButtons() error {
 		g.initMainWindow()
 	}
 	v := g.mainWindow
-	state := windowButtonState{v.DisableMinimize, v.DisableMaximize, v.DisableClose, g.sampleFullscreen(), v.Border, v.Resizable, v.Alpha()}
+	state := windowButtonState{v.DisableMinimize, v.DisableMaximize, v.DisableClose, g.sampleFullscreen(), v.HasBorder(), v.Resizable, v.Alpha()}
 	if g.windowButtonsApplied && g.windowButtonsState == state {
 		return nil
 	}

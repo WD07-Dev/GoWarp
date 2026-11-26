@@ -51,6 +51,12 @@ let focused = true;
 vm.runInNewContext(fs.readFileSync(process.argv[2], "utf8"), {
     Scratch, screen: {left: -1280, top: 0, width: 1280, height: 720, availLeft: -1280, availTop: 30, availWidth: 1280, availHeight: 690}, devicePixelRatio: 1.5, document: {hasFocus: () => focused, createElementNS(namespace, tag) { return new Element(tag); }}
 });
+assert.equal(JSON.parse(extension.get({ID: "main"})).frame, "bordered");
+extension.frame({ID: "main", FRAME: "bordered-locked"});
+extension.move({ID: "main", X: 90, Y: 60});
+assert.equal(JSON.parse(extension.get({ID: "main"})).frame, "bordered-locked");
+assert.equal(JSON.parse(extension.get({ID: "main"})).x, 90);
+extension.frame({ID: "main", FRAME: "bordered"});
 const stateBlock = extension.getInfo().blocks.find(block => block.opcode === "state");
 assert.equal(stateBlock?.blockType, Scratch.BlockType.BOOLEAN);
 assert.equal(extension[stateBlock.opcode]({ID: "main", STATE: stateBlock.arguments.STATE.defaultValue}), true);
@@ -65,7 +71,7 @@ for (const state of ["minimized", "maximized"]) {
 }
 assert.equal(extension.stageSize({DIMENSION: "width"}), 960);
 assert.equal(extension.stageSize({DIMENSION: "height"}), 360);
-extension.create({ID: "second", X: 600, Y: 100, W: 480, H: 360, BORDER: "false"});
+extension.create({ID: "second", X: 600, Y: 100, W: 480, H: 360, FRAME: "borderless"});
 assert.equal(extension.state({ID: "second", STATE: "open"}), true);
 assert.equal(extension.state({ID: "second", STATE: "focused"}), false);
 extension.viewport({ID: "second", X: 480, Y: 0, W: 240, H: 180});
@@ -109,7 +115,14 @@ assert.equal(extension.monitor({ID: "main", PROPERTY: "workWidth"}), 1920);
 assert.equal(extension.monitor({ID: "main", PROPERTY: "workX"}), -1920);
 assert.equal(extension.monitor({ID: "main", PROPERTY: "workY"}), 45);
 extension.set({ID:"main", JSON:'{"width":400,"height":300,"x":60,"y":60}'});
-extension.create({ID:"second", X:480, Y:60, W:400, H:300, BORDER:"true"});
+extension.create({ID:"second", X:480, Y:60, W:400, H:300, FRAME:"bordered"});
+const beforeDrag = extension.get({ID:"main"});
+assert.equal(extension.startDrag({ID:"main"}), undefined);
+assert.equal(extension.get({ID:"main"}), beforeDrag);
+assert.throws(() => extension.startDrag({ID:"missing"}));
+const dragBlock = extension.getInfo().blocks.find(b => b.opcode === "startDrag");
+assert.equal(dragBlock.text, "start dragging window [ID]");
+
 extension.center({ID:"main", SCOPE:"all"});
 assert.equal(JSON.parse(extension.get({ID:"main"})).x,-1370);
 assert.equal(JSON.parse(extension.get({ID:"main"})).y,412);
@@ -139,6 +152,18 @@ assert.equal(extension.monitor({ID: "main", PROPERTY: "workWidth"}), 1920);
 assert.throws(() => extension.view("missing"), /알 수 없는 창/);
 Scratch.translate.language = "fr";
 assert.equal(extension.getInfo().name, "Window API");
+
+for (const frame of ["bordered", "bordered-locked", "borderless"]) {
+    extension.frame({ID:"main", FRAME:frame});
+    extension.startDrag({ID:"main"});
+    assert.equal(JSON.parse(extension.get({ID:"main"})).frame, frame);
+}
+const beforeBadFrame = extension.get({ID:"main"});
+for (const frame of ["invalid", "borderless-locked", ""]) {
+    assert.throws(() => extension.frame({ID:"main", FRAME:frame}));
+    assert.equal(extension.get({ID:"main"}), beforeBadFrame);
+}
+assert.deepEqual(Array.from(extension.getInfo().menus.frames.items, item => item.value), ["bordered", "bordered-locked", "borderless"]);
 
 extension.quit();
 assert.equal(extension.state({ID: "main", STATE: "open"}), false);

@@ -18,21 +18,25 @@ import (
 )
 
 var user32 = windows.NewLazySystemDLL("user32.dll")
+var getAsyncKeyState = user32.NewProc("GetAsyncKeyState")
 
 type nativeWindow struct {
-	handle  uintptr
-	view    window.View
-	restore window.View // Last windowed geometry, owned by the window thread.
+	ready, pendingBounds bool
+	handle               uintptr
+	view                 window.View
+	restore              window.View // Last windowed geometry, owned by the window thread.
 }
 
 type windowManager struct {
+	revision      atomic.Uint64
 	centerMain    bool
 	positioning   bool
+	dragging      uintptr
 	stop          chan struct{}
 	done          chan struct{}
 	tasks         chan func()
 	items         map[string]*nativeWindow
-	retired       map[uintptr]bool
+	retired       map[uintptr]uint64
 	events        window.Input
 	closed        []string
 	held          map[string]bool
@@ -50,7 +54,7 @@ type windowManager struct {
 func startWindows() (*windowManager, error) {
 	m := &windowManager{
 		stop: make(chan struct{}), done: make(chan struct{}), tasks: make(chan func(), 32),
-		items: make(map[string]*nativeWindow), retired: make(map[uintptr]bool), held: make(map[string]bool),
+		items: make(map[string]*nativeWindow), retired: make(map[uintptr]uint64), held: make(map[string]bool),
 	}
 	ready := make(chan error, 1)
 	go m.run(ready)
@@ -70,6 +74,22 @@ func (m *windowManager) do(fn func()) {
 	}
 	m.wake()
 	<-done
+}
+
+func (m *windowManager) startDrag(id string) error {
+	var err error
+	m.do(func() {
+		w := m.items[id]
+		if w == nil {
+			err = fmt.Errorf("unknown native window %q", id)
+			return
+		}
+		// The native move loop must start after this task releases its caller.
+		if win.PostMessage(win.HWND(w.handle), win.WM_APP+2, 0, 0) == 0 {
+			err = fmt.Errorf("could not start dragging window %q", id)
+		}
+	})
+	return err
 }
 
 func (m *windowManager) wake() {
@@ -211,7 +231,7 @@ func (m *windowManager) wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr
 			m.updateSnapshot()
 		}
 	case win.WM_DPICHANGED:
-		if current != nil && !current.view.Fullscreen && !m.positioning {
+		if current != nil && !current.view.Fullscreen && !current.pendingBounds && !m.positioning {
 			v := current.view
 			b, err := windowBounds(v, uint32(wparam&0xffff))
 			if err == nil {
@@ -226,9 +246,50 @@ func (m *windowManager) wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr
 		m.drain()
 		m.updateSnapshot()
 		return 0
+	case win.WM_APP + 2:
+		if current == nil || m.dragging != 0 || !current.ready {
+			return 0
+		}
+		v := current.view
+		if v.Hidden || v.Fullscreen || v.Passthrough || win.IsIconic(win.HWND(hwnd)) || win.IsZoomed(win.HWND(hwnd)) {
+			return 0
+		}
+		button := uintptr(win.VK_LBUTTON)
+		if win.GetSystemMetrics(win.SM_SWAPBUTTON) != 0 {
+			button = win.VK_RBUTTON
+		}
+		pressed, _, _ := getAsyncKeyState.Call(button)
+		if pressed&0x8000 == 0 {
+			return 0
+		}
+		m.dragging = hwnd
+		win.ReleaseCapture()
+		menu := win.GetSystemMenu(win.HWND(hwnd), false)
+		if v.Frame == window.BorderedLocked && menu != 0 {
+			win.EnableMenuItem(menu, win.SC_MOVE, win.MF_ENABLED)
+		}
+		var point win.POINT
+		if win.GetCursorPos(&point) && win.ScreenToClient(win.HWND(hwnd), &point) {
+			coords := uintptr(uint32(uint16(point.X)) | uint32(uint16(point.Y))<<16)
+			win.DefWindowProc(win.HWND(hwnd), win.WM_SYSCOMMAND, win.SC_MOVE|win.HTCAPTION, coords)
+		}
+		if live := m.items[v.ID]; live == current && live.view.Frame == window.BorderedLocked {
+			if menu := win.GetSystemMenu(win.HWND(hwnd), false); menu != 0 {
+				win.EnableMenuItem(menu, win.SC_MOVE, win.MF_GRAYED)
+			}
+		}
+		// The native move loop consumes the button release instead of WM_LBUTTONUP.
+		m.events.Down = false
+		m.dragging = 0
+		m.updateSnapshot()
+		return 0
 	case win.WM_SYSCOMMAND:
 		if current != nil {
 			switch wparam & 0xfff0 {
+			case win.SC_MOVE:
+				if current.view.Frame == window.BorderedLocked && m.dragging != hwnd {
+					return 0
+				}
 			case win.SC_MINIMIZE:
 				if current.view.DisableMinimize {
 					return 0
@@ -254,6 +315,13 @@ func (m *windowManager) wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr
 	case win.WM_NCHITTEST:
 		if current != nil && current.view.Passthrough {
 			return ^uintptr(0) // HTTRANSPARENT
+		}
+		if current != nil && current.view.Frame == window.BorderedLocked && m.dragging != hwnd {
+			hit := win.DefWindowProc(win.HWND(hwnd), msg, wparam, lparam)
+			if hit == win.HTCAPTION {
+				return win.HTBORDER
+			}
+			return hit
 		}
 	case win.WM_KEYDOWN, win.WM_SYSKEYDOWN:
 		if key := keyName(wparam); key != "" && !m.held[key] {
@@ -290,7 +358,7 @@ func (m *windowManager) wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr
 
 func styles(v window.View) (uintptr, uintptr) {
 	style := uintptr(win.WS_POPUP)
-	if v.Border && !v.Fullscreen {
+	if v.HasBorder() && !v.Fullscreen {
 		style = win.WS_CAPTION | win.WS_SYSMENU
 		if !v.DisableMinimize {
 			style |= win.WS_MINIMIZEBOX
@@ -415,6 +483,11 @@ func (m *windowManager) center(views []window.View, id string, all bool) ([]wind
 				continue
 			}
 			w := m.items[v.ID]
+			if w.pendingBounds {
+				w.view.X, w.view.Y = v.X, v.Y
+				actual[i] = w.view
+				continue
+			}
 			if !win.SetWindowPos(win.HWND(w.handle), 0, int32(v.X), int32(v.Y), int32(outer[i].Dx()), int32(outer[i].Dy()), win.SWP_NOZORDER|win.SWP_NOACTIVATE) {
 				result = fmt.Errorf("cannot center window %q", v.ID)
 				return
@@ -437,6 +510,40 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 		// validation must also apply to actual monitor sizes, not requested sizes.
 		for i, v := range actual {
 			w := m.items[v.ID]
+			if w != nil && w.view.Frame != v.Frame && !w.view.Fullscreen && !v.Fullscreen && (v.KeepClientX || v.KeepClientY) {
+				hwnd := win.HWND(w.handle)
+				dpi := win.GetDpiForWindow(hwnd)
+				after, err := windowBounds(v, dpi)
+				if err != nil {
+					result = err
+					return
+				}
+				var inset win.POINT
+				// Pending bounds describe the next presentation, not the current HWND.
+				if !w.pendingBounds && !win.IsIconic(hwnd) && !win.IsZoomed(hwnd) {
+					var client win.POINT
+					var outer win.RECT
+					if !win.ClientToScreen(hwnd, &client) || !win.GetWindowRect(hwnd, &outer) {
+						result = fmt.Errorf("cannot read client position for %q", v.ID)
+						return
+					}
+					inset.X, inset.Y = client.X-outer.Left, client.Y-outer.Top
+				} else {
+					before, err := windowBounds(w.view, dpi)
+					if err != nil {
+						result = err
+						return
+					}
+					inset.X, inset.Y = -before.Left, -before.Top
+				}
+				if v.KeepClientX {
+					v.X += int(inset.X + after.Left)
+				}
+				if v.KeepClientY {
+					v.Y += int(inset.Y + after.Top)
+				}
+			}
+			v.KeepClientX, v.KeepClientY = false, false
 			if v.Fullscreen {
 				bounds, err := monitorBounds(v, w, false)
 				if err != nil {
@@ -465,23 +572,44 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 			result = err
 			return
 		}
+		changed := len(actual) != len(m.items)
+		for _, v := range actual {
+			w := m.items[v.ID]
+			if w == nil {
+				changed = true
+				continue
+			}
+			oldStyle, oldEx := styles(w.view)
+			style, ex := styles(v)
+			if w.view.Width != v.Width || w.view.Height != v.Height || w.view.Hidden != v.Hidden || oldStyle != style || oldEx != ex {
+				changed = true
+			}
+		}
+		if changed {
+			m.revision.Add(1)
+		}
 		active := make(map[string]bool, len(actual))
 		for i, v := range actual {
 			active[v.ID] = true
 			w := m.items[v.ID]
 			created := w == nil
-			title, err := windows.UTF16PtrFromString(v.Title)
-			if err != nil {
-				result = err
-				return
+			var title *uint16
+			var err error
+			if created || w.view.Title != v.Title {
+				title, err = windows.UTF16PtrFromString(v.Title)
+				if err != nil {
+					result = err
+					return
+				}
 			}
 			style, ex := styles(v)
-			bounds, err := windowBounds(v, 96)
-			if err != nil {
-				result = err
-				return
-			}
+			var bounds win.RECT
 			if created {
+				bounds, err = windowBounds(v, 96)
+				if err != nil {
+					result = err
+					return
+				}
 				hwnd, _, err := user32.NewProc("CreateWindowExW").Call(ex, uintptr(unsafe.Pointer(m.class)), uintptr(unsafe.Pointer(title)), style,
 					uintptr(v.X), uintptr(v.Y), uintptr(bounds.Right-bounds.Left), uintptr(bounds.Bottom-bounds.Top), 0, 0, m.instance, 0)
 				if hwnd == 0 {
@@ -498,6 +626,12 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 			}
 			oldStyle, oldEx := styles(old)
 			styleChanged := oldStyle != style || oldEx != ex
+			if !created && w.ready && !v.Hidden && (old.Width != v.Width || old.Height != v.Height || styleChanged) {
+				w.pendingBounds = true
+			}
+			if old.Hidden && !v.Hidden {
+				w.ready = false
+			}
 			// Store policy before SetWindowPos dispatches synchronous messages.
 			w.view = v
 			if styleChanged {
@@ -510,7 +644,7 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 			if old.Title != v.Title {
 				user32.NewProc("SetWindowTextW").Call(w.handle, uintptr(unsafe.Pointer(title)))
 			}
-			if created || old.DisableClose != v.DisableClose || styleChanged {
+			if created || old.DisableClose != v.DisableClose || old.Frame != v.Frame || styleChanged {
 				menu := win.GetSystemMenu(win.HWND(w.handle), false)
 				if menu != 0 {
 					flags := uint32(win.MF_ENABLED)
@@ -518,6 +652,11 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 						flags = win.MF_GRAYED
 					}
 					win.EnableMenuItem(menu, win.SC_CLOSE, flags)
+					flags = win.MF_ENABLED
+					if v.Frame == window.BorderedLocked {
+						flags = win.MF_GRAYED
+					}
+					win.EnableMenuItem(menu, win.SC_MOVE, flags)
 					win.DrawMenuBar(win.HWND(w.handle))
 				}
 			}
@@ -559,10 +698,12 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 					v.Y = int(work.Top + max(0, (work.Bottom-work.Top-(bounds.Bottom-bounds.Top))/2))
 					w.view, w.restore = v, v
 				}
-				ok, _, err := user32.NewProc("SetWindowPos").Call(w.handle, z, uintptr(v.X), uintptr(v.Y), uintptr(bounds.Right-bounds.Left), uintptr(bounds.Bottom-bounds.Top), flags)
-				if ok == 0 {
-					result = fmt.Errorf("SetWindowPos: %w", err)
-					return
+				if !w.pendingBounds {
+					ok, _, err := user32.NewProc("SetWindowPos").Call(w.handle, z, uintptr(v.X), uintptr(v.Y), uintptr(bounds.Right-bounds.Left), uintptr(bounds.Bottom-bounds.Top), flags)
+					if ok == 0 {
+						result = fmt.Errorf("SetWindowPos: %w", err)
+						return
+					}
 				}
 			}
 			// Do not restore a minimized window unless visibility explicitly changes.
@@ -570,9 +711,9 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 			if v.Hidden {
 				show = win.SW_HIDE
 			}
-			shouldShow := !v.Hidden
+			shouldShow := !v.Hidden && w.ready
 			visible := win.IsWindowVisible(win.HWND(w.handle))
-			if created || old.Hidden != v.Hidden || visible != shouldShow {
+			if v.Hidden || (w.ready && (old.Hidden != v.Hidden || visible != shouldShow)) {
 				win.ShowWindow(win.HWND(w.handle), show)
 			}
 			m.updateGeometry(w)
@@ -581,8 +722,8 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 		}
 		for id, w := range m.items {
 			if !active[id] {
-				win.ShowWindow(win.HWND(w.handle), win.SW_HIDE)
-				m.retired[w.handle] = true
+				// Keep the previous coverage until the replacement frame is composed.
+				m.retired[w.handle] = m.revision.Load()
 				delete(m.items, id)
 			}
 		}
@@ -590,10 +731,88 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 	return handles, actual, result
 }
 
+// Keep old coverage until the replacement windows have reached the desktop.
+func (m *windowManager) presented(revision uint64, flush func() error) (bool, error) {
+	applied := false
+	var result error
+	m.do(func() {
+		if revision != m.revision.Load() {
+			return
+		}
+		changed := false
+		for _, w := range m.items {
+			if !w.ready && !w.view.Hidden {
+				win.ShowWindow(win.HWND(w.handle), win.SW_SHOWNOACTIVATE)
+				changed = true
+			}
+			w.ready = true
+		}
+		applyBounds := func(w *nativeWindow) error {
+			v := w.view
+			bounds, err := windowBounds(v, win.GetDpiForWindow(win.HWND(w.handle)))
+			if err != nil {
+				return err
+			}
+			z := win.HWND_NOTOPMOST
+			if v.Topmost {
+				z = win.HWND_TOPMOST
+			}
+			if !win.SetWindowPos(win.HWND(w.handle), z, int32(v.X), int32(v.Y), bounds.Right-bounds.Left, bounds.Bottom-bounds.Top, win.SWP_NOACTIVATE|win.SWP_FRAMECHANGED) {
+				return fmt.Errorf("cannot apply prepared window bounds for %q", v.ID)
+			}
+			w.pendingBounds = false
+			m.updateGeometry(w)
+			return nil
+		}
+		// Expand first; shrinking would uncover the desktop before the new HWND
+		// is composed. Commit completion alone does not guarantee presentation.
+		for _, w := range m.items {
+			if !w.pendingBounds {
+				continue
+			}
+			changed = true
+			var size win.RECT
+			if !win.GetClientRect(win.HWND(w.handle), &size) {
+				result = fmt.Errorf("cannot read window bounds for %q", w.view.ID)
+				return
+			}
+			if w.view.Width >= int(size.Right) && w.view.Height >= int(size.Bottom) {
+				if result = applyBounds(w); result != nil {
+					return
+				}
+			}
+		}
+		for hwnd, removedAt := range m.retired {
+			if removedAt <= revision && win.IsWindowVisible(win.HWND(hwnd)) {
+				changed = true
+			}
+		}
+		if changed {
+			if result = flush(); result != nil {
+				return
+			}
+		}
+		for _, w := range m.items {
+			if w.pendingBounds {
+				if result = applyBounds(w); result != nil {
+					return
+				}
+			}
+		}
+		for hwnd, removedAt := range m.retired {
+			if removedAt <= revision {
+				win.ShowWindow(win.HWND(hwnd), win.SW_HIDE)
+			}
+		}
+		applied = true
+	})
+	return applied, result
+}
+
 // updateGeometry is called only on the window thread. Snapshots hand immutable
 // copies to the backend, which republishes resized tiles with the next frame.
 func (m *windowManager) updateGeometry(w *nativeWindow) {
-	if win.IsIconic(win.HWND(w.handle)) {
+	if w.pendingBounds || win.IsIconic(win.HWND(w.handle)) {
 		return
 	}
 	var bounds win.RECT
@@ -605,7 +824,7 @@ func (m *windowManager) updateGeometry(w *nativeWindow) {
 	}
 }
 
-func (m *windowManager) collect(active map[uintptr]*output) {
+func (m *windowManager) collect(active map[uintptr]*output, revision uint64) {
 	// Called only after GPU resources have been released. Copy keys before
 	// posting to the window thread; it must never inspect the GPU-owned map.
 	keep := make(map[uintptr]bool, len(active))
@@ -614,8 +833,8 @@ func (m *windowManager) collect(active map[uintptr]*output) {
 	}
 	select {
 	case m.tasks <- func() {
-		for hwnd := range m.retired {
-			if !keep[hwnd] {
+		for hwnd, removedAt := range m.retired {
+			if removedAt <= revision && !keep[hwnd] {
 				win.DestroyWindow(win.HWND(hwnd))
 				delete(m.retired, hwnd)
 			}
@@ -639,7 +858,7 @@ func (m *windowManager) updateSnapshot() {
 		m.updateGeometry(w)
 		v := w.view
 		v.State = window.State{Minimized: win.IsIconic(win.HWND(w.handle)), Maximized: win.IsZoomed(win.HWND(w.handle)), Focused: foreground == w.handle}
-		in.Visible = in.Visible || (win.IsWindowVisible(win.HWND(w.handle)) && !v.State.Minimized)
+		in.Visible = in.Visible || (!v.Hidden && (!w.ready || w.pendingBounds || (win.IsWindowVisible(win.HWND(w.handle)) && !v.State.Minimized)))
 		views = append(views, v)
 		if foreground == w.handle {
 			in.Focused = true

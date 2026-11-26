@@ -591,10 +591,27 @@ Times and positions are in seconds. Treat asset and voice handles as opaque valu
 | `window.create(json)` | Create an additional window; requires native multiwindow on Windows. |
 | `window.monitor(id)` | Return JSON monitor bounds (`x`, `y`, `width`, `height`) and usable work area (`workX`, `workY`, `workWidth`, `workHeight`) in physical desktop pixels. Uses the monitor nearest the named native window. Requires Windows multiwindow mode. |
 | `window.center(id, all)` | Center one native window (`all=false`) or the visible window group (`all=true`) in that monitor's work area. Includes borders, preserves client sizes and group spacing. Requires Windows multiwindow mode. |
+| `window.startDrag(id)` | Start native mouse dragging, including borderless windows. Requires Windows multiwindow mode. Returns without waiting for the drag to finish. |
 | `window.move(id, x, y)` | Move the outer window in desktop pixels. |
 | `window.viewport(id, x, y, width?, height?)` | Move a native window’s displayed stage region (top-left origin, Y downward). Supply both dimensions to resize it, or neither to preserve its size. Requires native multiwindow. |
-| `window.set(id, json)` | Change only the supplied properties, including border, buttons, fullscreen and opacity. |
+| `window.set(id, json)` | Change only the supplied properties, including frame, buttons, fullscreen and opacity. |
 | `window.remove(id)` | Explicitly remove a window, even when `disableClose` is enabled. |
+
+Call `window.startDrag(id)` on a left mouse press in a project-defined drag area. Windows handles movement from the current cursor position until the button is released; other scripts and rendering continue. The call does nothing when the left button is up, another drag is active, or the window is hidden, not yet presented, minimized, maximized, fullscreen, or mouse-passthrough. An unknown ID returns an error. In the browser, the example block validates the ID but does not move the browser or simulated windows.
+
+Window frames use a single `frame` property:
+
+| Value | Native title-bar/system-menu movement | `window.startDrag(id)` |
+| --- | --- | --- |
+| `bordered` | Allowed | Allowed |
+| `bordered-locked` | Blocked | Allowed: the project chooses the drag area |
+| `borderless` | No title bar | Allowed |
+
+For example, `window.set("main", "{\"frame\":\"bordered-locked\"}")` keeps the title bar but prevents ordinary title-bar dragging and the system menu's Move command. Call `window.startDrag("main")` when the user presses a project-defined drag handle to make only that area draggable. The move lock is restored when this drag finishes. `window.move` and `window.center` work in all three modes. Resizing and maximize buttons are independent settings.
+
+In Windows multiwindow mode, changing `frame` keeps the game content at the same desktop position on each axis whose `x` or `y` is omitted. Explicit `x`/`y` values remain outer-window coordinates and take precedence, even when equal to the previous coordinates. A subsequent `window.move` overrides the pending position adjustment. Fullscreen transitions keep their existing placement behavior.
+
+`bordered-locked` and `startDrag` require Windows multiwindow mode; this includes its `main` window. Ordinary single-window mode supports `bordered` and `borderless`. The example's create block defaults to `bordered`; raw `window.create` descriptions without `frame` default to `borderless`. The browser preview stores the frame choice but cannot change the browser window's decorations or start native dragging.
 
 The centering block uses `window.center("main", true)` to center a split-stage layout together; it does not stack each window in the same spot. Group centering skips hidden, minimized, maximized and fullscreen windows. Centering a minimized, maximized or fullscreen window individually returns an error: restore it first. If a group does not fit, its top-left is aligned with the work area rather than shrinking the game. Coordinates can be negative on secondary monitors. Do not mix these physical pixels with `host.window` screen dimensions, which use device-independent pixels.
 
@@ -602,8 +619,7 @@ The browser version simulates window positions. Its monitor block describes the 
 
 The `gowarpWindows` example exposes `window.state` through its “window [ID] is [STATE]?” boolean block. In the browser, `open` reflects the simulated window list, `focused` reflects browser focus for the visible `main` view, and `minimized`/`maximized` return `false` because no native windows are created. Closing the last native window exits the player, so scripts cannot run afterward.
 
-The [Window API](WINDOWS.md) describes property support, coordinates and the
-[GoWarp Windows blocks](examples/gowarpWindows.js). `main` is available without
+The [GoWarp Windows blocks](examples/gowarpWindows.js) expose these operations. `main` is available without
 enabling multiwindow. Unsupported properties return an error.
 
 Poll file-picker channels without blocking, using `Local` and `Again`/`YieldTick`. Cancellation or a read failure produces an empty string. Project fullscreen requests are tracked separately from the player's F11 mode.

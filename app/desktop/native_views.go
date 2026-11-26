@@ -1,7 +1,6 @@
 package desktop
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"io"
 	"math"
 	"slices"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
@@ -50,7 +50,10 @@ func nativeWindowViews(s *config.Settings, scale float64) ([]window.View, image.
 			continue
 		}
 		v := &views[i]
-		v.Border, v.Resizable = s.Platform.Border, s.Platform.Resizable
+		v.Frame, v.Resizable = window.Borderless, s.Platform.Resizable
+		if s.Platform.Border {
+			v.Frame = window.Bordered
+		}
 		v.Opacity = nil
 		v.Topmost = s.Platform.Topmost
 		v.DisableMinimize, v.DisableMaximize = s.Platform.DisableMinimize, s.Platform.DisableMaximize
@@ -176,8 +179,12 @@ func (g *game) syncNativeViews() error {
 
 func (g *game) nativeWindowCall(op string, args []any) (any, error) {
 	n := g.native
-	if op == "monitor" || op == "center" {
-		if (op == "monitor" && len(args) != 1) || (op == "center" && len(args) != 2) {
+	if op == "monitor" || op == "center" || op == "startDrag" {
+		want := 1
+		if op == "center" {
+			want = 2
+		}
+		if len(args) != want {
 			return nil, fmt.Errorf("invalid %s arguments", op)
 		}
 		id := extension.String(args[0])
@@ -186,6 +193,9 @@ func (g *game) nativeWindowCall(op string, args []any) (any, error) {
 		}
 		if err := g.syncNativeViews(); err != nil {
 			return nil, err
+		}
+		if op == "startDrag" {
+			return nil, n.backend.StartDrag(id)
 		}
 		if op == "monitor" {
 			monitor, err := n.backend.Monitor(id)
@@ -281,6 +291,7 @@ func editWindows(current []window.View, op string, args []any) ([]window.View, a
 				return current, nil, fmt.Errorf("invalid desktop coordinates")
 			}
 			v.X, v.Y = int(math.Round(x)), int(math.Round(y))
+			v.KeepClientX, v.KeepClientY = false, false
 		case "viewport":
 			if len(args) != 3 && len(args) != 5 {
 				return current, nil, fmt.Errorf("viewport requires ID, x, y and optionally width, height")
@@ -293,13 +304,28 @@ func editWindows(current []window.View, op string, args []any) ([]window.View, a
 			if len(args) != 2 {
 				return current, nil, fmt.Errorf("set requires ID and a JSON object")
 			}
-			// JSON decoding must not mutate the live opacity before validation.
+			// Decode pointer fields into copies so rejected edits cannot change live state.
 			if v.Opacity != nil {
 				alpha := *v.Opacity
 				v.Opacity = &alpha
 			}
-			if err := decodeView(extension.String(args[1]), v); err != nil {
+			frame := v.Frame
+			patch := extension.String(args[1])
+			if err := decodeView(patch, v); err != nil {
 				return current, nil, err
+			}
+			var position struct{ X, Y *int }
+			if err := json.Unmarshal([]byte(patch), &position); err != nil {
+				return current, nil, err
+			}
+			if frame != v.Frame {
+				v.KeepClientX, v.KeepClientY = true, true
+			}
+			if position.X != nil {
+				v.KeepClientX = false
+			}
+			if position.Y != nil {
+				v.KeepClientY = false
 			}
 			if v.ID != id {
 				return current, nil, fmt.Errorf("set cannot change a window ID")
@@ -310,17 +336,18 @@ func editWindows(current []window.View, op string, args []any) ([]window.View, a
 			return current, nil, fmt.Errorf("unknown native window operation %q", op)
 		}
 	}
-	if _, err := window.Pack(views); err != nil {
+	layout, err := window.Pack(views)
+	if err != nil {
 		return current, nil, err
 	}
-	return views, nil, nil
+	return layout.Views, nil, nil
 }
 
 func decodeView(text string, v *window.View) error {
-	if !bytes.HasPrefix(bytes.TrimSpace([]byte(text)), []byte("{")) {
+	if !strings.HasPrefix(strings.TrimSpace(text), "{") {
 		return fmt.Errorf("window description must be a JSON object")
 	}
-	d := json.NewDecoder(bytes.NewBufferString(text))
+	d := json.NewDecoder(strings.NewReader(text))
 	d.DisallowUnknownFields()
 	if err := d.Decode(v); err != nil {
 		return err

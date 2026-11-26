@@ -136,10 +136,10 @@ func TestScratchExampleStopsOnQ(t *testing.T) {
 	if err := json.Unmarshal([]byte(calls[1].args[0].(string)), &created); err != nil {
 		t.Fatal(err)
 	}
-	if main["width"] != float64(480) || main["stageWidth"] != float64(480) || main["border"] != true {
+	if main["width"] != float64(480) || main["stageWidth"] != float64(480) || main["frame"] != "bordered" {
 		t.Fatalf("main setup=%v", main)
 	}
-	if created["id"] != "second" || created["border"] != true || created["resizable"] != true || created["opacity"] != float64(1) {
+	if created["id"] != "second" || created["frame"] != "bordered" || created["resizable"] != true || created["opacity"] != float64(1) {
 		t.Fatalf("create dropdown/defaults=%v", created)
 	}
 	if len(calls) != 8 || calls[3].op != "viewport" {
@@ -168,7 +168,16 @@ func TestScratchExampleStopsOnQ(t *testing.T) {
 	if commands := r.DrainHostCommands(); len(commands) != 0 {
 		t.Fatalf("demo quit prematurely: %v", commands)
 	}
-	if err := r.QueueEvents([]vm.InputEvent{{Frame: 1000, Kind: "key", Key: "q", Down: true}}); err != nil {
+	if err := r.QueueEvents([]vm.InputEvent{{Frame: 1000, Kind: "key", Key: "space", Down: true}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Run(context.Background(), 10, 30, false); err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 8 {
+		t.Fatal("Space should no longer merge or move the example windows", calls)
+	}
+	if err := r.QueueEvents([]vm.InputEvent{{Frame: 1010, Kind: "key", Key: "q", Down: true}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.Run(context.Background(), 1, 30, false); err != nil {

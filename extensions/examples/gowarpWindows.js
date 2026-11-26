@@ -41,7 +41,7 @@ func New() e.Extension {
 				"x": c.Number("X"), "y": c.Number("Y"),
 				"width": width, "height": height,
 				"stageWidth": width, "stageHeight": height,
-				"border": e.Bool(c.Field("BORDER")), "resizable": true, "opacity": 1,
+				"frame": c.Field("FRAME"), "resizable": true, "opacity": 1,
 			})
 			if err != nil {
 				return e.Result{}, err
@@ -72,6 +72,10 @@ func New() e.Extension {
 			_, err := c.Call("window.center", c.String("ID"), scope == "all")
 			return e.Result{}, err
 		}},
+		{Opcode: "gowarpWindows_startDrag", Kind: "command", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			_, err := c.Call("window.startDrag", c.String("ID"))
+			return e.Result{}, err
+		}},
 		{Opcode: "gowarpWindows_move", Kind: "command", Inputs: []string{"ID", "X", "Y"}, Handler: func(c *e.Context) (e.Result, error) {
 			_, err := c.Call("window.move", c.String("ID"), c.Number("X"), c.Number("Y"))
 			return e.Result{}, err
@@ -79,6 +83,9 @@ func New() e.Extension {
 		{Opcode: "gowarpWindows_set", Kind: "command", Inputs: []string{"ID", "JSON"}, Handler: func(c *e.Context) (e.Result, error) {
 			_, err := c.Call("window.set", c.String("ID"), c.String("JSON"))
 			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_frame", Kind: "command", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			return setProperty(c, "frame", c.Field("FRAME"))
 		}},
 		{Opcode: "gowarpWindows_setBoolean", Kind: "command", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
 			return setProperty(c, c.Field("PROPERTY"), e.Bool(c.Field("VALUE")))
@@ -178,7 +185,7 @@ func setProperty(c *e.Context, property string, value any) (e.Result, error) {
             return {
                 id, title: id, x: 0, y: 0, width, height,
                 stageX: 0, stageY: 0, stageWidth: width, stageHeight: height,
-                border: true, resizable: true, disableMinimize: false, disableMaximize: false,
+                frame: "bordered", resizable: true, disableMinimize: false, disableMaximize: false,
                 disableClose: false, fullscreen: false, topmost: false, passthrough: false, hidden: false, opacity: 1
             };
         }
@@ -188,6 +195,9 @@ func setProperty(c *e.Context, property string, value any) (e.Result, error) {
             return view;
         }
         validate(view) {
+            if (!["bordered", "bordered-locked", "borderless"].includes(view.frame)) {
+                throw new Error(tr(`Invalid window frame: ${view.frame}`, `올바르지 않은 창 프레임: ${view.frame}`));
+            }
             for (const key of ["x", "y", "width", "height", "stageX", "stageY", "stageWidth", "stageHeight", "opacity"]) {
                 if (typeof view[key] !== "number" || !Number.isFinite(view[key])) throw new Error(tr(`Invalid window ${key}`, `올바르지 않은 창 속성: ${key}`));
             }
@@ -265,8 +275,8 @@ func setProperty(c *e.Context, property string, value any) (e.Result, error) {
                     },
                     {
                         opcode: "create", blockType: Scratch.BlockType.COMMAND,
-                        text: tr("create window [ID] x [X] y [Y] width [W] height [H] border [BORDER]", "창 [ID] 만들기 x [X] y [Y] 너비 [W] 높이 [H] 테두리 [BORDER]"),
-                        arguments: {ID: str("view"), X: num(100), Y: num(100), W: num(480), H: num(360), BORDER: {type: Scratch.ArgumentType.STRING, menu: "booleans", defaultValue: "true"}}
+                        text: tr("create window [ID] x [X] y [Y] width [W] height [H] frame [FRAME]", "창 [ID] 만들기 x [X] y [Y] 너비 [W] 높이 [H] 프레임 [FRAME]"),
+                        arguments: {ID: str("view"), X: num(100), Y: num(100), W: num(480), H: num(360), FRAME: {type: Scratch.ArgumentType.STRING, menu: "frames", defaultValue: "bordered"}}
                     },
                     {
                         opcode: "monitor", blockType: Scratch.BlockType.REPORTER,
@@ -279,17 +289,27 @@ func setProperty(c *e.Context, property string, value any) (e.Result, error) {
                         arguments: {ID: str("main"), SCOPE: {type: Scratch.ArgumentType.STRING, menu: "centerScopes", defaultValue: "window"}}
                     },
                     {
+                        opcode: "startDrag", blockType: Scratch.BlockType.COMMAND,
+                        text: tr("start dragging window [ID]", "창 [ID] 드래그 시작"),
+                        arguments: {ID: str("main")}
+                    },
+                    {
                         opcode: "move", blockType: Scratch.BlockType.COMMAND, text: tr("move window [ID] to x [X] y [Y]", "창 [ID]을(를) x [X] y [Y]로 옮기기"),
                         arguments: {ID: str("main"), X: num(100), Y: num(100)}
                     },
                     {
                         opcode: "set", blockType: Scratch.BlockType.COMMAND, text: tr("set window [ID] properties [JSON]", "창 [ID]의 속성을 [JSON]로 정하기"),
-                        arguments: {ID: str("main"), JSON: str('{"border":false,"opacity":0.8}')}
+                        arguments: {ID: str("main"), JSON: str('{"frame":"borderless","opacity":0.8}')}
+                    },
+                    {
+                        opcode: "frame", blockType: Scratch.BlockType.COMMAND,
+                        text: tr("set window [ID] frame to [FRAME]", "창 [ID]의 프레임을 [FRAME]으로 정하기"),
+                        arguments: {ID: str("main"), FRAME: {type: Scratch.ArgumentType.STRING, menu: "frames", defaultValue: "bordered"}}
                     },
                     {
                         opcode: "setBoolean", blockType: Scratch.BlockType.COMMAND,
                         text: tr("set window [ID] [PROPERTY] to [VALUE]", "창 [ID]의 [PROPERTY]을(를) [VALUE]로 정하기"),
-                        arguments: {ID: str("main"), PROPERTY: {type: Scratch.ArgumentType.STRING, menu: "properties", defaultValue: "border"},
+                        arguments: {ID: str("main"), PROPERTY: {type: Scratch.ArgumentType.STRING, menu: "properties", defaultValue: "resizable"},
                         VALUE: {type: Scratch.ArgumentType.STRING, menu: "booleans", defaultValue: "true"}}
                     },
                     {
@@ -349,8 +369,12 @@ func setProperty(c *e.Context, property string, value any) (e.Result, error) {
                         {text: tr("true", "켜기"), value: "true"},
                         {text: tr("false", "끄기"), value: "false"}
                     ]},
+                    frames: {acceptReporters: false, items: [
+                        {text: tr("bordered", "테두리 있음"), value: "bordered"},
+                        {text: tr("bordered · title-bar movement locked", "테두리 있음 · 제목 표시줄 이동 잠금"), value: "bordered-locked"},
+                        {text: tr("borderless", "테두리 없음"), value: "borderless"}
+                    ]},
                     properties: {acceptReporters: false, items: [
-                        {text: tr("border", "테두리 표시"), value: "border"},
                         {text: tr("resizable", "크기 변경 허용"), value: "resizable"},
                         {text: tr("disableMinimize", "최소화 버튼 비활성화"), value: "disableMinimize"},
                         {text: tr("disableMaximize", "최대화 버튼 비활성화"), value: "disableMaximize"},
@@ -371,11 +395,11 @@ func setProperty(c *e.Context, property string, value any) (e.Result, error) {
             this.guides.set(view.id, {show: Scratch.Cast.toBoolean(SHOW), color: `rgb(${color.r}, ${color.g}, ${color.b})`});
             this.draw();
         }
-        create({ID, X, Y, W, H, BORDER}) {
+        create({ID, X, Y, W, H, FRAME}) {
             const id = String(ID);
             if (this.views.has(id)) throw new Error(tr(`Duplicate window: ${id}`, `이미 있는 창: ${id}`));
             if (this.views.size >= 16) throw new Error(tr("At most 16 windows are supported", "창은 최대 16개까지 지원합니다."));
-            const view = {...this.defaultView(id, number(W), number(H)), x: Math.round(number(X)), y: Math.round(number(Y)), border: Scratch.Cast.toBoolean(BORDER)};
+            const view = {...this.defaultView(id, number(W), number(H)), x: Math.round(number(X)), y: Math.round(number(Y)), frame: String(FRAME)};
             this.validate(view);
             this.views.set(id, view);
             this.draw();
@@ -414,8 +438,11 @@ func setProperty(c *e.Context, property string, value any) (e.Result, error) {
             for (const v of moved) this.views.set(v.id, v);
             this.draw();
         }
+        // Native dragging has no browser equivalent; keep the preview window unchanged.
+        startDrag({ID}) { this.view(ID); }
         move({ID, X, Y}) { this.patch(ID, {x: Math.round(number(X)), y: Math.round(number(Y))}); }
         set({ID, JSON: properties}) { this.patch(ID, JSON.parse(String(properties))); }
+        frame({ID, FRAME}) { this.patch(ID, {frame: String(FRAME)}); }
         setBoolean({ID, PROPERTY, VALUE}) { this.patch(ID, {[PROPERTY]: Scratch.Cast.toBoolean(VALUE)}); }
         topmost({ID, VALUE}) { this.patch(ID, {topmost: Scratch.Cast.toBoolean(VALUE)}); }
         opacity({ID, PERCENT}) { this.patch(ID, {opacity: number(PERCENT) / 100}); }

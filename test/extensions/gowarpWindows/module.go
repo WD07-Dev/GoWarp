@@ -33,7 +33,7 @@ func New() e.Extension {
 				"x": c.Number("X"), "y": c.Number("Y"),
 				"width": width, "height": height,
 				"stageWidth": width, "stageHeight": height,
-				"border": e.Bool(c.Field("BORDER")), "resizable": true, "opacity": 1,
+				"frame": c.Field("FRAME"), "resizable": true, "opacity": 1,
 			})
 			if err != nil {
 				return e.Result{}, err
@@ -64,6 +64,10 @@ func New() e.Extension {
 			_, err := c.Call("window.center", c.String("ID"), scope == "all")
 			return e.Result{}, err
 		}},
+		{Opcode: "gowarpWindows_startDrag", Kind: "command", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			_, err := c.Call("window.startDrag", c.String("ID"))
+			return e.Result{}, err
+		}},
 		{Opcode: "gowarpWindows_move", Kind: "command", Inputs: []string{"ID", "X", "Y"}, Handler: func(c *e.Context) (e.Result, error) {
 			_, err := c.Call("window.move", c.String("ID"), c.Number("X"), c.Number("Y"))
 			return e.Result{}, err
@@ -71,6 +75,9 @@ func New() e.Extension {
 		{Opcode: "gowarpWindows_set", Kind: "command", Inputs: []string{"ID", "JSON"}, Handler: func(c *e.Context) (e.Result, error) {
 			_, err := c.Call("window.set", c.String("ID"), c.String("JSON"))
 			return e.Result{}, err
+		}},
+		{Opcode: "gowarpWindows_frame", Kind: "command", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
+			return setProperty(c, "frame", c.Field("FRAME"))
 		}},
 		{Opcode: "gowarpWindows_setBoolean", Kind: "command", Inputs: []string{"ID"}, Handler: func(c *e.Context) (e.Result, error) {
 			return setProperty(c, c.Field("PROPERTY"), e.Bool(c.Field("VALUE")))

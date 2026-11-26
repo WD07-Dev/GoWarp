@@ -3,6 +3,7 @@
 package multiwindow
 
 import (
+	"errors"
 	"image"
 	"testing"
 	"unsafe"
@@ -17,10 +18,10 @@ func TestWindowControlStyles(t *testing.T) {
 		view window.View
 		want uintptr
 	}{
-		{"fixed bordered defaults", window.View{Border: true}, 0x00ca0000},
-		{"resizable", window.View{Border: true, Resizable: true}, 0x00cf0000},
-		{"disabled buttons", window.View{Border: true, Resizable: true, DisableMinimize: true, DisableMaximize: true}, 0x00cc0000},
-		{"fullscreen ignores border and resize", window.View{Border: true, Resizable: true, Fullscreen: true}, 0x80000000},
+		{"fixed bordered defaults", window.View{Frame: window.Bordered}, 0x00ca0000},
+		{"resizable", window.View{Frame: window.Bordered, Resizable: true}, 0x00cf0000},
+		{"disabled buttons", window.View{Frame: window.Bordered, Resizable: true, DisableMinimize: true, DisableMaximize: true}, 0x00cc0000},
+		{"fullscreen ignores border and resize", window.View{Frame: window.Bordered, Resizable: true, Fullscreen: true}, 0x80000000},
 		{"borderless", window.View{}, 0x80000000},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -87,7 +88,11 @@ func TestMainWindowStartsCenteredOnlyOnce(t *testing.T) {
 			}
 			t.Cleanup(m.close)
 			m.centerMain = true
-			main := window.View{ID: "main", X: 100, Y: 100, Width: 320, Height: 240, StageWidth: 480, StageHeight: 360, Border: border, Hidden: true}
+			frame := window.Borderless
+			if border {
+				frame = window.Bordered
+			}
+			main := window.View{ID: "main", X: 100, Y: 100, Width: 320, Height: 240, StageWidth: 480, StageHeight: 360, Frame: frame, Hidden: true}
 			other := main
 			other.ID, other.X, other.Y = "other", 40, 60
 			_, actual, err := m.setViews([]window.View{main, other})
@@ -155,8 +160,8 @@ func TestNativeGroupCenterUsesBordersAndWorkArea(t *testing.T) {
 	}
 	defer m.close()
 	views := []window.View{
-		{ID: "main", X: 60, Y: 60, Width: 100, Height: 100, StageWidth: 100, StageHeight: 100, Border: true},
-		{ID: "other", X: 200, Y: 60, Width: 100, Height: 100, StageWidth: 100, StageHeight: 100, Border: true},
+		{ID: "main", X: 60, Y: 60, Width: 100, Height: 100, StageWidth: 100, StageHeight: 100, Frame: window.Bordered},
+		{ID: "other", X: 200, Y: 60, Width: 100, Height: 100, StageWidth: 100, StageHeight: 100, Frame: window.Bordered},
 	}
 	_, views, err = m.setViews(views)
 	if err != nil {
@@ -194,5 +199,279 @@ func TestNativeGroupCenterUsesBordersAndWorkArea(t *testing.T) {
 	})
 	if _, err := m.monitor("missing"); err == nil {
 		t.Fatal("unknown monitor window accepted")
+	}
+}
+
+func TestUserMovementLockKeepsScriptPositioning(t *testing.T) {
+	m, err := startWindows()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.close()
+	v := window.View{ID: "main", X: 100, Y: 100, Width: 320, Height: 240, StageWidth: 320, StageHeight: 240, Frame: window.BorderedLocked, Resizable: true}
+	_, views, err := m.setViews([]window.View{v})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.do(func() {
+		w := m.items["main"]
+		hwnd := win.HWND(w.handle)
+		menu := win.GetSystemMenu(hwnd, false)
+		flags, _, _ := user32.NewProc("GetMenuState").Call(uintptr(menu), win.SC_MOVE, win.MF_BYCOMMAND)
+		if flags&win.MF_GRAYED == 0 {
+			t.Error("Move menu remained enabled")
+		}
+		var rect win.RECT
+		win.GetWindowRect(hwnd, &rect)
+		found := false
+		for y := rect.Top; y < rect.Top+80; y++ {
+			point := uintptr(uint32(uint16(rect.Left+100)) | uint32(uint16(y))<<16)
+			if win.DefWindowProc(hwnd, win.WM_NCHITTEST, 0, point) == win.HTCAPTION {
+				found = true
+				if m.wndProc(w.handle, win.WM_NCHITTEST, 0, point) != win.HTBORDER {
+					t.Error("title bar still allows dragging")
+				}
+				m.dragging = w.handle
+				if m.wndProc(w.handle, win.WM_NCHITTEST, 0, point) != win.HTCAPTION {
+					t.Error("project-initiated drag did not allow native title-bar handling")
+				}
+				m.dragging = w.handle + 1
+				if m.wndProc(w.handle, win.WM_NCHITTEST, 0, point) != win.HTBORDER {
+					t.Error("another window's drag unlocked this title bar")
+				}
+				m.dragging = 0
+				if m.wndProc(w.handle, win.WM_NCHITTEST, 0, point) != win.HTBORDER {
+					t.Error("drag completion did not restore the lock")
+				}
+				break
+			}
+		}
+		if !found {
+			t.Error("could not locate title bar for hit test")
+		}
+		// The keyboard Move command must return without entering a modal move loop.
+		m.wndProc(w.handle, win.WM_SYSCOMMAND, win.SC_MOVE, 0)
+	})
+	views[0].X, views[0].Y = 180, 140
+	_, views, err = m.setViews(views)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if views[0].X != 180 || views[0].Y != 140 || views[0].Frame != window.BorderedLocked {
+		t.Fatal("script move failed or unlocked the window", views)
+	}
+	views, err = m.center(views, "main", false)
+	if err != nil || views[0].Frame != window.BorderedLocked {
+		t.Fatal("centering failed or unlocked the window", err)
+	}
+	views[0].Frame = window.Bordered
+	if _, _, err = m.setViews(views); err != nil {
+		t.Fatal(err)
+	}
+	m.do(func() {
+		hwnd := win.HWND(m.items["main"].handle)
+		flags, _, _ := user32.NewProc("GetMenuState").Call(uintptr(win.GetSystemMenu(hwnd, false)), win.SC_MOVE, win.MF_BYCOMMAND)
+		if flags&win.MF_GRAYED != 0 {
+			t.Error("Move menu was not restored")
+		}
+	})
+}
+
+func TestLayoutTransitionWaitsForPreparedFrame(t *testing.T) {
+	m, err := startWindows()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.close()
+	v := window.View{ID: "main", X: 80, Y: 80, Width: 320, Height: 240, StageWidth: 320, StageHeight: 240}
+	handles, _, err := m.setViews([]window.View{v})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if win.IsWindowVisible(win.HWND(handles[0])) {
+		t.Fatal("new window became visible before its first GPU frame")
+	}
+	if in, _, _ := m.poll(); !in.Visible {
+		t.Fatal("first-frame preparation would be skipped")
+	}
+	revision := m.revision.Load()
+	if ok, err := m.presented(revision, func() error { return nil }); err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	if !win.IsWindowVisible(win.HWND(handles[0])) {
+		t.Fatal("prepared window not revealed")
+	}
+	v.Width, v.StageWidth = 160, 160
+	second := v
+	second.ID, second.X = "second", 240
+	handles, _, err = m.setViews([]window.View{v, second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var size win.RECT
+	win.GetClientRect(win.HWND(handles[0]), &size)
+	if size.Right != 320 || win.IsWindowVisible(win.HWND(handles[1])) {
+		t.Fatal("old coverage disappeared before split frame was ready", size)
+	}
+	if ok, err := m.presented(revision, func() error { return nil }); err != nil || ok {
+		t.Fatal("stale frame revealed newer layout", ok, err)
+	}
+	flushes := 0
+	flushSplit := func() error {
+		flushes++
+		win.GetClientRect(win.HWND(handles[0]), &size)
+		if size.Right != 320 || !win.IsWindowVisible(win.HWND(handles[1])) {
+			t.Error("old coverage removed before replacement reached the desktop", size)
+		}
+		return nil
+	}
+	waitErr := errors.New("desktop presentation failed")
+	if ok, err := m.presented(m.revision.Load(), func() error {
+		flushSplit()
+		return waitErr
+	}); ok || !errors.Is(err, waitErr) {
+		t.Fatal("presentation failure discarded old coverage", ok, err)
+	}
+	win.GetClientRect(win.HWND(handles[0]), &size)
+	if size.Right != 320 {
+		t.Fatal("failed presentation shrank the old window", size)
+	}
+	if ok, err := m.presented(m.revision.Load(), flushSplit); err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	if flushes != 2 {
+		t.Fatal("split did not wait for desktop presentation", flushes)
+	}
+	win.GetClientRect(win.HWND(handles[0]), &size)
+	if size.Right != 160 || !win.IsWindowVisible(win.HWND(handles[1])) {
+		t.Fatal("prepared split was not applied", size)
+	}
+	v.Width, v.StageWidth = 320, 320
+	if _, _, err = m.setViews([]window.View{v}); err != nil {
+		t.Fatal(err)
+	}
+	if !win.IsWindowVisible(win.HWND(handles[1])) {
+		t.Fatal("second window vanished before merged frame was ready")
+	}
+	flushes = 0
+	if ok, err := m.presented(m.revision.Load(), func() error {
+		flushes++
+		win.GetClientRect(win.HWND(handles[0]), &size)
+		if size.Right != 320 || !win.IsWindowVisible(win.HWND(handles[1])) {
+			t.Error("retired window disappeared before expanded main reached the desktop", size)
+		}
+		return nil
+	}); err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	if flushes != 1 {
+		t.Fatal("merge did not wait for desktop presentation", flushes)
+	}
+	win.GetClientRect(win.HWND(handles[0]), &size)
+	if size.Right != 320 || win.IsWindowVisible(win.HWND(handles[1])) {
+		t.Fatal("merged window did not replace the second window", size)
+	}
+	v.X += 20
+	if _, _, err = m.setViews([]window.View{v}); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := m.presented(m.revision.Load(), func() error {
+		t.Error("position-only update waited for desktop presentation")
+		return nil
+	}); err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+}
+
+func TestDragRequestRespectsWindowState(t *testing.T) {
+	for _, v := range []window.View{
+		{Hidden: true}, {Fullscreen: true}, {Passthrough: true},
+	} {
+		m := &windowManager{items: map[string]*nativeWindow{"main": {handle: 1, ready: true, view: v}}}
+		if got := m.wndProc(1, win.WM_APP+2, 0, 0); got != 0 || m.dragging != 0 {
+			t.Fatalf("drag started for disabled window: %+v", v)
+		}
+	}
+	m := &windowManager{items: map[string]*nativeWindow{"main": {handle: 1}}}
+	if got := m.wndProc(1, win.WM_APP+2, 0, 0); got != 0 || m.dragging != 0 {
+		t.Fatal("unpresented window started dragging")
+	}
+	m.items["main"].ready = true
+	m.dragging = 1
+	if got := m.wndProc(1, win.WM_APP+2, 0, 0); got != 0 || m.dragging != 1 {
+		t.Fatal("nested drag changed active drag")
+	}
+}
+
+func TestFrameChangeKeepsClientOrigin(t *testing.T) {
+	for _, hidden := range []bool{true, false} {
+		name := "visible"
+		if hidden {
+			name = "hidden"
+		}
+		t.Run(name, func(t *testing.T) {
+			m, err := startWindows()
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(m.close)
+			v := window.View{ID: "main", X: 500, Y: 300, Width: 400, Height: 300,
+				StageWidth: 480, StageHeight: 360, Frame: window.Borderless, Hidden: hidden}
+			_, views, err := m.setViews([]window.View{v})
+			if err != nil {
+				t.Fatal(err)
+			}
+			present := func() {
+				t.Helper()
+				if ok, err := m.presented(m.revision.Load(), func() error { return nil }); err != nil || !ok {
+					t.Fatal("cannot apply prepared bounds", ok, err)
+				}
+			}
+			present()
+			origin := func() win.POINT {
+				t.Helper()
+				var point win.POINT
+				m.do(func() {
+					if !win.ClientToScreen(win.HWND(m.items["main"].handle), &point) {
+						t.Error("cannot read client origin")
+					}
+				})
+				return point
+			}
+			want := origin()
+			for _, frame := range []string{window.Bordered, window.BorderedLocked, window.Borderless, window.Bordered, window.Borderless} {
+				v = views[0]
+				v.Frame, v.KeepClientX, v.KeepClientY = frame, true, true
+				v.Width, v.Height = 800, 600
+				_, views, err = m.setViews([]window.View{v})
+				if err != nil {
+					t.Fatal(err)
+				}
+				present()
+				if got := origin(); got != want {
+					t.Fatalf("%s moved client origin: %+v, want %+v", frame, got, want)
+				}
+				if views[0].KeepClientX || views[0].KeepClientY {
+					t.Fatal("frame adjustment leaked into snapshot")
+				}
+				_, views, err = m.setViews(views)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := origin(); got != want {
+					t.Fatal("repeated sync shifted the client origin")
+				}
+			}
+			v = views[0]
+			v.Frame, v.X, v.Y = window.Bordered, 500, 300
+			_, views, err = m.setViews([]window.View{v})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if views[0].X != 500 || views[0].Y != 300 {
+				t.Fatal("explicit outer position was adjusted", views[0])
+			}
+
+		})
 	}
 }

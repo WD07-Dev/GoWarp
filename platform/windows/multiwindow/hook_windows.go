@@ -17,6 +17,8 @@ import (
 	"gowarp/core/window"
 )
 
+var dwmFlush = windows.NewLazySystemDLL("dwmapi.dll").NewProc("DwmFlush")
+
 type failure struct{ err error }
 
 type bridge struct {
@@ -35,9 +37,18 @@ type bridge struct {
 }
 
 type output struct {
-	hwnd                 uintptr
 	swap, target, visual *comObject
 	tile                 image.Rectangle
+	capacity, nextSize   image.Point
+	next, last           *comObject
+}
+
+func (o *output) release() {
+	release(o.last)
+	release(o.next)
+	release(o.visual)
+	release(o.target)
+	release(o.swap)
 }
 
 func (b *bridge) fail(err error) {
@@ -54,8 +65,9 @@ func (b *bridge) err() error {
 }
 
 type frame struct {
-	layout  window.Layout
-	handles []uintptr
+	revision uint64
+	layout   window.Layout
+	handles  []uintptr
 }
 
 func (b *bridge) install() error {
@@ -126,13 +138,12 @@ func (b *bridge) onPresent(swap *comObject, interval, flags uintptr) uintptr {
 		return hr
 	}
 	defer b.busy.Store(false)
-	if flags&1 != 0 { // DXGI_PRESENT_TEST is not a new presentation.
-	} else if b.err() == nil {
+	// DXGI_PRESENT_TEST does not submit a new frame.
+	if flags&1 == 0 && b.err() == nil {
 		b.fail(b.copyFrame(swap))
 		b.presents.Add(1)
 	}
-	// Preserve the source result, including occlusion and device loss. The probe
-	// must expose a hidden-source failure, not conceal it by returning S_OK.
+	// Preserve the source result, including occlusion and device loss.
 	hr, _, _ := syscall.SyscallN(b.present.original, uintptr(unsafe.Pointer(swap)), interval, flags)
 	return hr
 }
@@ -157,71 +168,37 @@ func (b *bridge) syncOutputs(source *comObject, f *frame) error {
 			return err
 		}
 	}
-	active := make(map[uintptr]bool, len(f.handles))
-	changed := false
 	for i, hwnd := range f.handles {
-		active[hwnd] = true
 		tile := f.layout.Tiles[i]
 		o := b.outputs[hwnd]
-		if o != nil && o.tile.Size() != tile.Size() {
-			if err := hresult("ResizeBuffers", call(o.swap, 13, 2, uintptr(tile.Dx()), uintptr(tile.Dy()), 87, 0)); err != nil {
-				return err
-			}
-		}
 		if o == nil {
-			o = &output{hwnd: hwnd}
+			o = &output{}
 			b.outputs[hwnd] = o
-			desc := swapDesc{Width: uint32(tile.Dx()), Height: uint32(tile.Dy()), Format: 87, SampleCount: 1, Usage: 0x20, BufferCount: 2, SwapEffect: 3, AlphaMode: 1}
-			if err := hresult("CreateSwapChainForComposition", call(factory, 24, uintptr(unsafe.Pointer(b.device)), uintptr(unsafe.Pointer(&desc)), 0, uintptr(unsafe.Pointer(&o.swap)))); err != nil {
-				return err
-			}
 			if err := hresult("CreateTargetForHwnd", call(b.composition, 6, hwnd, 1, uintptr(unsafe.Pointer(&o.target)))); err != nil {
 				return err
 			}
 			if err := hresult("CreateVisual", call(b.composition, 7, uintptr(unsafe.Pointer(&o.visual)))); err != nil {
 				return err
 			}
-			if err := hresult("SetContent", call(o.visual, 15, uintptr(unsafe.Pointer(o.swap)))); err != nil {
+		}
+		// Keep capacity when shrinking: the old pixels cover the old HWND until
+		// its geometry changes, and repeated split/join cycles reuse the buffer.
+		if o.swap == nil || tile.Dx() > o.capacity.X || tile.Dy() > o.capacity.Y {
+			o.nextSize = image.Pt(max(tile.Dx(), o.capacity.X), max(tile.Dy(), o.capacity.Y))
+			desc := swapDesc{Width: uint32(o.nextSize.X), Height: uint32(o.nextSize.Y), Format: 87, SampleCount: 1, Usage: 0x20, BufferCount: 2, SwapEffect: 3, AlphaMode: 1}
+			if err := hresult("CreateSwapChainForComposition", call(factory, 24, uintptr(unsafe.Pointer(b.device)), uintptr(unsafe.Pointer(&desc)), 0, uintptr(unsafe.Pointer(&o.next)))); err != nil {
 				return err
 			}
-			if err := hresult("SetRoot", call(o.target, 3, uintptr(unsafe.Pointer(o.visual)))); err != nil {
-				return err
-			}
-			changed = true
 		}
 		o.tile = tile
-	}
-	for hwnd, o := range b.outputs {
-		if active[hwnd] {
-			continue
-		}
-		call(o.target, 3, 0)
-		release(o.visual)
-		release(o.target)
-		release(o.swap)
-		delete(b.outputs, hwnd)
-		changed = true
-	}
-	if changed {
-		if err := hresult("Commit", call(b.composition, 3)); err != nil {
-			return err
-		}
-	}
-	b.applied = f
-	if b.manager != nil {
-		b.manager.collect(b.outputs)
 	}
 	return nil
 }
 
 func (b *bridge) copyFrame(source *comObject) error {
 	f := b.frame.Load()
-	if f == nil {
+	if f == nil || (b.manager != nil && f.revision != b.manager.revision.Load()) {
 		return nil
-	}
-	// Layout and pixels are published together by DrawFinalScreen.
-	if err := b.syncOutputs(source, f); err != nil {
-		return err
 	}
 	texture, err := buffer(source)
 	if err != nil {
@@ -233,25 +210,105 @@ func (b *bridge) copyFrame(source *comObject) error {
 	if desc.Format != 87 || desc.SampleCount != 1 || int(desc.Width) < f.layout.Size.X || int(desc.Height) < f.layout.Size.Y {
 		return fmt.Errorf("unexpected source texture: %+v", desc)
 	}
-	for _, hwnd := range f.handles {
+	transition := b.applied != f
+	if err := b.syncOutputs(source, f); err != nil {
+		return err
+	}
+	var replaced []*comObject
+	defer func() {
+		for _, swap := range replaced {
+			release(swap)
+		}
+	}()
+	for i, hwnd := range f.handles {
 		o := b.outputs[hwnd]
-		if !win.IsWindowVisible(win.HWND(hwnd)) {
+		if o.next == nil && o.last != nil && (f.layout.Views[i].Hidden || win.IsIconic(win.HWND(hwnd))) {
 			continue
 		}
-		if win.IsIconic(win.HWND(hwnd)) {
-			continue
+		swap := o.swap
+		if o.next != nil {
+			swap = o.next
 		}
-		destination, err := buffer(o.swap)
+		destination, err := buffer(swap)
 		if err != nil {
 			return err
+		}
+		// Preserve coverage outside a shrinking viewport until HWND bounds catch
+		// up. All copies stay on the existing D3D11 device.
+		if transition && o.last != nil && o.last != destination {
+			previous := box{Right: uint32(o.capacity.X), Bottom: uint32(o.capacity.Y), Back: 1}
+			call(b.context, 46, uintptr(unsafe.Pointer(destination)), 0, 0, 0, 0, uintptr(unsafe.Pointer(o.last)), 0, uintptr(unsafe.Pointer(&previous)))
+			runtime.KeepAlive(previous)
 		}
 		region := box{Left: uint32(o.tile.Min.X), Top: uint32(o.tile.Min.Y), Right: uint32(o.tile.Max.X), Bottom: uint32(o.tile.Max.Y), Back: 1}
 		call(b.context, 46, uintptr(unsafe.Pointer(destination)), 0, 0, 0, 0, uintptr(unsafe.Pointer(texture)), 0, uintptr(unsafe.Pointer(&region)))
 		runtime.KeepAlive(region)
-		release(destination)
-		if err := hresult("output Present", call(o.swap, 8, 0, 0)); err != nil {
+		if err := hresult("output Present", call(swap, 8, 0, 0)); err != nil {
+			release(destination)
 			return err
 		}
+		release(o.last)
+		o.last = destination
+		if o.next != nil {
+			if err := hresult("SetContent", call(o.visual, 15, uintptr(unsafe.Pointer(o.next)))); err != nil {
+				return err
+			}
+			if err := hresult("SetRoot", call(o.target, 3, uintptr(unsafe.Pointer(o.visual)))); err != nil {
+				return err
+			}
+			replaced = append(replaced, o.swap)
+			o.swap, o.next, o.capacity = o.next, nil, o.nextSize
+		}
+	}
+	if !transition {
+		return nil
+	}
+	// Only structural changes wait for composition; normal frames do not.
+	if err := hresult("Commit prepared outputs", call(b.composition, 3)); err != nil {
+		return err
+	}
+	if err := hresult("WaitForCommitCompletion", call(b.composition, 4)); err != nil {
+		return err
+	}
+	if b.manager != nil {
+		applied, err := b.manager.presented(f.revision, func() error {
+			hr, _, _ := dwmFlush.Call()
+			return hresult("DwmFlush", hr)
+		})
+		if err != nil {
+			return err
+		}
+		if !applied {
+			return nil
+		}
+	}
+	active := make(map[uintptr]bool, len(f.handles))
+	for _, hwnd := range f.handles {
+		active[hwnd] = true
+	}
+	removed := false
+	for hwnd, o := range b.outputs {
+		if active[hwnd] {
+			continue
+		}
+		if err := hresult("detach retired output", call(o.target, 3, 0)); err != nil {
+			return err
+		}
+		o.release()
+		delete(b.outputs, hwnd)
+		removed = true
+	}
+	if removed {
+		if err := hresult("Commit retired outputs", call(b.composition, 3)); err != nil {
+			return err
+		}
+		if err := hresult("WaitForCommitCompletion", call(b.composition, 4)); err != nil {
+			return err
+		}
+	}
+	b.applied = f
+	if b.manager != nil {
+		b.manager.collect(b.outputs, f.revision)
 	}
 	return nil
 }
@@ -263,9 +320,7 @@ func (b *bridge) close() error {
 		if o.target != nil {
 			call(o.target, 3, 0)
 		}
-		release(o.visual)
-		release(o.target)
-		release(o.swap)
+		o.release()
 	}
 	if b.composition != nil {
 		call(b.composition, 3)
