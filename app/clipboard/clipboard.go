@@ -21,7 +21,7 @@ func ReadWithLimit(ctx context.Context, limit int) (string, error) {
 	if limit <= 0 {
 		return "", errors.New("clipboard limit must be positive")
 	}
-	return run(ctx, func() (string, error) {
+	return runSerialized(ctx, func() (string, error) {
 		if err := native.Init(); err != nil {
 			return "", err
 		}
@@ -53,7 +53,7 @@ func WriteWithLimit(ctx context.Context, text string, limit int) error {
 	if len(text) > limit {
 		return fmt.Errorf("clipboard text exceeds %d KiB", (limit+1023)/1024)
 	}
-	_, err := run(ctx, func() (string, error) {
+	_, err := runSerialized(ctx, func() (string, error) {
 		if err := native.Init(); err != nil {
 			return "", err
 		}
@@ -65,10 +65,10 @@ func WriteWithLimit(ctx context.Context, text string, limit int) error {
 }
 
 /*
-Some backends cannot interrupt an in-flight native read. Return on cancellation
-without accumulating goroutines behind the library's process-wide lock.
+runSerialized returns on cancellation even if a native read cannot stop.
+The slot stays occupied until that read ends, preventing blocked goroutines from accumulating.
 */
-func run(ctx context.Context, operation func() (string, error)) (string, error) {
+func runSerialized(ctx context.Context, operation func() (string, error)) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}

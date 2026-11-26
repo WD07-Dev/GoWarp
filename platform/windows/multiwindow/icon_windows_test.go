@@ -34,7 +34,7 @@ func TestPreparedSourceIconsReachExistingAndNewWindows(t *testing.T) {
 		}
 	}()
 	sourceWindow := m.wakeWindow.Load()
-	m.do(func() {
+	m.invoke(func() {
 		for kind := uintptr(0); kind < 2; kind++ {
 			user32.NewProc("SendMessageW").Call(sourceWindow, 0x80, kind, source)
 		}
@@ -46,14 +46,14 @@ func TestPreparedSourceIconsReachExistingAndNewWindows(t *testing.T) {
 		t.Fatal(err)
 	}
 	var owned [2]uintptr
-	m.do(func() { owned = m.icons })
+	m.invoke(func() { owned = m.icons })
 	for _, icon := range owned {
 		if icon == 0 || icon == source {
 			t.Fatalf("native icon %x must be an independent copy of %x", icon, source)
 		}
 	}
 	// The native copies must survive the source's icon destruction.
-	m.do(func() {
+	m.invoke(func() {
 		for kind := uintptr(0); kind < 2; kind++ {
 			user32.NewProc("SendMessageW").Call(sourceWindow, 0x80, kind, 0)
 		}

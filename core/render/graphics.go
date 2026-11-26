@@ -600,7 +600,7 @@ func (r *Renderer) Touching(scene []vm.DisplayTarget, t vm.DisplayTarget, name s
 		if ot.image == nil {
 			continue
 		}
-		if r.scan(box, func(x, y float64) bool {
+		if r.anyPixelMatches(box, func(x, y float64) bool {
 			return tr.sample(x, y, t.State.Effects, true).A > 0 && ot.sample(x, y, other.State.Effects, true).A > 0
 		}) {
 			return true
@@ -609,7 +609,7 @@ func (r *Renderer) Touching(scene []vm.DisplayTarget, t vm.DisplayTarget, name s
 	return false
 }
 
-func (r *Renderer) scan(box vm.Bounds, match func(float64, float64) bool) bool {
+func (r *Renderer) anyPixelMatches(box vm.Bounds, match func(float64, float64) bool) bool {
 	if !finite(box.Left) || !finite(box.Right) || !finite(box.Top) || !finite(box.Bottom) {
 		return false
 	}
@@ -718,7 +718,7 @@ func (r *Renderer) TouchingColor(scene []vm.DisplayTarget, t vm.DisplayTarget, w
 	}
 	e := t.State.Effects
 	e.Ghost = 0
-	return r.scan(box, func(x, y float64) bool {
+	return r.anyPixelMatches(box, func(x, y float64) bool {
 		c := tr.sample(x, y, e, false)
 		if c.A == 0 {
 			return false

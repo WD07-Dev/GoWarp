@@ -307,7 +307,7 @@ func (s *Server) receive(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 	dir, err := os.MkdirTemp("", "gowarp-editor-*")
 	if err != nil {
-		s.finish(j, dir, err)
+		s.finishPreview(j, dir, err)
 		http.Error(w, "Could not create project directory", 500)
 		return
 	}
@@ -320,7 +320,7 @@ func (s *Server) receive(w http.ResponseWriter, r *http.Request) {
 		err = ctx.Err()
 	}
 	if err != nil {
-		s.finish(j, dir, err)
+		s.finishPreview(j, dir, err)
 		code := http.StatusBadRequest
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
@@ -336,7 +336,7 @@ func (s *Server) receive(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 	go func() {
 		var err error
-		defer func() { s.finish(j, dir, err) }()
+		defer func() { s.finishPreview(j, dir, err) }()
 		if err = ctx.Err(); err != nil {
 			return
 		}
@@ -401,7 +401,7 @@ func (s *Server) receiveProject(r *http.Request, path, snapshot string) (string,
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-func (s *Server) finish(j *job, dir string, err error) {
+func (s *Server) finishPreview(j *job, dir string, err error) {
 	j.stream.close()
 	var snapshot string
 	if j.snapshot != "" && s.ctx.Err() == nil {

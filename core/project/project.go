@@ -93,7 +93,7 @@ type Target struct {
 	Direction   float64  `json:"direction"`
 }
 
-// Defaults match the reference loader while retaining explicit zero/false values.
+// Missing fields use Scratch defaults; explicit zero and false values are preserved.
 func (t *Target) UnmarshalJSON(data []byte) error {
 	type plain Target
 	value := plain{

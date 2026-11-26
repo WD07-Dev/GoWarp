@@ -10,13 +10,14 @@ import (
 const playbackDiskBudget = 256 << 20
 
 type playbackBitmap struct {
-	size     image.Point
-	repeated bool
-	runs     []uint32 // Pixel count followed by the exact NRGBA value.
-	indices  []byte
-	palette  []uint32
-	stored   *io.SectionReader
-	lengths  [2]int
+	size           image.Point
+	repeated       bool
+	runs           []uint32 // Pixel count followed by the exact NRGBA value.
+	indices        []byte
+	palette        []uint32
+	stored         *io.SectionReader
+	runWords       int
+	paletteEntries int
 }
 
 func (lib *Library) PrepareCostumePlayback(progress func(LoadProgress)) error {
@@ -65,7 +66,7 @@ func (lib *Library) PrepareCostumePlayback(progress func(LoadProgress)) error {
 							available = max(available, int(playbackDiskBudget-diskBytes))
 						}
 						if bitmap := packPlaybackBitmap(asset, min(16<<20, available)); bitmap != nil {
-							size := bitmap.bytes()
+							size := bitmap.residentBytes()
 							if size <= budget-used {
 								used += size
 								c.playback[source.key] = bitmap
@@ -105,7 +106,7 @@ func (lib *Library) PrepareCostumePlayback(progress func(LoadProgress)) error {
 }
 
 func (bitmap *playbackBitmap) store(file *os.File, offset int64) error {
-	data := make([]byte, 0, bitmap.bytes())
+	data := make([]byte, 0, bitmap.residentBytes())
 	for _, value := range bitmap.runs {
 		data = binary.LittleEndian.AppendUint32(data, value)
 	}
@@ -117,7 +118,7 @@ func (bitmap *playbackBitmap) store(file *os.File, offset int64) error {
 		return err
 	}
 	bitmap.stored = io.NewSectionReader(file, offset, int64(len(data)))
-	bitmap.lengths = [2]int{len(bitmap.runs), len(bitmap.palette)}
+	bitmap.runWords, bitmap.paletteEntries = len(bitmap.runs), len(bitmap.palette)
 	bitmap.runs, bitmap.palette, bitmap.indices = nil, nil, nil
 	return nil
 }
@@ -131,13 +132,13 @@ func (bitmap *playbackBitmap) load() (*playbackBitmap, error) {
 		return nil, err
 	}
 	loaded := &playbackBitmap{size: bitmap.size, repeated: bitmap.repeated}
-	if bitmap.lengths[0] > 0 {
-		loaded.runs = make([]uint32, bitmap.lengths[0])
+	if bitmap.runWords > 0 {
+		loaded.runs = make([]uint32, bitmap.runWords)
 		for i := range loaded.runs {
 			loaded.runs[i] = binary.LittleEndian.Uint32(data[i*4:])
 		}
 	} else {
-		loaded.palette = make([]uint32, bitmap.lengths[1])
+		loaded.palette = make([]uint32, bitmap.paletteEntries)
 		for i := range loaded.palette {
 			loaded.palette[i] = binary.LittleEndian.Uint32(data[i*4:])
 		}
@@ -180,7 +181,7 @@ func packPlaybackBitmap(asset *cachedAsset, budget int) *playbackBitmap {
 	return bitmap
 }
 
-func (bitmap *playbackBitmap) bytes() int {
+func (bitmap *playbackBitmap) residentBytes() int {
 	return len(bitmap.runs)*4 + len(bitmap.indices) + len(bitmap.palette)*4
 }
 
@@ -216,8 +217,8 @@ func packIndexedBitmap(asset *cachedAsset, budget int) *playbackBitmap {
 	return &playbackBitmap{size: size, repeated: asset.repeated, indices: indices, palette: stored}
 }
 
-// Decode only visible pixels; cropped uploads must not allocate a full canvas.
-func (bitmap *playbackBitmap) region(region image.Rectangle) *image.NRGBA {
+// decodeRegion restores only the requested pixels, without allocating the full image.
+func (bitmap *playbackBitmap) decodeRegion(region image.Rectangle) *image.NRGBA {
 	scale := 1
 	if bitmap.repeated {
 		scale = 2
@@ -297,12 +298,12 @@ func (c *runtimeCache) playbackAsset(key string) *cachedAsset {
 		delete(c.playback, key)
 		return nil
 	}
-	asset := bitmap.asset(key)
+	asset := bitmap.decodeAsset(key)
 	c.put(asset)
 	return asset
 }
 
-func (bitmap *playbackBitmap) asset(key string) *cachedAsset {
+func (bitmap *playbackBitmap) decodeAsset(key string) *cachedAsset {
 	pixels := image.NewNRGBA(image.Rectangle{Max: bitmap.size})
 	if bitmap.indices != nil {
 		for i, index := range bitmap.indices {

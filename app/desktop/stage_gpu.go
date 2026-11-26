@@ -186,7 +186,7 @@ func (g *stageGPU) recentTexture(texture stageTexture) bool {
 	return texture.reused && g.clock-texture.used <= stageTextureReuseWindow
 }
 
-// Retain only identities so returning animation frames can earn extra cache space.
+// Track reuse without retaining image pixels.
 func (g *stageGPU) rememberTexture(key stageTextureKey, used uint64) {
 	if g.clock-used > stageTextureReuseWindow {
 		return
@@ -245,7 +245,7 @@ func (g *stageGPU) texture(r *render.Renderer, d render.DisplaySprite) (*ebiten.
 	return g.textureRegion(r, d, image.Rectangle{})
 }
 
-// Uniform rasters use one texel while geometry and effects keep the original dimensions.
+// Uniform images need one texel; geometry and effects still use the original size.
 func compactTexturePixels(pixels *image.NRGBA) *image.NRGBA {
 	bounds := pixels.Bounds()
 	if bounds.Empty() || bounds.Size() == image.Pt(1, 1) {
@@ -268,7 +268,7 @@ func compactTexturePixels(pixels *image.NRGBA) *image.NRGBA {
 func textureContentBounds(pixels *image.NRGBA) image.Rectangle {
 	w, h := pixels.Rect.Dx(), pixels.Rect.Dy()
 	left, top, right, bottom := w, h, 0, 0
-	// Trimming is optional. Bound host work for large sparse uploads.
+	// Skip trimming large images to bound CPU work.
 	remaining := 256 << 10
 	for y := 0; y < h; y++ {
 		if w > remaining {
@@ -911,8 +911,8 @@ func (g *stageGPU) initShader() error {
 }
 
 /*
-Warm each shader in a separate pixel so clears cannot discard its work. The caller flushes by
-reading.
+Draw each shader to a different pixel so clears cannot discard its work.
+The caller reads the pixels to force GPU execution.
 */
 func (g *stageGPU) drawShaderWarmup(dst *ebiten.Image) error {
 	for _, program := range []struct {

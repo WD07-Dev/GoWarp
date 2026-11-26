@@ -14,7 +14,7 @@ func (lib *Library) CostumeImageRegionAtScale(costume *Costume, scale float64, r
 		if source, ok := cache.costumes[costume]; ok && cache.entries[source.key] == nil {
 			if bitmap := cache.playback[source.key]; bitmap != nil {
 				if loaded, err := bitmap.load(); err == nil {
-					return loaded.region(region)
+					return loaded.decodeRegion(region)
 				}
 				delete(cache.playback, source.key)
 			}

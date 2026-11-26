@@ -99,7 +99,7 @@ func TestMainWindowStartsCenteredOnlyOnce(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			m.do(func() {
+			m.invoke(func() {
 				w := m.items["main"]
 				work, err := monitorBounds(w.view, w, true)
 				if err != nil {
@@ -182,7 +182,7 @@ func TestNativeGroupCenterUsesBordersAndWorkArea(t *testing.T) {
 	if moved[1].X-moved[0].X != gap {
 		t.Fatal("group spacing changed")
 	}
-	m.do(func() {
+	m.invoke(func() {
 		var group image.Rectangle
 		for _, id := range []string{"main", "other"} {
 			w := m.items[id]
@@ -213,7 +213,7 @@ func TestUserMovementLockKeepsScriptPositioning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.do(func() {
+	m.invoke(func() {
 		w := m.items["main"]
 		hwnd := win.HWND(w.handle)
 		menu := win.GetSystemMenu(hwnd, false)
@@ -268,7 +268,7 @@ func TestUserMovementLockKeepsScriptPositioning(t *testing.T) {
 	if _, _, err = m.setViews(views); err != nil {
 		t.Fatal(err)
 	}
-	m.do(func() {
+	m.invoke(func() {
 		hwnd := win.HWND(m.items["main"].handle)
 		flags, _, _ := user32.NewProc("GetMenuState").Call(uintptr(win.GetSystemMenu(hwnd, false)), win.SC_MOVE, win.MF_BYCOMMAND)
 		if flags&win.MF_GRAYED != 0 {
@@ -431,7 +431,7 @@ func TestFrameChangeKeepsClientOrigin(t *testing.T) {
 			origin := func() win.POINT {
 				t.Helper()
 				var point win.POINT
-				m.do(func() {
+				m.invoke(func() {
 					if !win.ClientToScreen(win.HWND(m.items["main"].handle), &point) {
 						t.Error("cannot read client origin")
 					}
@@ -441,7 +441,7 @@ func TestFrameChangeKeepsClientOrigin(t *testing.T) {
 			want := origin()
 			for _, frame := range []string{window.Bordered, window.BorderedLocked, window.Borderless, window.Bordered, window.Borderless} {
 				var previousStyle uintptr
-				m.do(func() {
+				m.invoke(func() {
 					previousStyle = win.GetWindowLongPtr(win.HWND(m.items["main"].handle), win.GWL_STYLE)
 				})
 				v = views[0]
@@ -452,7 +452,7 @@ func TestFrameChangeKeepsClientOrigin(t *testing.T) {
 					t.Fatal(err)
 				}
 				if !hidden {
-					m.do(func() {
+					m.invoke(func() {
 						w := m.items["main"]
 						if w.pendingBounds && win.GetWindowLongPtr(win.HWND(w.handle), win.GWL_STYLE) != previousStyle {
 							t.Error("frame changed before the replacement image and bounds were ready")

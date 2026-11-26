@@ -451,7 +451,7 @@ func inspectSoundWithMP3(format string, data []byte) (*Sound, *mp3PCM, error) {
 		if format == "ogg" {
 			stream, err = vorbis.DecodeF32(bytes.NewReader(data))
 		} else {
-			prepared, err = decodeMP3(data)
+			prepared, err = openMP3Stream(data)
 			stream = prepared
 		}
 		if err != nil {
@@ -598,7 +598,7 @@ func (lib *Library) CostumeImage(costume *Costume) *image.NRGBA {
 	if entry := cache.get(key); entry != nil {
 		if display := cache.display; display != nil {
 			if work := display.bitmapPending[key]; work != nil {
-				work.state.CompareAndSwap(0, 2)
+				work.state.CompareAndSwap(bitmapQueued, bitmapHostOwned)
 			}
 		}
 		return entry.originalPixels()

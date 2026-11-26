@@ -65,7 +65,7 @@ func rewriteExtensions(ctx context.Context, input, output string, sources map[st
 	}
 	// Use the same manifest limit as project.Load, separate from the JS limit.
 	const maxManifest = 64 << 20
-	data, err := limitedSource(&contextReader{ctx: ctx, reader: reader}, maxManifest)
+	data, err := readSourceWithLimit(&contextReader{ctx: ctx, reader: reader}, maxManifest)
 	reader.Close()
 	if err != nil {
 		return err

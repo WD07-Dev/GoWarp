@@ -306,7 +306,7 @@ func (b *bridge) copyFrame(source *comObject) error {
 	}
 	b.applied = f
 	if b.manager != nil {
-		b.manager.collect(b.outputs, f.revision)
+		b.manager.destroyRetiredWindows(b.outputs, f.revision)
 	}
 	return nil
 }

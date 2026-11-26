@@ -1,7 +1,4 @@
-/*
-Package extension is the native Go extension SDK. It depends on neither the
-Scratch VM nor the desktop host; a player supplies the Host implementation.
-*/
+// Package extension defines the Go extension SDK. Players implement Host.
 package extension
 
 import "fmt"
@@ -20,10 +17,10 @@ type TargetQuery struct {
 }
 
 type Context struct {
-	Args   map[string]any
-	Fields map[string]string
-	State  map[string]any
-	Local  map[string]any
+	Args   map[string]any    // Evaluated block inputs.
+	Fields map[string]string // Literal fields, including menus with acceptReporters: false.
+	State  map[string]any    // Shared by handlers in this extension instance.
+	Local  map[string]any    // Per invocation; preserved when Result.Again resumes the block.
 	Host   Host
 }
 

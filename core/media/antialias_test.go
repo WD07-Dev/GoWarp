@@ -63,7 +63,7 @@ func TestRuntimeWithoutAntialiasPreservesOpacityAndPreparedPixels(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertHardOpacity(t, loaded.asset(source.key).image, 127)
+	assertHardOpacity(t, loaded.decodeAsset(source.key).image, 127)
 	if err := lib.SetAntialias(true); err == nil {
 		t.Fatal("allowed changing mode after playback preparation")
 	}

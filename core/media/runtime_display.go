@@ -12,7 +12,7 @@ import (
 	"gowarp/core/project"
 )
 
-// Queued bitmap jobs share this decoded-pixel budget.
+// Total decoded-pixel reservation across queued bitmap jobs.
 const displayBitmapBudget = 16 << 20
 
 type displayRequest struct {
@@ -31,9 +31,16 @@ type displayResult struct {
 	err     error
 }
 
+const (
+	bitmapQueued uint32 = iota
+	bitmapWorkerOwned
+	bitmapHostOwned
+	bitmapDiscarded
+)
+
 type bitmapDecode struct {
 	bytes    int64
-	state    atomic.Uint32 // 0 queued, 1 worker owns it, 2 host owns it, 3 discarded lookahead
+	state    atomic.Uint32
 	done     chan struct{}
 	result   displayResult
 	consumed bool // host thread only
@@ -58,7 +65,7 @@ type displayPreparation struct {
 	next            map[*Costume][]displayRequest
 }
 
-func (d *displayPreparation) bitmapRoom(bytes int64) bool {
+func (d *displayPreparation) hasBitmapCapacity(bytes int64) bool {
 	if bytes <= 0 || bytes > displayBitmapBudget || len(d.bitmapPending) >= cap(d.bitmapJobs) {
 		return false
 	}
@@ -68,18 +75,18 @@ func (d *displayPreparation) bitmapRoom(bytes int64) bool {
 	return bytes <= displayBitmapBudget
 }
 
-func (d *displayPreparation) makeBitmapRoom(bytes int64, urgent bool) bool {
-	if d.bitmapRoom(bytes) {
+func (d *displayPreparation) ensureBitmapCapacity(bytes int64, urgent bool) bool {
+	if d.hasBitmapCapacity(bytes) {
 		return true
 	}
 	for key, work := range d.bitmapPending {
-		if !work.retained && (!urgent || !d.bitmapUnused[key] || !work.state.CompareAndSwap(0, 3)) {
+		if !work.retained && (!urgent || !d.bitmapUnused[key] || !work.state.CompareAndSwap(bitmapQueued, bitmapDiscarded)) {
 			continue
 		}
 		work.consumed = true
 		work.result = displayResult{}
 		delete(d.bitmapPending, key)
-		if d.bitmapRoom(bytes) {
+		if d.hasBitmapCapacity(bytes) {
 			return true
 		}
 	}
@@ -106,10 +113,10 @@ func (lib *Library) PrepareDisplayBitmap(costume *Costume) bool {
 		return false
 	}
 	work := display.bitmapPending[source.key]
-	if work != nil && (work.urgent || work.state.Load() != 0) {
+	if work != nil && (work.urgent || work.state.Load() != bitmapQueued) {
 		return false
 	}
-	if work == nil && !display.bitmapRoom(bytes) {
+	if work == nil && !display.hasBitmapCapacity(bytes) {
 	ready:
 		for range cap(display.bitmapJobs) {
 			select {
@@ -119,7 +126,7 @@ func (lib *Library) PrepareDisplayBitmap(costume *Costume) bool {
 				break ready
 			}
 		}
-		if !cache.ready() || !display.makeBitmapRoom(bytes, true) {
+		if !cache.ready() || !display.ensureBitmapCapacity(bytes, true) {
 			return false
 		}
 	}
@@ -187,7 +194,7 @@ func (lib *Library) EnableDisplayPreparation(path string, p *project.Project) er
 		}
 	}
 	if hasBitmaps {
-		// Leave a CPU for the host; workers share four jobs and 16 MiB.
+		// Limit workers to leave CPU time for the game loop.
 		var readers []*project.AssetReader
 		for range min(2, max(1, runtime.GOMAXPROCS(0)-1)) {
 			bitmapReader, err := project.OpenAssets(path, p)
@@ -205,13 +212,13 @@ func (lib *Library) EnableDisplayPreparation(path string, p *project.Project) er
 		var workers sync.WaitGroup
 		jobs, results := display.bitmapJobs, display.bitmaps
 		for i, bitmapReader := range readers {
-			// Speculation uses at most one worker; current images can use both.
+			// Only one worker prefetches; both can decode requested images.
 			var lookahead <-chan displayRequest
 			if i == 0 {
 				lookahead = display.bitmapLookahead
 			}
 			workers.Go(func() {
-				display.run(ctx, bitmapReader, lib.customFont, jobs, lookahead, results, nil)
+				display.decodeRequests(ctx, bitmapReader, lib.customFont, jobs, lookahead, results, nil)
 			})
 		}
 		go func() {
@@ -221,11 +228,11 @@ func (lib *Library) EnableDisplayPreparation(path string, p *project.Project) er
 	}
 	cache.display = display
 	// Workers share immutable fonts, but own glyph buffers and mutable raster state.
-	go display.run(ctx, reader, lib.customFont, display.jobs, nil, display.results, display.done)
+	go display.decodeRequests(ctx, reader, lib.customFont, display.jobs, nil, display.results, display.done)
 	return nil
 }
 
-func (d *displayPreparation) run(ctx context.Context, reader *project.AssetReader, fonts svgFontResolver, jobs, lookahead <-chan displayRequest, results chan<- displayResult, done chan<- struct{}) {
+func (d *displayPreparation) decodeRequests(ctx context.Context, reader *project.AssetReader, fonts svgFontResolver, jobs, lookahead <-chan displayRequest, results chan<- displayResult, done chan<- struct{}) {
 	if done != nil {
 		defer close(done)
 	}
@@ -246,14 +253,14 @@ func (d *displayPreparation) run(ctx context.Context, reader *project.AssetReade
 			return
 		}
 		result := displayResult{request: request}
-		decode := request.work == nil || request.work.state.CompareAndSwap(0, 1)
-		if !decode && request.work.state.Load() != 2 {
+		decode := request.work == nil || request.work.state.CompareAndSwap(bitmapQueued, bitmapWorkerOwned)
+		if !decode && request.work.state.Load() != bitmapHostOwned {
 			// A promoted request is decoded once; discarded speculation needs no handoff.
 			continue
 		}
 		if decode && request.playback != nil {
 			if bitmap, err := request.playback.load(); err == nil {
-				result.asset = bitmap.asset(request.key)
+				result.asset = bitmap.decodeAsset(request.key)
 				result.pixels = result.asset.image
 			}
 		}
@@ -322,7 +329,7 @@ ready:
 		}
 		size := lib.BitmapSize(costume)
 		bytes := int64(size.X) * int64(size.Y) * 4
-		if !display.makeBitmapRoom(bytes, false) {
+		if !display.ensureBitmapCapacity(bytes, false) {
 			continue
 		}
 		request.work = &bitmapDecode{done: make(chan struct{}), bytes: bytes}
@@ -336,10 +343,7 @@ ready:
 	}
 }
 
-/*
-acceptDisplayResult runs only on the host, including when a demand read
-catches up with a finished bitmap before the next display preparation call.
-*/
+// acceptDisplayResult transfers a worker result to the cache on the host thread.
 func (lib *Library) acceptDisplayResult(result displayResult, uploaded func(string) bool) {
 	cache := lib.cache
 	display := cache.display
@@ -348,10 +352,7 @@ func (lib *Library) acceptDisplayResult(result displayResult, uploaded func(stri
 		display.bitmapPending[key] == work && display.bitmapUnused[key] &&
 		result.err == nil && result.asset != nil && cache.entries[key] == nil &&
 		cache.bytes+result.asset.bytes > cache.limit && (uploaded == nil || !uploaded(key)) {
-		/*
-			Retain completed lookahead in its queue reservation when the LRU is full. New jobs may reclaim it
-			without evicting demand-loaded pixels.
-		*/
+		// Keep prefetched pixels in the queue budget rather than evicting images in use.
 		work.retained = true
 		return
 	}
@@ -372,10 +373,7 @@ func (lib *Library) acceptDisplayResult(result displayResult, uploaded func(stri
 		}
 	}
 	if result.err != nil {
-		/*
-			Speculation must not fail a project that never uses that costume.
-			An actual request still uses the normal synchronous error path.
-		*/
+		// Report failed prefetches only if the costume is actually requested.
 		if result.request.bitmap == nil {
 			cache.err = result.err
 		} else {
@@ -498,7 +496,7 @@ func (lib *Library) preparedDisplayBitmap(key string) (*cachedAsset, error) {
 		}
 	}
 	work = display.bitmapPending[key]
-	if work == nil || work.state.CompareAndSwap(0, 2) || work.state.Load() != 1 {
+	if work == nil || work.state.CompareAndSwap(bitmapQueued, bitmapHostOwned) || work.state.Load() != bitmapWorkerOwned {
 		return nil, nil
 	}
 	if bitmap := cache.playback[key]; bitmap != nil && bitmap.stored == nil {
@@ -524,8 +522,8 @@ func (lib *Library) preparedDisplayBitmap(key string) (*cachedAsset, error) {
 }
 
 /*
-CompactRepeatedPixels losslessly replaces identical 2x2 blocks with one texel. Shaders reconstruct
-the original sampling grid.
+CompactRepeatedPixels replaces identical 2x2 blocks with one texel, losslessly.
+Shaders reconstruct the original sampling grid.
 */
 func CompactRepeatedPixels(pixels *image.NRGBA) (*image.NRGBA, bool) {
 	w, h := pixels.Bounds().Dx(), pixels.Bounds().Dy()

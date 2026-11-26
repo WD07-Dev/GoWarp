@@ -200,7 +200,7 @@ func TestPlaybackBitmapPacksIndexedPixelsWithinBudget(t *testing.T) {
 	if packPlaybackBitmap(asset, stored-1) != nil {
 		t.Fatal("indexed pixels exceeded the available budget")
 	}
-	got := bitmap.asset("indexed")
+	got := bitmap.decodeAsset("indexed")
 	if !got.repeated || !bytes.Equal(got.image.Pix, asset.image.Pix) {
 		t.Fatal("packed pixels changed color, alpha or compact sampling")
 	}
@@ -208,7 +208,7 @@ func TestPlaybackBitmapPacksIndexedPixelsWithinBudget(t *testing.T) {
 		t.Fatal("indexed pixels changed collision-sized pixels")
 	}
 	region := image.Rect(3, 5, 177, 123)
-	cropped := bitmap.region(region)
+	cropped := bitmap.decodeRegion(region)
 	for y := region.Min.Y; y < region.Max.Y; y++ {
 		for x := region.Min.X; x < region.Max.X; x++ {
 			if cropped.NRGBAAt(x, y) != want.NRGBAAt(x, y) {
@@ -281,7 +281,7 @@ func TestPlaybackOverflowUsesTemporaryStorage(t *testing.T) {
 	name := lib.cache.playbackFile.Name()
 	resident := 0
 	for _, bitmap := range lib.cache.playback {
-		resident += bitmap.bytes()
+		resident += bitmap.residentBytes()
 	}
 	if lib.cache.limit+resident != 256<<10 || resident > 64<<10 {
 		t.Fatal("temporary playback escaped the original memory budget")
@@ -336,11 +336,11 @@ func TestStoredPlaybackRoundTrip(t *testing.T) {
 			if err := bitmap.store(file, 37); err != nil {
 				t.Fatal(err)
 			}
-			if bitmap.bytes() != 0 {
+			if bitmap.residentBytes() != 0 {
 				t.Fatal("disk-backed pixels retained the RAM payload")
 			}
 			loaded, err := bitmap.load()
-			if err != nil || !bytes.Equal(loaded.asset(name).image.Pix, asset.image.Pix) {
+			if err != nil || !bytes.Equal(loaded.decodeAsset(name).image.Pix, asset.image.Pix) {
 				t.Fatal("disk round trip changed pixels", err)
 			}
 		})
@@ -410,7 +410,7 @@ func TestIndexedPlaybackHandlesSubimageAndPaletteLimit(t *testing.T) {
 	if bitmap == nil || bitmap.indices == nil {
 		t.Fatal("subimage did not use indexed storage")
 	}
-	got := bitmap.asset("subimage").image
+	got := bitmap.decodeAsset("subimage").image
 	for y := 0; y < got.Bounds().Dy(); y++ {
 		for x := 0; x < got.Bounds().Dx(); x++ {
 			if got.NRGBAAt(x, y) != pixels.NRGBAAt(x+3, y+5) {
@@ -440,7 +440,7 @@ func BenchmarkIndexedBitmapPlayback(b *testing.B) {
 	if bitmap == nil || bitmap.indices == nil {
 		b.Fatal("image was not indexed")
 	}
-	b.Logf("source=%d compact=%d indexed=%d bytes", len(pixels.Pix), bitmap.size.X*bitmap.size.Y*4, bitmap.bytes())
+	b.Logf("source=%d compact=%d indexed=%d bytes", len(pixels.Pix), bitmap.size.X*bitmap.size.Y*4, bitmap.residentBytes())
 	b.Run("PNG", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
@@ -454,7 +454,7 @@ func BenchmarkIndexedBitmapPlayback(b *testing.B) {
 	b.Run("Indexed", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			bitmap.asset("indexed")
+			bitmap.decodeAsset("indexed")
 		}
 	})
 	b.Run("Stored", func(b *testing.B) {
@@ -473,7 +473,7 @@ func BenchmarkIndexedBitmapPlayback(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
-			loaded.asset("indexed")
+			loaded.decodeAsset("indexed")
 		}
 	})
 }
@@ -648,7 +648,7 @@ func TestIndexedPlaybackRegionPixels(t *testing.T) {
 	if bitmap == nil || bitmap.indices == nil {
 		t.Fatal("expected indexed playback")
 	}
-	source := bitmap.asset("indexed").image
+	source := bitmap.decodeAsset("indexed").image
 	for _, repeated := range []bool{false, true} {
 		bitmap.repeated = repeated
 		scale := 1
@@ -662,7 +662,7 @@ func TestIndexedPlaybackRegionPixels(t *testing.T) {
 			bounds.Add(image.Pt(-3, -5)), bounds.Add(image.Pt(3, 5)),
 			image.Rect(-5, -5, -1, -1),
 		} {
-			got := bitmap.region(region)
+			got := bitmap.decodeRegion(region)
 			want := region.Intersect(bounds)
 			if want.Empty() {
 				if got != nil {
@@ -696,7 +696,7 @@ func BenchmarkIndexedPlaybackRegion(b *testing.B) {
 			bounds.Min = image.Pt(1, 1)
 			b.ReportAllocs()
 			for b.Loop() {
-				bitmap.region(bounds)
+				bitmap.decodeRegion(bounds)
 			}
 		})
 	}

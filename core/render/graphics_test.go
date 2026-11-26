@@ -252,7 +252,7 @@ func TestOffscreenCollisionScanDoesNotRepeatUnrepresentableSteps(t *testing.T) {
 		{Left: 0, Right: 0, Bottom: 1e16, Top: 1e16},
 	} {
 		samples := 0
-		touched := r.scan(box, func(x, y float64) bool {
+		touched := r.anyPixelMatches(box, func(x, y float64) bool {
 			samples++
 			// Stop a broken scanner without hanging the test.
 			return samples > 1

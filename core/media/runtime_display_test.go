@@ -63,7 +63,7 @@ func resumeBitmapWorker(t *testing.T, lib *Library, dir string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	display.cancel = cancel
 	display.bitmapDone = make(chan struct{})
-	go display.run(ctx, reader, lib.customFont, display.bitmapJobs, display.bitmapLookahead, display.bitmaps, display.bitmapDone)
+	go display.decodeRequests(ctx, reader, lib.customFont, display.bitmapJobs, display.bitmapLookahead, display.bitmaps, display.bitmapDone)
 }
 
 func TestSelectedBitmapOvertakesQueuedLookahead(t *testing.T) {
@@ -130,7 +130,7 @@ func TestSelectedBitmapKeepsRunningDecodeReservations(t *testing.T) {
 	lib.PrepareDisplayCostume(lib.Costumes[0][0], nil)
 	for _, work := range display.bitmapPending {
 		// Hold both decodes in progress; their pixel memory cannot be reclaimed yet.
-		if !work.state.CompareAndSwap(0, 1) {
+		if !work.state.CompareAndSwap(bitmapQueued, bitmapWorkerOwned) {
 			t.Fatal("fixture did not leave the decode queued")
 		}
 	}
@@ -873,7 +873,7 @@ func TestBitmapWorkerSkipsDemandLoadedRequests(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	display.cancel = cancel
 	display.bitmapDone = make(chan struct{})
-	go display.run(ctx, reader, lib.customFont, display.bitmapJobs, display.bitmapLookahead, display.bitmaps, display.bitmapDone)
+	go display.decodeRequests(ctx, reader, lib.customFont, display.bitmapJobs, display.bitmapLookahead, display.bitmaps, display.bitmapDone)
 	select {
 	case result := <-display.bitmaps:
 		if result.request.key != "image:png:next.png" || result.err != nil || result.pixels != nil {
@@ -990,7 +990,7 @@ func TestCostumeImageWaitForWorkerCanBeCanceled(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("animation lookahead was not queued")
 	}
-	if !request.work.state.CompareAndSwap(0, 1) {
+	if !request.work.state.CompareAndSwap(bitmapQueued, bitmapWorkerOwned) {
 		t.Fatal("request was already claimed")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
@@ -1017,7 +1017,7 @@ func TestPackedBitmapDoesNotWaitForBusyWorker(t *testing.T) {
 				t.Fatal("bitmap was not queued")
 			}
 			request := <-display.bitmapJobs
-			if !request.work.state.CompareAndSwap(0, 1) {
+			if !request.work.state.CompareAndSwap(bitmapQueued, bitmapWorkerOwned) {
 				t.Fatal("worker could not claim the bitmap")
 			}
 			if err := os.Remove(filepath.Join(dir, "next.png")); err != nil {
@@ -1041,7 +1041,7 @@ func TestPackedBitmapDoesNotWaitForBusyWorker(t *testing.T) {
 			}
 			cached := lib.cache.get(request.key)
 			before := lib.cache.bytes
-			result := displayResult{request: request, asset: request.playback.asset(request.key)}
+			result := displayResult{request: request, asset: request.playback.decodeAsset(request.key)}
 			result.pixels = result.asset.image
 			request.work.result = result
 			close(request.work.done)

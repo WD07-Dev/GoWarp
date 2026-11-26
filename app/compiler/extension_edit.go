@@ -54,7 +54,7 @@ func OpenExtensionDocument(ctx context.Context, path string) (*ExtensionDocument
 		if err != nil {
 			return nil, err
 		}
-		manifest, err = limitedSource(&contextReader{ctx: ctx, reader: reader}, 64<<20)
+		manifest, err = readSourceWithLimit(&contextReader{ctx: ctx, reader: reader}, 64<<20)
 		reader.Close()
 		if err != nil {
 			return nil, err

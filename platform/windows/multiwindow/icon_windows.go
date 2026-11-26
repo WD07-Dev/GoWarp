@@ -47,7 +47,7 @@ func (m *windowManager) copySourceIcons(hwnd uintptr) error {
 		}
 		copies[kind] = copy
 	}
-	m.do(func() {
+	m.invoke(func() {
 		old := m.icons
 		m.icons = copies
 		for _, w := range m.items {

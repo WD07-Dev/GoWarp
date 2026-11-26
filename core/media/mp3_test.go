@@ -35,7 +35,7 @@ func TestMP3ClickMatchesReference(t *testing.T) {
 
 func TestMP3ReadAndSeek(t *testing.T) {
 	data := readMediaFixture(t, "click.mp3")
-	s, err := decodeMP3(data)
+	s, err := openMP3Stream(data)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -699,7 +699,7 @@ func TestEmbeddedExtensionSDK(t *testing.T) {
 }
 
 func TestExtensionSDKExcludesEmbeddedArchive(t *testing.T) {
-	if extensionSDKFile("app/assets/embed/runtime-source.zip") {
+	if isExtensionSDKFile("app/assets/embed/runtime-source.zip") {
 		t.Fatal("source SDK recursively includes its generated archive")
 	}
 }
@@ -817,7 +817,7 @@ func TestExtensionSDKPreservesPlatformSources(t *testing.T) {
 			t.Errorf("SDK extraction %s: %q, %v", name, data, err)
 		}
 	}
-	if extensionSDKFile("platform/linux/native/dialog_linux_test.go") {
+	if isExtensionSDKFile("platform/linux/native/dialog_linux_test.go") {
 		t.Fatal("SDK includes native tests")
 	}
 }

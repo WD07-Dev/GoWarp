@@ -66,7 +66,8 @@ func startWindows() (*windowManager, error) {
 	return m, nil
 }
 
-func (m *windowManager) do(fn func()) {
+// invoke waits for fn to finish on the window thread.
+func (m *windowManager) invoke(fn func()) {
 	done := make(chan struct{})
 	m.tasks <- func() {
 		fn()
@@ -79,7 +80,7 @@ func (m *windowManager) do(fn func()) {
 
 func (m *windowManager) startDrag(id string) error {
 	var err error
-	m.do(func() {
+	m.invoke(func() {
 		w := m.items[id]
 		if w == nil {
 			err = fmt.Errorf("unknown native window %q", id)
@@ -100,7 +101,7 @@ func (m *windowManager) wake() {
 	}
 }
 
-func (m *windowManager) drain() {
+func (m *windowManager) runPendingTasks() {
 	for {
 		select {
 		case task := <-m.tasks:
@@ -166,7 +167,7 @@ func (m *windowManager) run(ready chan<- error) {
 			return
 		default:
 		}
-		m.drain()
+		m.runPendingTasks()
 		var msg win.MSG
 		for win.PeekMessage(&msg, 0, 0, 0, win.PM_REMOVE) {
 			win.TranslateMessage(&msg)
@@ -244,7 +245,7 @@ func (m *windowManager) wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr
 		}
 		return 0
 	case win.WM_APP + 1:
-		m.drain()
+		m.runPendingTasks()
 		m.updateSnapshot()
 		return 0
 	case win.WM_APP + 2:
@@ -422,7 +423,7 @@ func monitorBounds(v window.View, w *nativeWindow, workArea bool) (win.RECT, err
 func (m *windowManager) monitor(id string) (window.Monitor, error) {
 	var result window.Monitor
 	var err error
-	m.do(func() {
+	m.invoke(func() {
 		w := m.items[id]
 		if w == nil {
 			err = fmt.Errorf("unknown native window %q", id)
@@ -442,7 +443,7 @@ func (m *windowManager) monitor(id string) (window.Monitor, error) {
 func (m *windowManager) center(views []window.View, id string, all bool) ([]window.View, error) {
 	actual := append([]window.View(nil), views...)
 	var result error
-	m.do(func() {
+	m.invoke(func() {
 		anchor := m.items[id]
 		if anchor == nil {
 			result = fmt.Errorf("unknown native window %q", id)
@@ -505,7 +506,7 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 	var result error
 	handles := make([]uintptr, len(views))
 	actual := append([]window.View(nil), views...)
-	m.do(func() {
+	m.invoke(func() {
 		defer func() { m.centerMain = false }()
 		// Resolve fullscreen and restore geometry before mutating any HWND. Atlas
 		// validation must also apply to actual monitor sizes, not requested sizes.
@@ -751,7 +752,7 @@ func (w *nativeWindow) applyFrame() error {
 func (m *windowManager) presented(revision uint64, flush func() error) (bool, error) {
 	applied := false
 	var result error
-	m.do(func() {
+	m.invoke(func() {
 		if revision != m.revision.Load() {
 			return
 		}
@@ -830,8 +831,10 @@ func (m *windowManager) presented(revision uint64, flush func() error) (bool, er
 	return applied, result
 }
 
-// updateGeometry is called only on the window thread. Snapshots hand immutable
-// copies to the backend, which republishes resized tiles with the next frame.
+/*
+updateGeometry runs on the window thread. The backend receives immutable snapshots
+and updates resized tiles with the next frame.
+*/
 func (m *windowManager) updateGeometry(w *nativeWindow) {
 	if w.pendingBounds || win.IsIconic(win.HWND(w.handle)) {
 		return
@@ -845,9 +848,11 @@ func (m *windowManager) updateGeometry(w *nativeWindow) {
 	}
 }
 
-func (m *windowManager) collect(active map[uintptr]*output, revision uint64) {
-	// Called only after GPU resources have been released. Copy keys before
-	// posting to the window thread; it must never inspect the GPU-owned map.
+func (m *windowManager) destroyRetiredWindows(active map[uintptr]*output, revision uint64) {
+	/*
+		GPU resources must be released first. Copy the active handles so the
+		window thread never reads the render thread's map.
+	*/
 	keep := make(map[uintptr]bool, len(active))
 	for hwnd := range active {
 		keep[hwnd] = true

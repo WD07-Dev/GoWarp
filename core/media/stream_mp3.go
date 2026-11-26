@@ -23,7 +23,7 @@ func (s *streamMP3) Length() int64 {
 
 func (s *streamMP3) prepare() error {
 	if s.decoder == nil && s.err == nil {
-		s.decoder, s.err = decodeMP3(s.data)
+		s.decoder, s.err = openMP3Stream(s.data)
 		s.data = nil
 		if s.err != nil {
 			// Initialization EOF is invalid input, not successful playback EOF.

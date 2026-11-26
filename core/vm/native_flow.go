@@ -12,7 +12,7 @@ type nativeFlowNode struct {
 	Stop        string
 }
 
-// Straight-line repeats already have a batched fast path. Connect branching loops.
+// flowEntries selects scripts with branching or nested loops for compilation.
 func (g *nativeGenerator) flowEntries(t *target, p *procedure) []string {
 	type pendingBlock struct {
 		id    string
@@ -62,7 +62,7 @@ func (g *nativeGenerator) flowEntries(t *target, p *procedure) []string {
 		if !branchingRepeat && !hasWait {
 			return nil
 		}
-		// Keep the existing batched path when a repeat body compiles as a whole.
+		// A repeat whose entire body compiles can use batched execution.
 		for _, id := range ids {
 			b := t.source.Blocks[id]
 			if b.Opcode != "control_repeat" {

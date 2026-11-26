@@ -306,10 +306,10 @@ func nativeCompare(a, b nativeComparison) float64 {
 		}
 		return a.number - b.number
 	}
-	return nativeCompareSlow(a, b)
+	return nativeCompareCoerced(a, b)
 }
 
-func nativeCompareSlow(a, b nativeComparison) float64 {
+func nativeCompareCoerced(a, b nativeComparison) float64 {
 	an, bn := a.number, b.number
 	if !a.numeric {
 		an = a.comparisonNumber()

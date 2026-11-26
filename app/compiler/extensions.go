@@ -81,7 +81,7 @@ func resolveExtensionSources(ctx context.Context, input string, p *project.Proje
 	return sources, nil
 }
 
-func limitedSource(r io.Reader, limit int64) ([]byte, error) {
+func readSourceWithLimit(r io.Reader, limit int64) ([]byte, error) {
 	data, err := io.ReadAll(io.LimitReader(r, limit+1))
 	if err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ func readExtensionSource(ctx context.Context, input, location string) ([]byte, s
 		if strings.HasSuffix(strings.ToLower(head), ";base64") {
 			r = base64.NewDecoder(base64.StdEncoding, r)
 		}
-		data, err := limitedSource(r, extensionSourceLimit)
+		data, err := readSourceWithLimit(r, extensionSourceLimit)
 		return data, "", err
 	}
 	parsed, err := url.Parse(location)
@@ -133,7 +133,7 @@ func readExtensionSource(ctx context.Context, input, location string) ([]byte, s
 		if response.StatusCode != http.StatusOK {
 			return nil, "", fmt.Errorf("source HTTP status %s", response.Status)
 		}
-		data, err := limitedSource(response.Body, extensionSourceLimit)
+		data, err := readSourceWithLimit(response.Body, extensionSourceLimit)
 		return data, "", err
 	}
 	if parsed.Scheme != "" {
@@ -159,7 +159,7 @@ func readExtensionSource(ctx context.Context, input, location string) ([]byte, s
 					return nil, "", err
 				}
 				defer r.Close()
-				data, err := limitedSource(r, extensionSourceLimit)
+				data, err := readSourceWithLimit(r, extensionSourceLimit)
 				return data, "", err
 			}
 		}
@@ -181,7 +181,7 @@ func readExtensionSource(ctx context.Context, input, location string) ([]byte, s
 		return nil, "", err
 	}
 	defer f.Close()
-	data, err := limitedSource(f, extensionSourceLimit)
+	data, err := readSourceWithLimit(f, extensionSourceLimit)
 	return data, path, err
 }
 
@@ -298,14 +298,14 @@ func unpackExtensionFiles(ctx context.Context, archive *zip.Reader, destination 
 		if entry.FileInfo().IsDir() {
 			continue
 		}
-		if !extensionSDKFile(entry.Name) {
+		if !isExtensionSDKFile(entry.Name) {
 			continue
 		}
 		reader, err := entry.Open()
 		if err != nil {
 			return err
 		}
-		data, err := limitedSource(reader, extensionSDKLimit-total)
+		data, err := readSourceWithLimit(reader, extensionSDKLimit-total)
 		reader.Close()
 		if err != nil {
 			return err
@@ -321,7 +321,7 @@ func unpackExtensionFiles(ctx context.Context, archive *zip.Reader, destination 
 	return nil
 }
 
-func extensionSDKFile(name string) bool {
+func isExtensionSDKFile(name string) bool {
 	if name == "app/assets/embed/runtime-source.zip" {
 		return false
 	}
@@ -356,7 +356,7 @@ func copyExtensionSDK(ctx context.Context, root, destination string) (string, er
 				return err
 			}
 			rel = filepath.ToSlash(rel)
-			if !extensionSDKFile(rel) {
+			if !isExtensionSDKFile(rel) {
 				return nil
 			}
 			if entry.Type()&os.ModeSymlink != 0 {
@@ -366,7 +366,7 @@ func copyExtensionSDK(ctx context.Context, root, destination string) (string, er
 			if err != nil {
 				return err
 			}
-			data, err := limitedSource(file, extensionSDKLimit-total)
+			data, err := readSourceWithLimit(file, extensionSDKLimit-total)
 			file.Close()
 			if err != nil {
 				return err

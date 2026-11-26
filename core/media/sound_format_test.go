@@ -267,7 +267,7 @@ func TestCompressedMusicMatchesDecodedPCM(t *testing.T) {
 				var decoder io.ReadSeeker
 				switch soundFormat("wav", data) {
 				case "mp3":
-					decoder, err = decodeMP3(data)
+					decoder, err = openMP3Stream(data)
 				case "ogg":
 					decoder, err = vorbis.DecodeF32(bytes.NewReader(data))
 				}

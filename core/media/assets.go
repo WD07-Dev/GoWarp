@@ -217,7 +217,7 @@ func DecodeSound(format string, data []byte) (*Sound, error) {
 	case "wav":
 		return decodeWAV(data)
 	case "mp3":
-		decoded, err = decodeMP3(data)
+		decoded, err = openMP3Stream(data)
 	case "ogg":
 		decoded, err = vorbis.DecodeF32(bytes.NewReader(data))
 	default:

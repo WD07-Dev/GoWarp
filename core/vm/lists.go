@@ -30,7 +30,7 @@ type List struct {
 	sharing   *listSharing
 }
 
-// Keep the prepared inputs, never their values or the owning sprite's list.
+// Cache input evaluators, not values or sprite-specific lists.
 type listWrite struct {
 	id          string
 	index, item *numericExpression
@@ -191,7 +191,7 @@ func (list *List) replace(index int, item any) {
 	list.Items[index] = item
 }
 
-// Release old keys while keeping the bounded table for the next search.
+// Clear retained keys while reusing the table allocation.
 func (list *List) invalidateTextIndex() {
 	if index := list.textIndex; index != nil && index.valid {
 		clear(index.values)
