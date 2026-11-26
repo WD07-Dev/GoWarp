@@ -32,11 +32,22 @@ func MainWithExtensions(bundle extension.Bundle) {
 	os.Exit(runMainWithExtensions(bundle))
 }
 
+func readPlayerProject(executable string) (*compiler.Package, error) {
+	if os.Getenv("GOWARP_PREVIEW") == "1" {
+		dir := os.Getenv("GOWARP_WORKDIR")
+		if !filepath.IsAbs(dir) {
+			return nil, fmt.Errorf("preview directory must be an absolute path")
+		}
+		return compiler.ReadPreview(dir)
+	}
+	return compiler.ReadPackage(executable)
+}
+
 func runMainWithExtensions(bundle extension.Bundle) int {
 	path, err := os.Executable()
 	var p *compiler.Package
 	if err == nil {
-		p, err = compiler.ReadPackage(path)
+		p, err = readPlayerProject(path)
 	}
 	appID := "gowarp"
 	if p != nil {
@@ -91,27 +102,28 @@ func runPackaged(p *compiler.Package, bundle extension.Bundle, diagnostics *runt
 			}
 		}()
 	}
-	parent := ""
-	if os.Getenv("GOWARP_PREVIEW") == "1" {
-		parent = os.Getenv("GOWARP_WORKDIR")
-	}
-	dir, err := os.MkdirTemp(parent, "gowarp-player-*")
-	if err != nil {
-		ui.ShowMessage("GoWarp", err.Error())
-		return 1
-	}
-	defer os.RemoveAll(dir)
-	path := filepath.Join(dir, p.Name)
-	started := false
-	extract := func(ctx context.Context) error {
-		if err := ctx.Err(); err != nil {
+	preview := os.Getenv("GOWARP_PREVIEW") == "1"
+	path := p.Settings.Project
+	var extract func(context.Context) error
+	if !preview {
+		dir, err := os.MkdirTemp("", "gowarp-player-*")
+		if err != nil {
+			ui.ShowMessage("GoWarp", err.Error())
+			return 1
+		}
+		defer os.RemoveAll(dir)
+		path = filepath.Join(dir, p.Name)
+		extract = func(ctx context.Context) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			err := os.WriteFile(path, p.Project, 0600)
+			p.Project = nil
 			return err
 		}
-		err := os.WriteFile(path, p.Project, 0600)
-		p.Project = nil
-		return err
 	}
-	if err = runPrepared(ctx, path, p.Settings, os.Getenv("GOWARP_PREVIEW") == "1", &started, extract, bundle); err != nil && ctx.Err() == nil {
+	started := false
+	if err := runPrepared(ctx, path, p.Settings, preview, &started, extract, bundle); err != nil && ctx.Err() == nil {
 		diagnostics.record("runtime error: " + err.Error())
 		fmt.Fprintln(os.Stderr, err)
 		if !started {

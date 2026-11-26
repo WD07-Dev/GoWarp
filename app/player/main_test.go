@@ -3,12 +3,92 @@ package player
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"gowarp/app/config"
 	"gowarp/core/cloud"
 	"gowarp/core/project"
 )
+
+func TestPreviewPlayerRunsWithoutPackagedProject(t *testing.T) {
+	if os.Getenv("GOWARP_TEST_PREVIEW") == "1" {
+		os.Exit(runMainWithExtensions(nil))
+	}
+	dir := t.TempDir()
+	s := config.Default(nil)
+	s.Project = filepath.Join(dir, "project.json")
+	s.Player.CloseOnStop = true
+	s.Player.Mute = true
+	data, err := json.Marshal(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "preview.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	project := `{"targets":[{"isStage":true,"name":"Stage","blocks":{
+		"flag":{"opcode":"event_whenflagclicked","next":"stop","topLevel":true},
+		"stop":{"opcode":"control_stop","parent":"flag","fields":{"STOP_OPTION":["all",null]}}
+	}}]}`
+	if err := os.WriteFile(s.Project, []byte(project), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestPreviewPlayerRunsWithoutPackagedProject$")
+	cmd.Env = append(os.Environ(), "GOWARP_TEST_PREVIEW=1", "GOWARP_PREVIEW=1", "GOWARP_WORKDIR="+dir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("preview did not execute its stop-all block: %v\n%s", err, output)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) != 2 {
+		t.Fatalf("preview extracted an extra project: %v, %v", entries, err)
+	}
+}
+
+func TestPreviewLoadsExternalProjectOnlyInPreviewMode(t *testing.T) {
+	dir := t.TempDir()
+	s := config.Default(nil)
+	s.Project = filepath.Join(dir, "project.sb3")
+	s.Width, s.Height = 640, 480
+	s.Player.AutoStart = false
+	data, err := json.Marshal(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "preview.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	executable := filepath.Join(dir, "unpackaged-player")
+	if err := os.WriteFile(executable, []byte("runtime"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOWARP_WORKDIR", dir)
+	t.Setenv("GOWARP_PREVIEW", "1")
+	p, err := readPlayerProject(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Settings.Project != s.Project || p.Settings.Width != 640 || p.Settings.Player.AutoStart || len(p.Project) != 0 {
+		t.Fatalf("external preview was not loaded: %+v", p)
+	}
+	t.Setenv("GOWARP_PREVIEW", "")
+	if _, err := readPlayerProject(executable); err == nil {
+		t.Fatal("normal player used preview settings")
+	}
+	t.Setenv("GOWARP_PREVIEW", "1")
+	if err := os.Remove(filepath.Join(dir, "preview.json")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readPlayerProject(executable); !os.IsNotExist(err) {
+		t.Fatalf("missing preview settings: %v", err)
+	}
+}
 
 func TestCloudNumberEncodingKeepsDecimalDigits(t *testing.T) {
 	for _, tc := range []struct {

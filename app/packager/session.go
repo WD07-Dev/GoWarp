@@ -74,12 +74,8 @@ func startPreview(ctx, runContext context.Context, t compiler.Template, input st
 	if err != nil {
 		return nil, err
 	}
-	name := "game"
-	if t.OS == "windows" {
-		name += ".exe"
-	}
-	path := filepath.Join(dir, name)
-	if err = compiler.Export(ctx, t, input, path, s); err != nil {
+	path, err := compiler.PreparePreview(ctx, t, input, dir, s)
+	if err != nil {
 		os.RemoveAll(dir)
 		return nil, err
 	}

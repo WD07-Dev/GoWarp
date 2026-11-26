@@ -248,46 +248,54 @@ func Templates(dir string) ([]Template, error) {
 }
 
 func Export(ctx context.Context, t Template, input, output string, s config.Settings) error {
-	if err := ctx.Err(); err != nil {
+	t, err := prepareRuntime(ctx, t, input, output, s)
+	if err != nil {
 		return err
+	}
+	return writePackage(ctx, t, input, output, s)
+}
+
+func prepareRuntime(ctx context.Context, t Template, input, output string, s config.Settings) (Template, error) {
+	if err := ctx.Err(); err != nil {
+		return t, err
 	}
 	if err := s.Validate(); err != nil {
-		return err
+		return t, err
 	}
 	if t.Version != config.Version {
-		return fmt.Errorf("runtime version mismatch")
+		return t, fmt.Errorf("runtime version mismatch")
 	}
 	switch t.OS {
 	case "linux", "windows":
 	default:
-		return fmt.Errorf("unsupported runtime OS")
+		return t, fmt.Errorf("unsupported runtime OS")
 	}
 	switch t.Arch {
 	case "386", "amd64", "arm64":
 	default:
-		return fmt.Errorf("unsupported runtime architecture")
+		return t, fmt.Errorf("unsupported runtime architecture")
 	}
 	p, err := project.Load(input)
 	if err != nil {
-		return err
+		return t, err
 	}
 	sources, err := projectSourcePaths(input, p)
 	if err != nil {
-		return err
+		return t, err
 	}
 	sources = append(sources, t.Path)
 	if exe, e := os.Executable(); e == nil {
 		sources = append(sources, exe)
 	}
 	if err = protectOutput(output, sources); err != nil {
-		return err
+		return t, err
 	}
 	if _, err := exec.LookPath("go"); err != nil {
-		return fmt.Errorf(i18n.Tr("error.go_missing"), err)
+		return t, fmt.Errorf(i18n.Tr("error.go_missing"), err)
 	}
 	extensions, err := resolveExtensionSources(ctx, input, p)
 	if err != nil {
-		return err
+		return t, err
 	}
 	for _, extension := range extensions {
 		if extension.Path != "" {
@@ -295,16 +303,16 @@ func Export(ctx context.Context, t Template, input, output string, s config.Sett
 		}
 	}
 	if err = protectOutput(output, sources); err != nil {
-		return err
+		return t, err
 	}
 	t, err = extensionRuntime(ctx, t, extensions, output, p)
 	if err != nil {
-		return err
+		return t, err
 	}
 	if err = protectOutput(output, []string{t.Path, t.validatorPath}); err != nil {
-		return err
+		return t, err
 	}
-	return writePackage(ctx, t, input, output, s)
+	return t, nil
 }
 
 func writePackage(ctx context.Context, t Template, input, output string, s config.Settings) error {

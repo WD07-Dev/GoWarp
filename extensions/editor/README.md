@@ -44,6 +44,8 @@ Changes to assets, sprites, variable/list definitions, extensions or runtime set
 
 GoWarp imports unsaved project changes, assets and supported TurboWarp settings. Compiler caching and snapshot reuse reduce unnecessary uploads and compilation.
 
+Preview launches use the cached native runtime with a separate project and settings file. They skip executable packaging, icon insertion and project recompression. **GoWarp Stop** still closes the process; another run reuses the compiler cache but loads game resources again. Use the green flag and Scratch's stop button to restart scripts in the open preview without reloading resources.
+
 Runtime extensions require GoWarp-compatible implementations. The editor helper uses `/* @gowarp-ignore */` and does not require a `@gowarp-go` section.
 
 Only one preview can run per connection. Uploads are limited to 512 MiB. Temporary files are cleaned up when the preview or connection closes.
