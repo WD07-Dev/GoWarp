@@ -185,7 +185,6 @@ editor.copying,Copying connection address…,연결 주소 복사 중…
 editor.copied,Connection address copied. Paste it in TurboWarp -> GoWarp Run.,연결 주소를 복사했습니다. TurboWarp -> GoWarp Run에 붙여넣으세요.
 editor.disconnecting,Disconnecting TurboWarp…,TurboWarp 연결 종료 중…
 editor.disconnected,TurboWarp disconnected.,TurboWarp 연결을 종료했습니다.
-editor.preview_mode,TurboWarp Preview,TurboWarp 미리보기
 editor.preview_settings,Preview mode - Settings apply on the next GoWarp Run.,미리보기 모드 - 설정은 다음 GoWarp Run부터 적용됩니다.
 editor.disconnect_first,Disconnect TurboWarp before opening a project or editing extensions.,프로젝트 열기나 확장 편집 전에 TurboWarp 연결을 끊어 주세요.
 editor.connected_project,Project from the connected TurboWarp editor,연결된 TurboWarp 편집기의 프로젝트

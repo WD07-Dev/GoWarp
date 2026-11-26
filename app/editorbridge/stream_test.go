@@ -27,6 +27,22 @@ func TestPreviewFrameSizeUsesBrowserPixels(t *testing.T) {
 	}
 }
 
+func TestPreviewAcceptsFullHDFrame(t *testing.T) {
+	const width, height = 1920, 1080
+	data := make([]byte, 9+width*height*4)
+	data[0] = 1
+	binary.LittleEndian.PutUint32(data[1:5], width)
+	binary.LittleEndian.PutUint32(data[5:9], height)
+	if len(data) > maxFrameSize || !validFrame(data) {
+		t.Fatal("full-HD preview was rejected")
+	}
+	binary.LittleEndian.PutUint32(data[1:5], 1921)
+	data = append(data, make([]byte, height*4)...)
+	if validFrame(data) {
+		t.Fatal("invalid frame dimensions were accepted")
+	}
+}
+
 func TestReadPlayerPacketReusesStorage(t *testing.T) {
 	want := []byte("first frame")
 	packet := make([]byte, 4+len(want))
@@ -175,6 +191,26 @@ func TestPreviewStreamsFramesAndCommandsWithoutRebuilding(t *testing.T) {
 		t.Fatal("frame request exceeded the two-frame limit")
 	}
 	peer.Frame(2, 1, func([]byte) { t.Fatal("unrequested GPU readback") })
+	if err := websocket.JSON.Send(ws, Command{Action: "frame", Width: 1440, Height: 1080, Frames: 1}); err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.Now().Add(3 * time.Second)
+	for !peer.WantsFrame() && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if width, height := peer.FrameSize(480, 360); width != 1440 || height != 1080 {
+		t.Fatalf("high-DPI request was reduced: %dx%d", width, height)
+	}
+	peer.Frame(1440, 1080, func(pixels []byte) {
+		clear(pixels)
+		pixels[0], pixels[len(pixels)-1] = 123, 255
+	})
+	if err := websocket.Message.Receive(ws, &frame); err != nil {
+		t.Fatal(err)
+	}
+	if !validFrame(frame) || len(frame) != 9+1440*1080*4 || frame[9] != 123 || frame[len(frame)-1] != 255 {
+		t.Fatal("high-DPI frame was altered or truncated")
+	}
 	ws.Close()
 	select {
 	case command := <-peer.Commands:

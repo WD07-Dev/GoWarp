@@ -14,7 +14,7 @@
 
 The extension is saved with the SB3 even when no extension blocks are used. Connection addresses and tokens are never saved.
 
-Once connected, the packager shows **TurboWarp Preview** and imports the editor project's settings. Change execution, stage/window and other settings in the packager; they apply on the **next GoWarp Run**, without interrupting the current game. A settings change restarts the player on that next run, while unchanged projects still reuse their uploaded snapshot.
+Once connected, the packager shows **Preview** and imports the editor project's settings. Change execution, stage/window and other settings in the packager; they apply on the **next GoWarp Run**, without interrupting the current game. A settings change restarts the player on that next run, while unchanged projects still reuse their uploaded snapshot.
 
 Disconnect before opening a different SB3 or project settings file. File opening, extension editing and exporting are disabled during preview mode. Disconnecting restores the previously open packager settings. **GoWarp Stop** closes the game but keeps the editor connected.
 
@@ -27,7 +27,7 @@ Keep GoWarp open while connected. Allow local network access if your browser ask
 
 **Multi-window** forces Native window mode and disables Embedded preview. This also applies when the mode is requested by an older or modified editor helper.
 
-Embedded preview supports up to 60 streamed frames per second with a maximum image edge of 960 pixels. Frames are transmitted as uncompressed RGBA over authenticated loopback WebSockets.
+Embedded preview supports up to 60 streamed frames per second with a maximum image edge of 1920 pixels. The render size follows the stage's displayed size and the browser's pixel ratio. The preview canvas uses pixelated scaling instead of the browser's default smooth scaling. Larger previews require more rendering and transfer work. Frames are transmitted as uncompressed RGBA over authenticated loopback WebSockets.
 
 TurboWarp's VM frame loop is paused during preview to avoid duplicate execution. Audio plays locally, and the native window must remain open. Use Native window mode for accurate performance measurements.
 

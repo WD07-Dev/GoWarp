@@ -18,7 +18,8 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-const maxFrameSize = 9 + 960*960*4
+const maxFrameEdge = 1920
+const maxFrameSize = 9 + maxFrameEdge*maxFrameEdge*4
 const maxCommandSize = 4 << 20
 
 // Command messages are applied by the player on its VM thread.
@@ -311,7 +312,7 @@ func validFrame(data []byte) bool {
 		return false
 	}
 	w, h := int(binary.LittleEndian.Uint32(data[1:5])), int(binary.LittleEndian.Uint32(data[5:9]))
-	return w > 0 && h > 0 && w <= 960 && h <= 960 && len(data) == 9+w*h*4
+	return w > 0 && h > 0 && w <= maxFrameEdge && h <= maxFrameEdge && len(data) == 9+w*h*4
 }
 
 func ConnectRuntime(ctx context.Context, address string, embedded bool) (*Peer, error) {
@@ -377,7 +378,7 @@ func (p *Peer) read() {
 		}
 		if command.Action == "frame" {
 			if command.Width > 0 && command.Height > 0 {
-				p.frameSize.Store(uint32(min(command.Width, 960))<<16 | uint32(min(command.Height, 960)))
+				p.frameSize.Store(uint32(min(command.Width, maxFrameEdge))<<16 | uint32(min(command.Height, maxFrameEdge)))
 			}
 			if p.Embedded {
 				count := int32(max(1, min(command.Frames, 2)))
@@ -458,7 +459,7 @@ func (p *Peer) FrameSize(width, height int) (int, int) {
 }
 
 func (p *Peer) Frame(width, height int, read func([]byte)) {
-	if !p.WantsFrame() || width < 1 || height < 1 || width > 960 || height > 960 {
+	if !p.WantsFrame() || width < 1 || height < 1 || width > maxFrameEdge || height > maxFrameEdge {
 		return
 	}
 	var data []byte

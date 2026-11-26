@@ -11,6 +11,8 @@ function editor(t, language = "en") {
     const listeners = new Map();
     let displayed = 0;
     let finishZip;
+    let zipStarted;
+    const zipReady = new Promise(resolve => { zipStarted = resolve; });
     let holdZip = false;
     let zipOptions;
     let generated = 0;
@@ -89,7 +91,7 @@ function editor(t, language = "en") {
         async generateAsync(options) {
             generated++;
             zipOptions = options;
-            if (holdZip) await new Promise(resolve => { finishZip = resolve; });
+            if (holdZip) await new Promise(resolve => { finishZip = resolve; zipStarted(); });
             return new Blob([JSON.stringify(this.files)]);
         }
     }
@@ -192,6 +194,7 @@ function editor(t, language = "en") {
         loading: () => document.getElementById("gowarp-preview-loading"),
         holdZip: () => { holdZip = true; },
         finishZip: () => finishZip(),
+        zipReady,
         generated: () => generated,
         zipOptions: () => zipOptions,
         runButton: () => document.getElementById("gowarp-editor-button"),
@@ -199,12 +202,12 @@ function editor(t, language = "en") {
         stops: () => stops, displayed: () => displayed,
         embedded: () => { nodes.find(node => node.tagName === "select").value = "embedded"; },
         hidden: value => { document.hidden = value; listeners.get("visibilitychange")(); },
-        frame: () => {
-            const data = new ArrayBuffer(9 + 4);
+        frame: (width = 1, height = 1) => {
+            const data = new ArrayBuffer(9 + width * height * 4);
             const header = new DataView(data);
             header.setUint8(0, 1);
-            header.setUint32(1, 1, true);
-            header.setUint32(5, 1, true);
+            header.setUint32(1, width, true);
+            header.setUint32(5, height, true);
             sockets.at(-1).onmessage({data});
         },
         run: () => document.getElementById("gowarp-editor-button").onclick(),
@@ -309,6 +312,24 @@ test("embedded preview requests physical pixels on high-DPI screens", async t =>
     assert.equal(frame.height, 720);
 });
 
+test("embedded preview keeps detail above 960 pixels and bounds oversized requests", async t => {
+    const e = editor(t);
+    e.pixelRatio(3);
+    e.embedded();
+    await e.connect();
+    await e.run();
+    await settle();
+    let frame = e.commands.find(command => command.action === "frame");
+    assert.equal(frame.width, 1440);
+    assert.equal(frame.height, 1080);
+    e.pixelRatio(5);
+    e.frame(1440, 1080);
+    assert.equal(e.displayed(), 1);
+    frame = e.commands.at(-1);
+    assert.equal(frame.width, 1920);
+    assert.equal(frame.height, 1440);
+});
+
 async function settle() {
     for(let i=0; i < 10; i++) await new Promise(resolve => setImmediate(resolve));
 }
@@ -318,7 +339,7 @@ test("preview shows loading while preparing and cancels before upload", async t 
     await e.connect();
     e.holdZip();
     const running = e.run();
-    await settle();
+    await e.zipReady;
     assert.ok(e.loading(), "stage has no loading display during archive preparation");
     assert.equal(e.loading().children[1].textContent, "Preparing project...");
     await e.stopButton().onclick();

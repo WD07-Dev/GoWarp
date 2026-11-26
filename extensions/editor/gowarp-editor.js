@@ -59,6 +59,7 @@
     let multiWindow = false;
     let activeDisplay = "native";
     let pendingFrames = 0;
+    const maxFrameEdge = 1920;
     let mouseRequest = 0;
     let pendingMouse = null;
     const reports = new Map();
@@ -116,7 +117,7 @@
     #gowarp-editor-dialog::backdrop {background:#0008;}
     #gowarp-editor-dialog h2 {margin:0 0 12px;color:#ff4b51;}
     #gowarp-editor-dialog input, #gowarp-editor-dialog select {box-sizing:border-box;width:100%;padding:10px;border:1px solid #666;border-radius:5px;background:#111;color:#eee;font:13px monospace;}
-    #gowarp-preview {position:absolute;inset:0;width:100%;height:100%;z-index:100;outline:none;touch-action:none;background:#000;}
+    #gowarp-preview {position:absolute;inset:0;width:100%;height:100%;z-index:100;outline:none;touch-action:none;background:#000;image-rendering:pixelated;}
     #gowarp-preview:focus-visible {outline:2px solid #ff4b51;outline-offset:-2px;}
     #gowarp-preview-loading {position:absolute;inset:0;z-index:101;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#202020ed;color:#eee;font:14px sans-serif;}
     #gowarp-preview-loading strong {color:#ff4b51;font-size:22px;}
@@ -147,8 +148,8 @@
     element("option", tr("Native window (default)", "별도 창 (기본)"), displayMode).value = "native";
     element("option", tr("Embedded preview (experimental)", "편집기 안에서 미리보기 (실험적)"), displayMode).value = "embedded";
     element("p", tr(
-        "Embedded preview displays up to 60 frames/s, with a maximum edge of 960 px. Audio plays locally. The native window must stay open.",
-        "편집기 안 표시는 최대 60프레임/초, 긴 변 960px로 전송합니다. 소리는 PC에서 재생하며 네이티브 창은 계속 열려 있어야 합니다."
+        "Embedded preview displays up to 60 frames/s, with a maximum edge of 1920 px. Audio plays locally. The native window must stay open.",
+        "편집기 안 표시는 최대 60프레임/초, 긴 변 1920px로 전송합니다. 소리는 PC에서 재생하며 네이티브 창은 계속 열려 있어야 합니다."
     ), dialog);
     const controls = element("div", "", dialog);
     const connectButton = element("button", tr("Connect", "연결"), controls);
@@ -698,9 +699,9 @@
         if (document.hidden || !overlay || phase !== "running" || activeDisplay !== "embedded" || pendingFrames >= 2) return;
         const bounds = overlay.getBoundingClientRect();
         const ratio = window.devicePixelRatio || 1;
-        const width = Math.max(1, Math.ceil(bounds.width * ratio));
-        const height = Math.max(1, Math.ceil(bounds.height * ratio));
-        const scale = Math.min(1, 960 / Math.max(width, height));
+        const width = Math.max(1, Math.round(bounds.width * ratio));
+        const height = Math.max(1, Math.round(bounds.height * ratio));
+        const scale = Math.min(1, maxFrameEdge / Math.max(width, height));
         const frames = 2 - pendingFrames;
         if (send({
             action: "frame", frames, width: Math.max(1, Math.floor(width * scale)),
@@ -715,7 +716,7 @@
         if (buffer.byteLength < 9) return;
         const header = new DataView(buffer);
         const width = header.getUint32(1, true), height = header.getUint32(5, true);
-        if (header.getUint8(0) !== 1 || !width || !height || width > 960 || height > 960 ||
+        if (header.getUint8(0) !== 1 || !width || !height || width > maxFrameEdge || height > maxFrameEdge ||
         buffer.byteLength !== 9+width*height*4) return;
         pendingFrames = Math.max(0, pendingFrames - 1);
         if (document.hidden) return;
