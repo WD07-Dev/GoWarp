@@ -24,7 +24,6 @@ import (
 const Version = 1
 
 type Window struct {
-	// Initial game display size, excluding player controls. Zero inherits the stage size.
 	Width      int    `json:"width"`
 	Height     int    `json:"height"`
 	Fit        string `json:"fit"`

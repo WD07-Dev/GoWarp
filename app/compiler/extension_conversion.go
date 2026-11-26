@@ -19,10 +19,6 @@ type extensionContextWriter struct {
 	writer io.Writer
 }
 
-/*
-ConvertExtensions atomically embeds annotated JS, preserving blocks, assets and unknown fields.
-Failed or canceled conversions leave the destination intact.
-*/
 func ConvertExtensions(ctx context.Context, input, output string, sources map[string][]byte) error {
 	if err := ctx.Err(); err != nil {
 		return err

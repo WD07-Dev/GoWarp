@@ -57,10 +57,6 @@ func runMainWithExtensions(bundle extension.Bundle) int {
 	if logErr != nil {
 		fmt.Fprintln(os.Stderr, "runtime diagnostics:", logErr)
 	}
-	/*
-		Do not defer normal completion: an unhandled panic must leave the
-		crash descriptor installed, including for panics in other goroutines.
-	*/
 	code := 1
 	if err != nil {
 		diagnostics.record("package error: " + err.Error())

@@ -27,7 +27,6 @@ func (a *application) choice(x, y, width int, choices []string, selected int, ch
 		label = displayChoice(choices[selected])
 	}
 	a.label(x+10, y+23, a.fitText(label, width-44), foreground)
-	// Draw the arrow directly: the embedded font does not include this glyph.
 	for row := 0; row < 4; row++ {
 		a.fill(image.Rect(x+width-24+row, y+15+row, x+width-17-row, y+16+row), ui.Muted)
 	}
@@ -141,7 +140,6 @@ func (a *application) renderDropdown() {
 	}
 }
 
-// Boolean fields keep a text label as well as color so state is not color-only.
 func choiceColors(choices []string, selected int) (color.Color, color.Color) {
 	if len(choices) == 2 && choices[0] == "true" && choices[1] == "false" {
 		if selected == 0 {

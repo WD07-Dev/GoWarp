@@ -98,10 +98,6 @@ func payload(file *os.File) (size, projectSize, optionsSize int64, err error) {
 	return size, int64(p), int64(o), nil
 }
 
-/*
-Build packages the current executable with a project. Failed or
-canceled builds leave existing output intact.
-*/
 func Build(ctx context.Context, options Options) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err

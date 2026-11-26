@@ -11,7 +11,6 @@ import (
 	mp3 "github.com/nicholas-fedor/mp3-decoder"
 )
 
-// mp3PCM exposes the decoder's stereo samples as little-endian float32 bytes.
 type mp3PCM struct {
 	decoder  *mp3.Decoder
 	length   int64
@@ -33,8 +32,13 @@ func decodeMP3(data []byte) (*mp3PCM, error) {
 	return &mp3PCM{decoder: decoder, length: frames * 8}, nil
 }
 
-func (s *mp3PCM) SampleRate() int { return s.decoder.Info().SampleRate }
-func (s *mp3PCM) Length() int64   { return s.length }
+func (s *mp3PCM) SampleRate() int {
+	return s.decoder.Info().SampleRate
+}
+
+func (s *mp3PCM) Length() int64 {
+	return s.length
+}
 
 func (s *mp3PCM) Read(p []byte) (int, error) {
 	if len(p) == 0 {

@@ -169,7 +169,6 @@ func Run(ctx context.Context, path string, p *project.Project, options Options, 
 		return g.controller.vm, err
 	}
 	if err == nil && options.Settings == nil {
-		// Closing during preparation cancels the run; CLI callers require a runtime on success.
 		err = context.Canceled
 	}
 	return nil, err
@@ -177,7 +176,6 @@ func Run(ctx context.Context, path string, p *project.Project, options Options, 
 
 func keyName(key ebiten.Key, text string) string {
 	s := key.String()
-	// OS text input includes Shift and Caps Lock, even when enabled before focus.
 	if len(s) == 1 && s[0] >= 'A' && s[0] <= 'Z' {
 		for _, char := range text {
 			if strings.EqualFold(s, string(char)) {

@@ -358,7 +358,6 @@ func (s *Server) receive(w http.ResponseWriter, r *http.Request) {
 			s.status = Status{Phase: "running"}
 		}
 		s.mu.Unlock()
-		// The launcher reaps its process on cancellation before completing this channel.
 		err = <-done
 	}()
 	w.Header().Set("Content-Type", "application/json")

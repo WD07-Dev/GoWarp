@@ -31,7 +31,6 @@ type displayResult struct {
 	err     error
 }
 
-// One worker or host claims each decode. Per-image completion bypasses mailbox ordering.
 type bitmapDecode struct {
 	bytes    int64
 	state    atomic.Uint32 // 0 queued, 1 worker owns it, 2 host owns it, 3 discarded lookahead
@@ -52,12 +51,11 @@ type displayPreparation struct {
 	bitmapJobs      chan displayRequest
 	bitmapLookahead chan displayRequest
 	bitmapDone      chan struct{}
-	// Only the host thread accesses pending and the library's LRU.
-	pending       map[string]bool
-	bitmapPending map[string]*bitmapDecode
-	bitmapUnused  map[string]bool
-	failed        map[string]bool
-	next          map[*Costume][]displayRequest
+	pending         map[string]bool
+	bitmapPending   map[string]*bitmapDecode
+	bitmapUnused    map[string]bool
+	failed          map[string]bool
+	next            map[*Costume][]displayRequest
 }
 
 func (d *displayPreparation) bitmapRoom(bytes int64) bool {
@@ -88,10 +86,6 @@ func (d *displayPreparation) makeBitmapRoom(bytes int64, urgent bool) bool {
 	return false
 }
 
-/*
-PrepareDisplayBitmap queues a selected image. The host owns the cache and joins only that decode
-when needed.
-*/
 func (lib *Library) PrepareDisplayBitmap(costume *Costume) bool {
 	cache := lib.cache
 	if cache == nil || cache.display == nil || !cache.ready() || costume == nil || !costume.Bitmap {
@@ -116,7 +110,6 @@ func (lib *Library) PrepareDisplayBitmap(costume *Costume) bool {
 		return false
 	}
 	if work == nil && !display.bitmapRoom(bytes) {
-		// Release completed reservations before stamps queue more work during VM execution.
 	ready:
 		for range cap(display.bitmapJobs) {
 			select {
@@ -144,10 +137,6 @@ func (lib *Library) PrepareDisplayBitmap(costume *Costume) bool {
 	}
 }
 
-/*
-EnableDisplayPreparation starts SVG and bitmap workers with independent readers. Call during
-loading, before transferring the library to the game thread.
-*/
 func (lib *Library) EnableDisplayPreparation(path string, p *project.Project) error {
 	cache := lib.cache
 	if cache == nil || cache.display != nil {
@@ -174,7 +163,6 @@ func (lib *Library) EnableDisplayPreparation(path string, p *project.Project) er
 		failed:          make(map[string]bool),
 		next:            make(map[*Costume][]displayRequest),
 	}
-	// Look two frames ahead for large, equally sized animation bitmaps within the shared budget.
 	hasBitmaps := false
 	for _, costumes := range lib.Costumes {
 		for i, costume := range costumes {
@@ -198,7 +186,6 @@ func (lib *Library) EnableDisplayPreparation(path string, p *project.Project) er
 			}
 		}
 	}
-	// Separate readers keep SVG scaling from blocking bitmap workers; only the host mutates the LRU.
 	if hasBitmaps {
 		// Leave a CPU for the host; workers share four jobs and 16 MiB.
 		var readers []*project.AssetReader
@@ -281,10 +268,6 @@ func (d *displayPreparation) run(ctx context.Context, reader *project.AssetReade
 					result.asset = newCostumeAsset(request.key, decoded.Image, true)
 				}
 			} else if err == nil && ctx.Err() == nil {
-				/*
-					As in CostumeImageAtScale, an unsupported high-resolution raster
-					falls back to base pixels. Archive read failures remain errors.
-				*/
 				result.pixels, _, _ = rasterSVGWithAntialias(data, request.density, fonts, d.noAntialias)
 			}
 		}
@@ -295,7 +278,6 @@ func (d *displayPreparation) run(ctx context.Context, reader *project.AssetReade
 			request.work.result = result
 			close(request.work.done)
 		}
-		// Bitmap results fit their reserved queue budget. SVG results retain an unbuffered handoff.
 		select {
 		case <-ctx.Done():
 			return
@@ -304,24 +286,18 @@ func (d *displayPreparation) run(ctx context.Context, reader *project.AssetReade
 	}
 }
 
-/*
-PrepareDisplayCostume advances lookahead even on GPU hits. Call on the host thread; uploaded
-reports complete GPU textures.
-*/
 func (lib *Library) PrepareDisplayCostume(costume *Costume, uploaded func(string) bool) {
 	cache := lib.cache
 	if cache == nil || cache.display == nil || !cache.ready() {
 		return
 	}
 	display := cache.display
-	// Retry evicted lookahead only after actual use, avoiding repeated decoding of an unchanged frame.
 	if source, ok := cache.costumes[costume]; ok {
 		delete(display.bitmapUnused, source.key)
 		if display.bitmapPending[source.key] != nil && (uploaded == nil || !uploaded(source.key)) {
 			lib.PrepareDisplayBitmap(costume)
 		}
 	}
-	// Bound result draining so continuously finishing workers cannot monopolize the host.
 ready:
 	for range cap(display.bitmapJobs) + 1 {
 		var result displayResult

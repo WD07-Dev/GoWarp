@@ -12,8 +12,11 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// SetAntialias selects runtime SVG rasterization before playback or display workers
-// are prepared. Initially cached SVG pixels are discarded when the mode changes.
+type hardSVGScanner struct {
+	*rasterx.ScannerGV
+	mask *image.Alpha
+}
+
 func (lib *Library) SetAntialias(enabled bool) error {
 	if lib.noAntialias == !enabled {
 		return nil
@@ -36,8 +39,6 @@ func (lib *Library) SetAntialias(enabled bool) error {
 	return nil
 }
 
-// WithoutFontAntialias thresholds only glyph coverage. Metrics and ownership
-// remain with face; closing the returned face closes the original face.
 func WithoutFontAntialias(face font.Face) font.Face {
 	if _, ok := face.(*hardFontFace); ok {
 		return face
@@ -68,13 +69,6 @@ func (m hardCoverage) At(x, y int) color.Color {
 	return color.Alpha{}
 }
 
-// Rasterize geometric coverage before applying the original color source, so
-// opacity, gradients, and translucent embedded pixels retain their alpha.
-type hardSVGScanner struct {
-	*rasterx.ScannerGV
-	mask *image.Alpha
-}
-
 func (s *hardSVGScanner) Draw() {
 	dst, src, offset := s.Dest, s.Source, s.Offset
 	if s.mask == nil || s.mask.Bounds() != dst.Bounds() {
@@ -91,7 +85,6 @@ func (s *hardSVGScanner) Draw() {
 			s.mask.Pix[i] = 0
 		}
 	}
-	// rasterx gradients inherit Uniform.RGBA64At, which bypasses their color function.
 	switch src.(type) {
 	case *rasterx.ColorFuncImage, *rasterx.ClipImage:
 		src = struct{ image.Image }{src}

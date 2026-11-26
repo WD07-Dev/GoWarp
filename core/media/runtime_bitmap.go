@@ -19,10 +19,6 @@ type playbackBitmap struct {
 	lengths  [2]int
 }
 
-/*
-PrepareCostumePlayback prepares lossless base rasters within the shared cache budget. Call during
-loading, before starting display workers.
-*/
 func (lib *Library) PrepareCostumePlayback(progress func(LoadProgress)) error {
 	c := lib.cache
 	if c == nil || c.playback != nil {
@@ -41,7 +37,6 @@ func (lib *Library) PrepareCostumePlayback(progress func(LoadProgress)) error {
 	for _, costumes := range lib.Costumes {
 		total += len(costumes)
 	}
-	// Prioritize expensive SVG rasters; bitmaps use the remaining allowance.
 	for _, bitmap := range []bool{false, true} {
 		for _, costumes := range lib.Costumes {
 			for _, costume := range costumes {
@@ -299,7 +294,6 @@ func (c *runtimeCache) playbackAsset(key string) *cachedAsset {
 	}
 	bitmap, err := bitmap.load()
 	if err != nil {
-		// Optional prepared storage may fail; the original asset remains available.
 		delete(c.playback, key)
 		return nil
 	}

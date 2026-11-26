@@ -274,7 +274,6 @@ func (g *stageGPU) Draw(dst *ebiten.Image, r *render.Renderer, scene []vm.Displa
 		p.work, p.frame = p.frame, p.work
 		p.workBacking, p.frameBacking = p.frameBacking, p.workBacking
 	}
-	// Bypass unchanged color filters while preserving nearest sampling and project-shader normalization.
 	copyOnly := c.Nearest && !filtered && v.Shader == nil && v.Split == nil
 	if copyOnly && p.copy == nil {
 		var err error
@@ -291,7 +290,6 @@ func (g *stageGPU) Draw(dst *ebiten.Image, r *render.Renderer, scene []vm.Displa
 		}
 	}
 	uniforms := p.uniformValues(w, h, c)
-	// GPUs may flush subnormal float32 values to zero, selecting the color-filter branch.
 	if c.Blur >= 0x1p-126 {
 		canvasImage(&p.blur, &p.blurBacking, w, h)
 		other := p.frame
@@ -372,14 +370,9 @@ func drawCanvasBorder(dst *ebiten.Image, c vm.CanvasEffects) {
 	size := float32(c.BorderWidth)
 	col := color.Color(vm.ParseColor(c.BorderColor))
 	if c.BorderStyle == "dotted" || c.BorderStyle == "dashed" {
-		/*
-			CSS backgrounds extend under the border. Painting the stage over
-			that background must not expose stage pixels in the border's gaps.
-		*/
 		if c.Background != "transparent" {
 			background := vm.ParseColor(c.Background)
 			vector.StrokeRect(dst, size/2, size/2, w-size, h-size, size, background, false)
-			// Matching opaque colors form a solid ring; skip individual dots.
 			if background.A == 255 && background == col {
 				return
 			}
