@@ -56,13 +56,14 @@ type Status struct {
 }
 
 type job struct {
-	snapshot string
-	ctx      context.Context
-	cancel   context.CancelFunc
-	done     chan struct{}
-	token    string
-	stream   *relay
-	display  string
+	snapshot        string
+	discardSnapshot bool
+	ctx             context.Context
+	cancel          context.CancelFunc
+	done            chan struct{}
+	token           string
+	stream          *relay
+	display         string
 }
 
 type Server struct {
@@ -231,6 +232,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && r.URL.Path == "/disconnect":
 		s.mu.Lock()
 		if s.active != nil {
+			s.active.discardSnapshot = true
 			s.status = Status{Phase: "stopping"}
 			s.active.cancel()
 		} else {
@@ -242,6 +244,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		s.settings = nil
 		s.settingsRevision, s.settingsError = "", ""
+		s.snapshot = ""
+		os.Remove(filepath.Join(s.cacheDir, "project.sb3"))
 		s.mu.Unlock()
 		w.WriteHeader(http.StatusAccepted)
 	case r.Method == http.MethodPost && r.URL.Path == "/stop":
@@ -403,19 +407,17 @@ func (s *Server) receiveProject(r *http.Request, path, snapshot string) (string,
 
 func (s *Server) finishPreview(j *job, dir string, err error) {
 	j.stream.close()
-	var snapshot string
-	if j.snapshot != "" && s.ctx.Err() == nil {
+	s.mu.Lock()
+	if !j.discardSnapshot && j.snapshot != "" && s.ctx.Err() == nil {
 		if err := os.Rename(filepath.Join(dir, "project.sb3"), filepath.Join(s.cacheDir, "project.sb3")); err == nil {
-			snapshot = j.snapshot
+			s.snapshot = j.snapshot
 		}
 	}
+	s.mu.Unlock()
 	if dir != "" {
 		os.RemoveAll(dir)
 	}
 	s.mu.Lock()
-	if snapshot != "" {
-		s.snapshot = snapshot
-	}
 	if j.ctx.Err() != nil || errors.Is(err, context.Canceled) {
 		err = nil
 	}

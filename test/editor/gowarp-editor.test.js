@@ -192,7 +192,7 @@ function editor(t, language = "en") {
         disconnect: () => nodes.find(node => node.textContent === "Disconnect").onclick(),
         uploadedFiles: () => uploadedFiles,
         loading: () => document.getElementById("gowarp-preview-loading"),
-        holdZip: () => { holdZip = true; },
+        holdZip: (value = true) => { holdZip = value; },
         finishZip: () => finishZip(),
         zipReady,
         generated: () => generated,
@@ -331,7 +331,7 @@ test("embedded preview keeps detail above 960 pixels and bounds oversized reques
 });
 
 async function settle() {
-    for(let i=0; i < 10; i++) await new Promise(resolve => setImmediate(resolve));
+    for(let i=0; i < 10; i++) await new Promise(resolve => setTimeout(resolve, 0));
 }
 
 test("preview shows loading while preparing and cancels before upload", async t => {
@@ -481,7 +481,37 @@ test("disconnecting an unreachable packager unlocks the address for reconnecting
     assert.equal(e.address().disabled, true);
     await e.run();
     await settle();
-    assert.equal(e.commands.at(-1).action, "flag");
+    assert.equal(e.uploads(), 2);
+});
+
+test("disconnect releases the cached archive before reconnecting", async t => {
+    const e = editor(t);
+    await e.connect();
+    await e.run();
+    await settle();
+    assert.equal(e.generated(), 1);
+    await e.disconnect();
+    await e.connect();
+    await e.run();
+    await settle();
+    assert.equal(e.generated(), 2, "disconnected project assets remained cached");
+});
+
+test("disconnect during archive creation cannot repopulate the cache", async t => {
+    const e = editor(t);
+    await e.connect();
+    e.holdZip();
+    const running = e.run();
+    await e.zipReady;
+    await e.disconnect();
+    e.finishZip();
+    await running;
+    assert.equal(e.uploads(), 0);
+    e.holdZip(false);
+    await e.connect();
+    await e.run();
+    await settle();
+    assert.equal(e.generated(), 2, "cancelled archive remained cached");
 });
 
 test("opening settings after the packager closes unlocks the connection address", async t => {

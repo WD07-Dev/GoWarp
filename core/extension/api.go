@@ -53,42 +53,26 @@ Warp scripts need not yield unless YieldTick is set. Again repeats this
 command with its evaluated arguments and Local state retained.
 */
 type Result struct {
-	Value any
-	/*
-		Branch names a substack input. With Again, the handler is called again
-		after that substack returns, retaining Local and evaluated arguments.
-	*/
-	Branch string
-	Yield  bool
-	Again  bool
-	// YieldTick waits for the next VM tick, including in warp/turbo mode.
-	YieldTick bool
-	// ReevaluateInputs refreshes inputs on Again while retaining Local state.
+	Value            any
+	Branch           string
+	Yield            bool
+	Again            bool
+	YieldTick        bool
 	ReevaluateInputs bool
 }
 
 type Handler func(*Context) (Result, error)
 
 type Block struct {
-	// Text labels stage monitors; [INPUT] placeholders use the saved monitor parameters.
-	Text    string
-	Opcode  string
-	Kind    string
-	Inputs  []string
-	Handler Handler
-	/*
-		BorrowContext reuses call storage. The handler must finish synchronously
-		without retaining or returning Context, Args, Fields, or Local.
-		State and argument values keep their normal lifetimes.
-	*/
+	Text          string
+	Opcode        string
+	Kind          string
+	Inputs        []string
+	Handler       Handler
 	BorrowContext bool
 }
 
 type Extension struct {
-	/*
-		Prepare transforms block graphs before compilation and runtime installation.
-		It must be deterministic and independent of runtime state or external I/O.
-	*/
 	Prepare func(*Project) error
 	ID      string
 	Blocks  []Block

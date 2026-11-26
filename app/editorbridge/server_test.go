@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -92,6 +93,39 @@ func TestEditorConnectionIsExplicit(t *testing.T) {
 	res = request(t, s, "POST", "/disconnect", "https://turbowarp.org", s.token, nil)
 	if res.StatusCode != http.StatusAccepted || readConnected() {
 		t.Fatal("disconnect left the editor session active")
+	}
+}
+
+func TestDisconnectDiscardsPreviewSnapshot(t *testing.T) {
+	for _, stopped := range []bool{false, true} {
+		t.Run(fmt.Sprint("stopped=", stopped), func(t *testing.T) {
+			s, err := Start(context.Background(), func(ctx context.Context, _ string, _ Options) (<-chan error, error) {
+				done := make(chan error, 1)
+				go func() { <-ctx.Done(); done <- nil }()
+				return done, nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(s.Close)
+			request(t, s, "POST", "/run", "https://turbowarp.org", s.token, strings.NewReader("snapshot"))
+			waitPhase(t, s, "running")
+			if stopped {
+				s.Stop()
+				waitPhase(t, s, "ready")
+				if s.Status().Snapshot == "" {
+					t.Fatal("Stop discarded the reusable snapshot")
+				}
+			}
+			request(t, s, "POST", "/disconnect", "https://turbowarp.org", s.token, nil)
+			waitPhase(t, s, "ready")
+			if s.Status().Snapshot != "" {
+				t.Fatal("disconnect retained the snapshot")
+			}
+			if _, err := os.Stat(filepath.Join(s.cacheDir, "project.sb3")); !os.IsNotExist(err) {
+				t.Fatalf("disconnected project remains on disk: %v", err)
+			}
+		})
 	}
 }
 

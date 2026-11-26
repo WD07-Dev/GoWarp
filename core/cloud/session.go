@@ -108,10 +108,6 @@ func (s *Session) Set(name, value string) {
 	defer s.mu.Unlock()
 	switch s.mode(name) {
 	case "local":
-		/*
-			Local saves include names and serialized game data. Numeric-only
-			validation belongs to the network cloud protocol.
-		*/
 		previous, exists := s.local[name]
 		if exists && previous == value {
 			return
@@ -303,10 +299,6 @@ func (s *Session) connect() error {
 		s.ready = false
 		s.mu.Unlock()
 	}()
-	/*
-		The protocol has no end-of-snapshot marker. Suppress writes during a
-		bounded initial receive window and never replay pre-sync changes.
-	*/
 	readyAt := time.Now().Add(time.Second)
 	received := make(chan error, 1)
 	go func() {

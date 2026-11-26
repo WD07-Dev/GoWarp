@@ -28,37 +28,24 @@ const maxDecodedBytes = 256 << 20
 
 // Long music tracks can exceed 64 MiB after conversion to stereo float PCM.
 const maxSoundBytes = 128 << 20
-
-/*
-A project can contain many costumes and narration clips. Keep this separate
-from the per-SVG working limits used while decoding a single costume.
-*/
 const maxLibraryBytes = 1 << 30
 
 type Costume struct {
-	// CacheKey identifies generated pixels after their CPU buffer is evicted.
-	CacheKey string
-	Image    *image.NRGBA
-	// Bitmap costumes preserve source pixels when enlarged; SVG and text stay smooth.
+	CacheKey                        string
+	Image                           *image.NRGBA
 	Bitmap                          bool
 	Width, Height, CenterX, CenterY float64
 }
 
 type Sound struct {
-	Samples []float32
-	Rate    int
-	frames  int
-	// PCM16 WAV can be sampled directly without expanding the entire sound.
+	Samples  []float32
+	Rate     int
+	frames   int
 	pcm16WAV bool
 	mp3      bool
-	/*
-		Metadata can find PCM held by an active player after LRU eviction,
-		without keeping unused music alive outside the cache budget.
-	*/
 	decoded  weak.Pointer[Sound]
 	decoding weak.Pointer[soundDecode]
-	// Encoded data can likewise be shared while a streaming player owns it.
-	source weak.Pointer[cachedAsset]
+	source   weak.Pointer[cachedAsset]
 }
 
 func (s *Sound) Duration() float64 {
@@ -236,7 +223,6 @@ func DecodeSound(format string, data []byte) (*Sound, error) {
 	return &Sound{Rate: decoded.SampleRate(), Samples: samples}, nil
 }
 
-// ResampleSound converts decoded PCM once, before repeated playback.
 func ResampleSound(sound *Sound, rate int) (*Sound, error) {
 	if sound.Rate < 1 || rate < 1 || sound.Rate > 384000 || rate > 384000 {
 		return nil, fmt.Errorf("invalid sound sample rate")
@@ -292,7 +278,6 @@ func readSoundSamples(decoded io.Reader, length int64) ([]float32, error) {
 	}
 }
 
-// LoadVisual decodes only costumes; headless audio retains metadata timing.
 func LoadVisual(path string, p *project.Project) (*Library, error) {
 	visual := *p
 	visual.Targets = make([]*project.Target, len(p.Targets))

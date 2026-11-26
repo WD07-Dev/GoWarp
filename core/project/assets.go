@@ -12,14 +12,12 @@ func AssetName(md5ext, assetID, format string) string {
 	return assetID + "." + format
 }
 
-// ReadAssets reads only referenced files, never extracting archive paths.
 func ReadAssets(path string, p *Project) (map[string][]byte, error) {
 	reader, err := OpenAssets(path, p)
 	if err != nil {
 		return nil, err
 	}
 	defer reader.Close()
-	// Unlike OpenAssets, this function retains every asset in memory.
 	var total int64
 	for _, entry := range reader.assets {
 		if entry.size > maxAssetsSize-total {

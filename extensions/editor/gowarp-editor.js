@@ -431,6 +431,7 @@
                     type: "blob", mimeType: "application/x.scratch.sb3",
                     compressionOptions: {level: 1}
                 });
+                if (disposed || upload.signal.aborted || connection !== target) return;
                 archiveCache = project.size <= 64 * 1024 * 1024 ? {json, assets, blob: project} : null;
             }
             if(disposed || upload.signal.aborted || connection !== target) return;
@@ -438,6 +439,7 @@
             status.textContent = messages[phase];
             refresh();
             const receipt = await request(target, "/run", "POST", project, options, upload);
+            if (disposed || upload.signal.aborted || connection !== target) return;
             previewSettingsRevision = receipt.settingsRevision || "";
             activeDisplay = receipt.display || options.display;
             displayMode.value = activeDisplay;
@@ -486,7 +488,6 @@
     runButton.onclick = () => run();
     stopButton.onclick = stop;
     disconnectButton.onclick = async () => {
-        if (upload) upload.abort();
         const target = connection;
         resetConnection();
         address.value = "";
@@ -500,8 +501,20 @@
 
     function resetConnection() {
         clearTimeout(polling);
+        polling = null;
+        if (upload) upload.abort();
         connection = null;
         multiWindow = false;
+        archiveCache = null;
+        lastUpload = null;
+        serverSnapshot = "";
+        previewSnapshot = null;
+        previewRevision = -1;
+        previewTargets.clear();
+        settingsRevision = "";
+        previewSettingsRevision = "";
+        initialCommand = null;
+        activeDisplay = "native";
         phase = "ready";
         status.textContent = tr("Disconnected", "연결 해제됨");
         restoreEditor();
@@ -525,8 +538,11 @@
         cancelAnimationFrame(mouseRequest);
         mouseRequest = 0;
         pendingMouse = null;
-        overlay?.remove();
-        overlay = null;
+        if (overlay) {
+            overlay.width = overlay.height = 0;
+            overlay.remove();
+            overlay = null;
+        }
         for(const report of reports.values()) clearTimeout(report.timeout);
         reports.clear();
         for(const pending of requests.values()) {
@@ -796,16 +812,9 @@
                 method: "POST", headers: {Authorization: `Bearer ${connection.token}`},
                 credentials: "omit", keepalive: true, targetAddressSpace
             }).catch(() => {});
-            connection = null;
         }
-        clearTimeout(polling);
-        if (upload) upload.abort();
         observer.disconnect();
-        archiveCache = null;
-        lastUpload = null;
-        loading?.remove();
-        loading = null;
-        restoreEditor();
+        resetConnection();
         for (const event of projectEvents) vm.removeListener(event, changed);
         for (const event of settingsEvents) runtime.removeListener(event, changed);
         if (runtime.toggleScript === toggleScript) runtime.toggleScript = originalToggle;

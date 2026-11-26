@@ -86,12 +86,14 @@ type Target struct {
 	Variables      map[string][]any  `json:"variables"`
 	Lists          map[string][]any  `json:"lists"`
 	Blocks         Blocks            `json:"blocks"`
-	// ScriptOrder retains the saved top-level block order for event dispatch.
-	ScriptOrder []string `json:"-"`
-	X           float64  `json:"x"`
-	Y           float64  `json:"y"`
-	Direction   float64  `json:"direction"`
+	ScriptOrder    []string          `json:"-"`
+	X              float64           `json:"x"`
+	Y              float64           `json:"y"`
+	Direction      float64           `json:"direction"`
 }
+
+// Undefined preserves a missing initial variable value separately from null.
+type Undefined struct{}
 
 // Missing fields use Scratch defaults; explicit zero and false values are preserved.
 func (t *Target) UnmarshalJSON(data []byte) error {
@@ -173,7 +175,6 @@ func decodeBlocks(data []byte) (Blocks, []string, error) {
 		if err := decoder.Decode(&raw); err != nil {
 			return nil, nil, err
 		}
-		// Scratch also stores unattached variable/list reporter arrays in blocks.
 		if len(raw) > 0 && raw[0] == '[' {
 			continue
 		}
@@ -197,10 +198,6 @@ func decodeBlocks(data []byte) (Blocks, []string, error) {
 			scripts = append(scripts, id)
 		}
 	}
-	/*
-		JavaScript enumerates array-index keys first, then other keys in saved
-		order. Block IDs are usually nonnumeric, but either form is valid.
-	*/
 	index := func(id string) (uint64, bool) {
 		n, err := strconv.ParseUint(id, 10, 32)
 		return n, err == nil && n < 1<<32-1 && strconv.FormatUint(n, 10) == id
@@ -215,9 +212,6 @@ func decodeBlocks(data []byte) (Blocks, []string, error) {
 	})
 	return blocks, scripts, nil
 }
-
-// Undefined preserves a missing initial variable value separately from null.
-type Undefined struct{}
 
 func (Undefined) MarshalJSON() ([]byte, error) {
 	return []byte(`"undefined"`), nil
