@@ -1,6 +1,6 @@
 # GoWarp
 
-<img src="./gowarp-icon.png" alt="GoWarp Logo" width="128">
+<img src="./icon.png" alt="GoWarp Logo" width="128">
 
 A Go-based packager and runtime that turns Scratch and TurboWarp projects into standalone executables.
 
