@@ -18,6 +18,8 @@ export interface SpriteInfo {
 }
 
 export interface FolderData {
-    folders: {id: string; name: string}[];
-    marks: {n: string; f: string}[];
+    folders: {
+        id: string;
+        name: string;
+    }[];
 }

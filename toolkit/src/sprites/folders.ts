@@ -28,7 +28,6 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         }, 2400);
     }
 
-    var SF_KEY = 'gowarp-toolkit.folders';
     var SF_FOLDER = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' + '<path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></svg>';
     var SF_FOLDER_PLUS = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' + '<path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z' + 'm.5 5H13v2.5h2.5V14H13v2.5h-2.5V14H8v-1.5h2.5V10z"/></svg>';
     var SF_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" ' + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>';
@@ -43,68 +42,29 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         sig: '',
         shown: '',
         active: '',
-        project: '',
+        project: null,
         data: null as FolderData | null,
-        links: {},
+        sortable: null,
+        openFolders: null as string[] | null,
+        hidden: new Map<HTMLElement, string>(),
         theme: '',
         editing: false,
         mounted: false,
         count: 0
     };
 
-    function sfAll() {
-        try {
-            var raw = window.localStorage.getItem(SF_KEY);
-            var all = raw ? JSON.parse(raw) : {};
-            return all && typeof all === 'object' ? all : {};
-        } catch (e) {
-            return {};
-        }
-    }
-    function sfSave() {
-        try {
-            var all = sfAll();
-            all[sf.project] = sf.data;
-            window.localStorage.setItem(SF_KEY, JSON.stringify(all));
-        } catch (e) {}
-    }
-    function sfProjectKey() {
-        var p = location.pathname;
-        var m = p.match(/\/projects\/(\d+)/);
-        if(m) return 'scratch:' + m[1];
-        m = p.match(/\/(\d{6,})(?:\/|$)/);
-        if(m) return location.hostname + ':' + m[1];
-        var title = String(document.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
-        return location.hostname + ':' + p + ':' + title;
-    }
     function sfLoad() {
-        var key = sfProjectKey();
-        if(sf.project !== key) {
-            sf.project = key;
-            var raw = sfAll()[key];
-            var data: FolderData = {folders: [], marks: []};
-            if(raw && Array.isArray(raw.folders)) {
-                raw.folders.forEach(function (f: {id: string; name: string}) {
-                    if(f && typeof f.id === 'string' && typeof f.name === 'string') {
-                        data.folders.push({id: f.id, name: f.name.slice(0, 24)});
-                    }
-                });
-            }
-            if(raw && Array.isArray(raw.marks)) {
-                raw.marks.forEach(function (m: {n: string; f: string}) {
-                    if(m && typeof m.n === 'string' && typeof m.f === 'string') data.marks.push({n: m.n, f: m.f});
-                });
-            }
-            sf.data = data;
-            sf.links = {};
+        const vm = findVM();
+        const project = vm?.runtime?.targets?.find((target: any) => target.isStage);
+        if (sf.project !== project) {
+            sf.project = project;
             sf.active = '';
             sf.sig = '';
             sf.count = 0;
         }
+        const names = new Set(sfSprites().map(sfFolderOf).filter(Boolean));
+        sf.data = {folders: Array.from(names, (name: string) => ({id: name, name}))};
         return sf.data;
-    }
-    function sfId () {
-        return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     }
     function sfPane () {
         return document.querySelector('[class*="sprite-selector_sprite-selector"]');
@@ -116,7 +76,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
     }
     function sfTileName (tile: Element) {
         var n = tile && tile.querySelector('[class*="sprite-selector-item_sprite-name"]');
-        return n ? (n.textContent || '').trim() : '';
+        return n ? (n.textContent || '') : '';
     }
     function sfSprites (): SpriteInfo[] {
         var out = [];
@@ -127,49 +87,44 @@ export function createFolders(context: PaintContext, services: FolderServices) {
                     out.push({id: t.id, name: String(t.sprite.name)});
                 }
             });
-            if (out.length) return out;
         }
-        sfTiles().forEach(function (tile: HTMLElement) {
-            var name = sfTileName(tile);
-            if (name) out.push({id: 'dom:' + name, name: name});
-        });
         return out;
     }
 
-    function sfLink(sprites: SpriteInfo[]) {
-        var data = sfLoad();
-        var live = {};
-        sprites.forEach(function (s: SpriteInfo) { live[s.id] = true; });
-        Object.keys(sf.links).forEach(function (id: string) {
-            if (!live[id]) delete sf.links[id];
-        });
-        var used = [];
-        Object.keys(sf.links).forEach(function (id: string) { used.push(sf.links[id]); });
-        sprites.forEach(function (s: SpriteInfo) {
-            var link = sf.links[s.id];
-            if(link) {
-                if(link.n !== s.name) {
-                    link.n = s.name; sfSave();
-                }
-                return;
-            }
-            for(let i=0; i < data.marks.length; i++) {
-                var mark = data.marks[i];
-                if (used.indexOf(mark) < 0 && mark.n === s.name) {
-                    sf.links[s.id] = mark;
-                    used.push(mark);
-                    return;
-                }
-            }
-        });
-    }
     function sfFolderOf(sprite: SpriteInfo): string {
-        var link = sf.links[sprite.id];
-        if(!link) return '';
-        for(let i=0; i < sf.data.folders.length; i++) {
-            if(sf.data.folders[i].id === link.f) return link.f;
+        const divider = sprite.name.indexOf('//');
+        return divider > 0 ? sprite.name.slice(0, divider) : '';
+    }
+    function sfTileSprite(tile: Element, sprites: SpriteInfo[]): SpriteInfo | undefined {
+        if (tile.classList.contains('sa-folders-folder')) return;
+        let fiber = context.editor.fiberOf(tile);
+        for (let i = 0; fiber && i < 30; i++, fiber = fiber.return) {
+            const props = fiber.stateNode?.props || fiber.memoizedProps;
+            if (props?.dragType === 'SPRITE' && typeof props.id === 'string') {
+                return sprites.find((sprite: SpriteInfo) => sprite.id === props.id);
+            }
         }
-        return '';
+        const name = sfTileName(tile);
+        return sprites.find((sprite: SpriteInfo) => sprite.name === name);
+    }
+    function sfOpenFolders() {
+        const tile = sfTiles()[0];
+        let fiber = tile && context.editor.fiberOf(tile);
+        for (let i = 0; fiber && i < 40; i++, fiber = fiber.return) {
+            const sortable = fiber.stateNode;
+            if (!Array.isArray(sortable?.state?.folders) ||
+                !Array.isArray(sortable.props?.items) ||
+                typeof sortable.handleAddSortable !== 'function') continue;
+            if (sf.sortable !== sortable) {
+                sf.sortable = sortable;
+                sf.openFolders = [...sortable.state.folders];
+            }
+            const folders = sf.data.folders.map((folder: {id: string}) => folder.id);
+            if (folders.some((name: string) => !sortable.state.folders.includes(name))) {
+                sortable.setState({folders});
+            }
+            return;
+        }
     }
     function sfFolderName(id: string) {
         for(let i=0; i < sf.data.folders.length; i++) {
@@ -183,37 +138,52 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             return f.id !== exceptId && f.name.toLowerCase() === lower;
         });
     }
-    function sfAssign(sprite: SpriteInfo, folderId: string) {
-        var data = sfLoad();
-        var link = sf.links[sprite.id];
-        if(!link) {
-            link = {n: sprite.name, f: ''};
-            sf.links[sprite.id] = link;
-            data.marks.push(link);
+    function sfRenameSprites(sprites: SpriteInfo[], folderName: string) {
+        const vm = findVM();
+        if (!vm || typeof vm.renameSprite !== 'function') return;
+        for (const sprite of sprites) {
+            const folder = sfFolderOf(sprite);
+            const base = folder ? sprite.name.slice(folder.length + 2) : sprite.name;
+            let name = folderName ? folderName + '//' + base : base;
+            if (!name || ['_mouse_', '_stage_', '_edge_', '_myself_', '_random_'].includes(name)) name += '2';
+            vm.renameSprite(sprite.id, name);
         }
-        link.n = sprite.name;
-        link.f = folderId || '';
-        if(!link.f) {
-            var i = data.marks.indexOf(link);
-            if(i >= 0) data.marks.splice(i, 1);
-        }
-        sfSave();
+        vm.emitWorkspaceUpdate?.();
+        vm.emitProjectChanged?.();
         sf.sig = '';
+        sfLoad();
+    }
+    function sfAssign(sprite: SpriteInfo, folderId: string) {
+        sfRenameSprites([sprite], folderId);
         sfSync();
     }
-    function sfMakeFolder(name: string) {
-        var data = sfLoad();
-        if(!name || sfNameTaken(name)) {
-            var base = tr('sfDefault');
-            var n = 1;
-            do {
-                name = base + ' ' + n++;
-            } while (sfNameTaken(name));
+    function sfValidName(name: string): boolean {
+        if (!name || name.includes('//') || name.endsWith('/')) {
+            pageToast(tr('sfInvalidName'), true);
+            return false;
         }
-        var folder = {id: sfId(), name: String(name).slice(0, 24)};
-        data.folders.push(folder);
-        sfSave();
-        return folder;
+        return true;
+    }
+    function sfMakeFolder(name: string, sprite: SpriteInfo) {
+        if (!name) {
+            const base = tr('sfDefault');
+            let n = 1;
+            do { name = base + ' ' + n++; } while (sfNameTaken(name));
+        }
+        if (!sfValidName(name)) return null;
+        if (sfNameTaken(name)) {
+            pageToast(tr('sfDup'), true);
+            return null;
+        }
+        sfRenameSprites([sprite], name);
+        return {id: name, name};
+    }
+    function sfRenameFolder(folderId: string, name: string) {
+        if (!sfValidName(name)) return;
+        if (sfNameTaken(name, folderId)) { pageToast(tr('sfDup'), true); return; }
+        sfRenameSprites(sfSprites().filter((sprite: SpriteInfo) => sfFolderOf(sprite) === folderId), name);
+        if (sf.active === folderId) sf.active = name;
+        pageToast(tr('sfRenamed'));
     }
 
     function sfPaint(node: PaintElement) {
@@ -329,7 +299,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         var add = document.createElement('button');
         add.type = 'button';
         add.className = 'gwt-fchip gwt-fnew';
-        add.title = tr('sfNew');
+        add.title = tr('sfNewSelected');
         add.setAttribute('aria-label', tr('sfNew'));
         add.textContent = '+';
         listen(add, 'click', function () { sfNewChip(add); });
@@ -370,13 +340,15 @@ export function createFolders(context: PaintContext, services: FolderServices) {
     }
     function sfNewChip(addBtn: HTMLElement) {
         if(!sf.bar || sf.editing) return;
+        const sprite = sfSprites().find((item: SpriteInfo) => item.id === findVM()?.editingTarget?.id);
+        if (!sprite) { pageToast(tr('sfSelectSprite'), true); return; }
         var holder = document.createElement('span');
         holder.className = 'gwt-fchip gwt-fhold';
         sf.bar.insertBefore(holder, addBtn);
         sfNameInput(holder, '', function (name: string) {
-            if (sfNameTaken(name)) { pageToast(tr('sfDup'), true); return; }
-            sfMakeFolder(name);
-            sf.active = '';
+            const folder = sfMakeFolder(name, sprite);
+            if (!folder) return;
+            sf.active = folder.id;
             pageToast(tr('sfCreated'));
         }, function () {
             holder.remove();
@@ -386,22 +358,12 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         var folder = sfLoad().folders.filter(function (f: { id: string; name: string; }) { return f.id === folderId; })[0];
         if(!folder) return;
         sfNameInput(chip, folder.name, function (name: string) {
-            if (sfNameTaken(name, folderId)) { pageToast(tr('sfDup'), true); return; }
-            folder.name = name;
-            sfSave();
-            pageToast(tr('sfRenamed'));
+            sfRenameFolder(folderId, name);
         });
     }
     function sfDeleteFolder(folderId: string) {
-        var data = sfLoad();
-        data.folders = data.folders.filter(function (f: { id: string; name: string; }) { return f.id !== folderId; });
-        data.marks = data.marks.filter(function (m: { n: string; f: string; }) { return m.f !== folderId; });
-        Object.keys(sf.links).forEach(function (id: string) {
-            if (sf.links[id].f === folderId) delete sf.links[id];
-        });
+        sfRenameSprites(sfSprites().filter((sprite: SpriteInfo) => sfFolderOf(sprite) === folderId), '');
         if (sf.active === folderId) sf.active = '';
-        sfSave();
-        sf.sig = '';
         pageToast(tr('sfDeleted'));
         sfSync();
     }
@@ -461,15 +423,16 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         sfMenu(x, y, [
             {head: sfFolderName(folderId)},
             {label: tr('sfRename'), icon: SF_FOLDER, run: function () {
-                var chip = sf.bar && sf.bar.querySelector('[data-folder="' + folderId + '"]');
+                var chip = sf.bar && Array.from((sf.bar as HTMLElement).querySelectorAll<HTMLElement>('.gwt-fchip')).find(
+                    (item: HTMLElement) => item.dataset.folder === folderId
+                );
                 if (chip) sfRenameChip(chip, folderId);
             }},
             {label: tr('sfDelete'), run: function () { sfDeleteFolder(folderId); }}
         ]);
     }
     function sfSpriteMenu(tile: Element, anchor: Element) {
-        var name = sfTileName(tile);
-        var sprite = sfSprites().filter(function (s: SpriteInfo) { return s.name === name; })[0];
+        var sprite = sfTileSprite(tile, sfSprites());
         if(!sprite) return;
         var current = sfFolderOf(sprite);
         var data = sfLoad();
@@ -485,8 +448,9 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             rows.push({label: tr('sfNone'), run: function () { sfAssign(sprite, ''); }});
         }
         rows.push({label: tr('sfNew'), icon: SF_FOLDER_PLUS, run: function () {
-            var folder = sfMakeFolder('');
-            sfAssign(sprite, folder.id);
+            var folder = sfMakeFolder('', sprite);
+            if (!folder) return;
+            sfSync();
             pageToast(tr('sfCreated'));
         }});
         var r = anchor.getBoundingClientRect();
@@ -494,7 +458,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
     }
     function sfDecorate() {
         sfTiles().forEach(function (tile: HTMLElement) {
-            if(tile.querySelector('.gwt-sf-tile')) return;
+            if(tile.classList.contains('sa-folders-folder') || tile.querySelector('.gwt-sf-tile')) return;
             var b = createIconButton(document, 'gwt-sf-tile', tr('sfMove'), SF_FOLDER);
             listen(b, 'click', function (event: PointerEvent) {
                 event.preventDefault();
@@ -507,17 +471,21 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         });
     }
     function sfApplyFilter(sprites: SpriteInfo[]) {
-        var byName = {};
-        sprites.forEach(function (s: SpriteInfo) { byName[s.name] = s; });
+        for (const [wrap] of sf.hidden) {
+            if (!wrap.isConnected) sf.hidden.delete(wrap);
+        }
         sfTiles().forEach(function (tile: HTMLElement) {
-            var sprite = byName[sfTileName(tile)];
-            var show = !sf.active || (sprite && sfFolderOf(sprite) === sf.active);
-            var wrap = tile.parentElement;
-            if(!wrap) return;
-            if(show) {
-                if (wrap.style.display === 'none') wrap.style.display = '';
-            }else if(wrap.style.display !== 'none') {
-                wrap.style.display = 'none';
+            const sprite = sfTileSprite(tile, sprites);
+            const show = !tile.classList.contains('sa-folders-folder') &&
+                (!sf.active || (sprite && sfFolderOf(sprite) === sf.active));
+            const wrap = tile.parentElement;
+            if (!wrap) return;
+            if (!show) {
+                if (!sf.hidden.has(wrap)) sf.hidden.set(wrap, wrap.style.display);
+                if (wrap.style.display !== 'none') wrap.style.display = 'none';
+            } else if (sf.hidden.has(wrap)) {
+                wrap.style.display = sf.hidden.get(wrap);
+                sf.hidden.delete(wrap);
             }
         });
     }
@@ -543,7 +511,8 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         ensureStyle();
 
         var sprites = sfSprites();
-        sfLink(sprites);
+        sfLoad();
+        sfOpenFolders();
         if(sf.active && sf.count && sprites.length > sf.count) sf.active = '';
         sf.count = sprites.length;
         sfEnsureBar(scroll);
@@ -599,11 +568,11 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         sf.count = 0;
         sf.theme = '';
         Array.prototype.forEach.call(document.querySelectorAll('.gwt-sf-tile'), function (b: HTMLElement) { b.remove(); });
-        var scroll = document.querySelector('[class*="sprite-selector_scroll-wrapper"]');
-        if(!scroll) return;
-        Array.prototype.forEach.call(scroll.querySelectorAll('[class*="sprite-selector_sprite-wrapper"]'), function (w: HTMLElement) {
-            if (w.style.display === 'none') w.style.display = '';
-        });
+        for (const [wrap, display] of sf.hidden) wrap.style.display = display;
+        sf.hidden.clear();
+        if (sf.sortable?.ref?.isConnected) sf.sortable.setState({folders: sf.openFolders});
+        sf.sortable = null;
+        sf.openFolders = null;
     }
 
     listen(document, 'pointerdown', function (event: PointerEvent) {
