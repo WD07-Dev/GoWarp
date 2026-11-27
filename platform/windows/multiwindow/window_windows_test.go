@@ -8,8 +8,9 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/lxn/win"
 	"gowarp/core/window"
+
+	"github.com/lxn/win"
 )
 
 func TestWindowControlStyles(t *testing.T) {
@@ -249,7 +250,6 @@ func TestUserMovementLockKeepsScriptPositioning(t *testing.T) {
 		if !found {
 			t.Error("could not locate title bar for hit test")
 		}
-		// The keyboard Move command must return without entering a modal move loop.
 		m.wndProc(w.handle, win.WM_SYSCOMMAND, win.SC_MOVE, 0)
 	})
 	views[0].X, views[0].Y = 180, 140

@@ -93,7 +93,6 @@ func (r *Runtime) SetMonitorSlider(index int, value float64) bool {
 	return true
 }
 
-// List writes must detach clone-shared storage and invalidate lookup caches.
 func (r *Runtime) EditMonitorList(index int, operation string, item int, value string) bool {
 	m := r.editableMonitor(index, true)
 	if m == nil || len(value) > maxGeneratedText {

@@ -43,7 +43,6 @@ func testNativeListSearch(t *testing.T) {
 		if native.targets[1].procedures[code].native == nil {
 			t.Fatalf("%s did not compile", code)
 		}
-		// Keep the index across calls, then invalidate it with a list mutation.
 		for _, query := range []any{"seed", "SEED", "missing", float64(2), "02", "", "new"} {
 			var errors [2]error
 			for i, r := range []*Runtime{native, interpreted} {
@@ -100,33 +99,23 @@ func addNativeSharedListBlocks(blocks project.Blocks) {
 	blocks["sharedListsRepeat"] = &project.Block{Opcode: "control_repeat", Inputs: map[string][]any{
 		"TIMES": {float64(1), []any{float64(12), "x", "x"}}, "SUBSTACK": {float64(2), "sharedListsCall"},
 	}}
-	blocks["sharedListsCall"] = &project.Block{Opcode: "procedures_call", Next: "sharedListsRead",
-		Mutation: map[string]json.RawMessage{"proccode": json.RawMessage(`"sharedListHelper"`)}}
-	blocks["sharedListsRead"] = &project.Block{Opcode: "data_changevariableby",
-		Fields: map[string][]any{"VARIABLE": {"score", "score"}}, Inputs: map[string][]any{"VALUE": {float64(2), "sharedListsLength"}}}
+	blocks["sharedListsCall"] = &project.Block{Opcode: "procedures_call", Next: "sharedListsRead", Mutation: map[string]json.RawMessage{"proccode": json.RawMessage(`"sharedListHelper"`)}}
+	blocks["sharedListsRead"] = &project.Block{Opcode: "data_changevariableby", Fields: map[string][]any{"VARIABLE": {"score", "score"}}, Inputs: map[string][]any{"VALUE": {float64(2), "sharedListsLength"}}}
 	blocks["sharedListsLength"] = &project.Block{Opcode: "data_lengthoflist", Fields: map[string][]any{"LIST": {"items", "items"}}}
-	blocks["sharedListClear"] = &project.Block{Opcode: "data_deletealloflist", Next: "sharedListRead0",
-		Fields: map[string][]any{"LIST": {"items", "items"}}}
-	// The drawing callback keeps this on the real compiled-call path.
+	blocks["sharedListClear"] = &project.Block{Opcode: "data_deletealloflist", Next: "sharedListRead0", Fields: map[string][]any{"LIST": {"items", "items"}}}
 	for i := range 3 {
 		next := fmt.Sprintf("sharedListRead%d", i+1)
 		if i == 2 {
 			next = "sharedListAppend"
 		}
-		blocks[fmt.Sprintf("sharedListRead%d", i)] = &project.Block{Opcode: "data_setvariableto", Next: next,
-			Fields: map[string][]any{"VARIABLE": {"y", "y"}}, Inputs: map[string][]any{"VALUE": {float64(2), "sharedListsLength"}}}
+		blocks[fmt.Sprintf("sharedListRead%d", i)] = &project.Block{Opcode: "data_setvariableto", Next: next, Fields: map[string][]any{"VARIABLE": {"y", "y"}}, Inputs: map[string][]any{"VALUE": {float64(2), "sharedListsLength"}}}
 	}
-	blocks["sharedListAppend"] = &project.Block{Opcode: "data_addtolist", Next: "sharedListStamp",
-		Fields: map[string][]any{"LIST": {"items", "items"}}, Inputs: literalInputs(map[string]any{"ITEM": "007"})}
+	blocks["sharedListAppend"] = &project.Block{Opcode: "data_addtolist", Next: "sharedListStamp", Fields: map[string][]any{"LIST": {"items", "items"}}, Inputs: literalInputs(map[string]any{"ITEM": "007"})}
 	blocks["sharedListStamp"] = &project.Block{Opcode: "pen_stamp"}
-	blocks["sharedListObserverStart"] = &project.Block{Opcode: "data_addtolist", Next: "sharedListObserverCall",
-		Fields: map[string][]any{"LIST": {"trail", "trail"}}, Inputs: literalInputs(map[string]any{"ITEM": "pending"})}
-	blocks["sharedListObserverCall"] = &project.Block{Opcode: "procedures_call", Next: "sharedListObserverRead",
-		Mutation: map[string]json.RawMessage{"proccode": json.RawMessage(`"sharedListHelper"`)}}
-	blocks["sharedListObserverRead"] = &project.Block{Opcode: "data_setvariableto",
-		Fields: map[string][]any{"VARIABLE": {"score", "score"}}, Inputs: map[string][]any{"VALUE": {float64(2), "sharedListObserverItem"}}}
-	blocks["sharedListObserverItem"] = &project.Block{Opcode: "data_itemoflist",
-		Fields: map[string][]any{"LIST": {"trail", "trail"}}, Inputs: literalInputs(map[string]any{"INDEX": float64(1)})}
+	blocks["sharedListObserverStart"] = &project.Block{Opcode: "data_addtolist", Next: "sharedListObserverCall", Fields: map[string][]any{"LIST": {"trail", "trail"}}, Inputs: literalInputs(map[string]any{"ITEM": "pending"})}
+	blocks["sharedListObserverCall"] = &project.Block{Opcode: "procedures_call", Next: "sharedListObserverRead", Mutation: map[string]json.RawMessage{"proccode": json.RawMessage(`"sharedListHelper"`)}}
+	blocks["sharedListObserverRead"] = &project.Block{Opcode: "data_setvariableto", Fields: map[string][]any{"VARIABLE": {"score", "score"}}, Inputs: map[string][]any{"VALUE": {float64(2), "sharedListObserverItem"}}}
+	blocks["sharedListObserverItem"] = &project.Block{Opcode: "data_itemoflist", Fields: map[string][]any{"LIST": {"trail", "trail"}}, Inputs: literalInputs(map[string]any{"INDEX": float64(1)})}
 }
 
 type nativeListGraphics struct {
@@ -256,7 +245,6 @@ func runNativeSharedLists(t testing.TB, r *Runtime) {
 	target := r.targets[1]
 	target.variables["x"].Value = float64(100)
 	target.variables["score"].Value = float64(0)
-	// Start each run with the same empty list.
 	target.state.Lists["items"] = List{Items: []any{}}
 	r.startHat(target, "sharedListsHat", false)
 	if err := r.Run(context.Background(), 1, 60, false); err != nil {

@@ -31,7 +31,6 @@ func nativeCode(name string, data map[string]any) string {
 	return out.String()
 }
 
-// Keep generated calculations within the scheduler's work budget.
 const nativeWorkLimit = 8192
 
 type nativeFunction struct {
@@ -202,10 +201,6 @@ func nativeConstant(value any) (nativeExpression, bool) {
 	}, true
 }
 
-/*
-GenerateNative emits project-specific Go into the existing runtime SDK.
-Unsupported operations retain the shared VM execution path.
-*/
 func GenerateNative(p *project.Project) ([]byte, error) {
 	g := &nativeGenerator{
 		known:  make(map[*procedure]*nativeFunction),
@@ -407,7 +402,6 @@ func (g *nativeGenerator) compileRegions(t *target, code string) {
 				e.loopBody = id
 			}
 			body, ok := e.statements(id, 1)
-			// Small regions cost less to interpret than to call.
 			if ok && e.work < 7 && e.loopBody == "" {
 				break
 			}
@@ -691,7 +685,6 @@ func (e *nativeEmitter) input(b *project.Block, name string, depth int) (nativeE
 		case "operator_gt":
 			op = ">"
 		}
-		// One nonnumeric constant forces Scratch's text fallback for both operands.
 		if left.textComparison || right.textComparison {
 			return nativeBoolean("(compareText(text(" + left.raw() + "),text(" + right.raw() + "))" + op + "0)"), leftOK && rightOK
 		}
@@ -962,7 +955,6 @@ func (e *nativeEmitter) statements(id string, depth int) (string, bool) {
 				return "", false
 			}
 			if e.t.procedures[code] == nil {
-				// Undefined calls skip their inputs; debug commands still need the interpreter.
 				debugCode := strings.ReplaceAll(code, "\u200b", "")
 				if debugCode == "breakpoint" || debugCode == "tw:debugger;" ||
 					strings.HasPrefix(debugCode, "log ") || strings.HasPrefix(debugCode, "warn ") || strings.HasPrefix(debugCode, "error ") {
@@ -1030,7 +1022,6 @@ func (e *nativeEmitter) statements(id string, depth int) (string, bool) {
 				}
 			}
 			if callee.work <= 32 && !callee.effects.external && !duplicated {
-				// Small calculations share the caller's slots instead of flushing them at each call.
 				args := make([]nativeExpression, len(arguments))
 				for i, value := range arguments {
 					args[i] = nativeExpression{value: value}

@@ -108,7 +108,6 @@ func (r *Runtime) Options() RuntimeOptions {
 	return r.options
 }
 
-// StageShaderSources returns registered programs without selecting or running them.
 func (r *Runtime) StageShaderSources() []extension.ShaderSource {
 	unique := make(map[[2]string]extension.ShaderSource, len(r.visual.shaders))
 	for _, shader := range r.visual.shaders {
@@ -187,7 +186,6 @@ func (r *Runtime) prepareSensingScene(name string, all bool) []DisplayTarget {
 
 func (r *Runtime) releaseSensingScene(scene []DisplayTarget) {
 	clear(scene)
-	// Do not retain a large clone burst, or references to costumes/text state.
 	if cap(scene) <= 4096 {
 		r.sensingScene = scene[:0]
 	}

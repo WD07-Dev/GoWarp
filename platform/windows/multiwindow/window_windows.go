@@ -66,7 +66,6 @@ func startWindows() (*windowManager, error) {
 	return m, nil
 }
 
-// invoke waits for fn to finish on the window thread.
 func (m *windowManager) invoke(fn func()) {
 	done := make(chan struct{})
 	m.tasks <- func() {
@@ -279,7 +278,6 @@ func (m *windowManager) wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr
 				win.EnableMenuItem(menu, win.SC_MOVE, win.MF_GRAYED)
 			}
 		}
-		// The native move loop consumes the button release instead of WM_LBUTTONUP.
 		m.events.Down = false
 		m.dragging = 0
 		m.updateSnapshot()
@@ -475,7 +473,6 @@ func (m *windowManager) center(views []window.View, id string, all bool) ([]wind
 			result = err
 			return
 		}
-		// Apply target-monitor DPI bounds ourselves; ignore suggested DPI-change positions.
 		m.positioning = true
 		defer func() { m.positioning = false }()
 		for i, v := range moved {
@@ -506,8 +503,6 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 	actual := append([]window.View(nil), views...)
 	m.invoke(func() {
 		defer func() { m.centerMain = false }()
-		// Resolve fullscreen and restore geometry before mutating any HWND. Atlas
-		// validation must also apply to actual monitor sizes, not requested sizes.
 		for i, v := range actual {
 			w := m.items[v.ID]
 			if w != nil && w.view.Frame != v.Frame && !w.view.Fullscreen && !v.Fullscreen && (v.KeepClientX || v.KeepClientY) {
@@ -519,7 +514,6 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 					return
 				}
 				var inset win.POINT
-				// Pending bounds describe the next presentation, not the current HWND.
 				if !w.pendingBounds && !win.IsIconic(hwnd) && !win.IsZoomed(hwnd) {
 					var client win.POINT
 					var outer win.RECT
@@ -632,7 +626,6 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 			if old.Hidden && !v.Hidden {
 				w.ready = false
 			}
-			// Store policy before SetWindowPos dispatches synchronous messages.
 			w.view = v
 			if created || styleChanged || old.DisableClose != v.DisableClose || old.Frame != v.Frame {
 				w.pendingFrame = true
@@ -685,7 +678,6 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 					}
 				}
 			}
-			// Do not restore a minimized window unless visibility explicitly changes.
 			show := int32(win.SW_SHOWNOACTIVATE)
 			if v.Hidden {
 				show = win.SW_HIDE
@@ -744,7 +736,6 @@ func (w *nativeWindow) applyFrame() error {
 	return nil
 }
 
-// Keep old coverage until the replacement windows have reached the desktop.
 func (m *windowManager) presented(revision uint64, flush func() error) (bool, error) {
 	applied := false
 	var result error
@@ -782,8 +773,6 @@ func (m *windowManager) presented(revision uint64, flush func() error) (bool, er
 			m.updateGeometry(w)
 			return nil
 		}
-		// Expand first; shrinking would uncover the desktop before the new HWND
-		// is composed. Commit completion alone does not guarantee presentation.
 		for _, w := range m.items {
 			if !w.pendingBounds {
 				continue

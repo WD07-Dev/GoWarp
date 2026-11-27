@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// Compile only synchronous argument expressions; the call itself may still yield.
 func (g *nativeGenerator) compileCallInputs(t *target) {
 	ids := make([]string, 0)
 	for id, b := range t.source.Blocks {
@@ -63,7 +62,6 @@ func (g *nativeGenerator) compileCallInputs(t *target) {
 				"Name": name, "Value": expression, "Index": index,
 			}))
 		}
-		// Simple literal/variable arguments already have a cheap interpreted path.
 		if !supported || e.work < 4 || e.work > nativeWorkLimit {
 			continue
 		}
@@ -80,7 +78,6 @@ func nativeInputDeterministic(n *numericExpression) bool {
 	if n == nil {
 		return true
 	}
-	// Named or dynamic list indexes may consume randomness before a later error.
 	if n.op == exprListItem && !n.left.numeric {
 		return false
 	}

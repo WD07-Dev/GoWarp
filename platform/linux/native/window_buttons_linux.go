@@ -24,10 +24,6 @@ type windowX11 struct {
 	setErrorHandler func(uintptr) uintptr
 }
 
-/*
-A window can disappear while walking the X11 tree. Ignore that BadWindow
-response during discovery, restoring the application's handler before return.
-*/
 var windowX11ErrorHandler = purego.NewCallback(func(uintptr, uintptr) int32 {
 	return 0
 })
@@ -38,7 +34,6 @@ func SetWindowProperties(disableMinimize, disableMaximize, disableClose bool, op
 	if math.IsNaN(opacity) || math.IsInf(opacity, 0) || opacity < 0 || opacity > 1 {
 		return fmt.Errorf("window opacity must be between 0 and 1")
 	}
-	// XSetErrorHandler is process-global; serialize our temporary replacement.
 	windowX11Mu.Lock()
 	defer windowX11Mu.Unlock()
 	lib, err := purego.Dlopen("libX11.so.6", purego.RTLD_NOW|purego.RTLD_LOCAL)
@@ -74,7 +69,6 @@ func SetWindowProperties(disableMinimize, disableMaximize, disableClose bool, op
 	values := x.property(display, window, atom)
 	var hints [5]uintptr
 	copy(hints[:], values)
-	// MWM_FUNC_ALL reverses the mask: other bits then mean exclusions.
 	const allFunctions = uintptr(2 | 4 | 8 | 16 | 32)
 	if hints[0]&1 == 0 {
 		hints[1] = allFunctions
@@ -92,7 +86,6 @@ func SetWindowProperties(disableMinimize, disableMaximize, disableClose bool, op
 	if disableClose {
 		hints[1] &^= 32
 	}
-	// Xlib stores each 32-bit property item in a native unsigned long.
 	x.changeProperty(display, window, atom, atom, 32, 0, &hints[0], 5)
 	opacityAtom := x.internAtom(display, "_NET_WM_WINDOW_OPACITY", 0)
 	if opacity == 1 {

@@ -11,15 +11,14 @@ import (
 )
 
 type GraphicEffects struct {
-	Color      float64 `json:"color"`
-	Fisheye    float64 `json:"fisheye"`
-	Whirl      float64 `json:"whirl"`
-	Pixelate   float64 `json:"pixelate"`
-	Mosaic     float64 `json:"mosaic"`
-	Brightness float64 `json:"brightness"`
-	Ghost      float64 `json:"ghost"`
-	// Tint is immutable normalized RGB; nil leaves source colors unchanged.
-	Tint *[3]float64 `json:"tint,omitempty"`
+	Color      float64     `json:"color"`
+	Fisheye    float64     `json:"fisheye"`
+	Whirl      float64     `json:"whirl"`
+	Pixelate   float64     `json:"pixelate"`
+	Mosaic     float64     `json:"mosaic"`
+	Brightness float64     `json:"brightness"`
+	Ghost      float64     `json:"ghost"`
+	Tint       *[3]float64 `json:"tint,omitempty"`
 }
 
 func (e GraphicEffects) MarshalJSON() ([]byte, error) {
@@ -122,7 +121,6 @@ func switchCostume(t *target, value any, backdrop bool) {
 }
 
 func costumeIndex(t *target, name string) (int, bool) {
-	// Small lists are cheaper to scan, and standalone targets have no cache owner.
 	if t.owner == nil || len(t.source.Costumes) < 16 {
 		for i, costume := range t.source.Costumes {
 			if costume.Name == name {
@@ -133,10 +131,6 @@ func costumeIndex(t *target, name string) (int, bool) {
 	}
 	names := t.owner.costumeNames[t.source]
 	if names == nil {
-		/*
-			Clones share the source-name index. Adding or deleting a costume
-			invalidates it through the asset API.
-		*/
 		names = make(map[string]int, len(t.source.Costumes))
 		for i, c := range t.source.Costumes {
 			if _, exists := names[c.Name]; !exists {

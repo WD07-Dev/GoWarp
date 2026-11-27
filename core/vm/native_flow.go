@@ -12,7 +12,6 @@ type nativeFlowNode struct {
 	Stop        string
 }
 
-// flowEntries selects scripts with branching or nested loops for compilation.
 func (g *nativeGenerator) flowEntries(t *target, p *procedure) []string {
 	type pendingBlock struct {
 		id    string
@@ -110,7 +109,6 @@ func (g *nativeGenerator) compileScript(t *target, p *procedure, code string, sc
 		complete := false
 		if loopBody && p.warp {
 			_, complete = probe.statements(id, 1)
-			// Keep branches and callbacks at explicit interruption boundaries.
 			complete = complete && probe.work <= nativeWorkLimit && probe.depth == 1 && !probe.effects.external
 		}
 		if !complete {
@@ -193,7 +191,6 @@ func (g *nativeGenerator) combineFlowCalculations(t *target, p *procedure, nodes
 		entries[node.ID] = i
 	}
 	covered := make(map[string]bool)
-	// Keep interior entry points for interpreter fallback and budget-limited resumes.
 	for i := range nodes {
 		if nodes[i].Complete || covered[nodes[i].ID] {
 			continue
@@ -245,7 +242,6 @@ func (e *nativeEmitter) flowStatement(id string) (string, bool) {
 		return nativeCode("statement", map[string]any{"Region": true, "Next": b.Next, "Body": body}), ok
 	case "procedures_call":
 		if e.resumable {
-			// The call can change warp mode, suspend, or recurse. Resume via the VM.
 			return "", false
 		}
 		code, err := mutationText(b, "proccode")

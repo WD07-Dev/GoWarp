@@ -58,7 +58,6 @@ func TestExtensionTouchingTargetUsesExactCandidate(t *testing.T) {
 	if value, err := c.Call("target.touchingTarget", logicTargetID(clone)); err != nil || value != true {
 		t.Fatal(value, err)
 	}
-	// Existing name queries must not populate a broader cached scene for this API.
 	r.graphics = &extensionTouchGraphics{}
 	if _, err := c.Call("target.touching", "Obstacle"); err != nil {
 		t.Fatal(err)
@@ -118,7 +117,6 @@ func TestObjectSensingReusesQueryStorage(t *testing.T) {
 	block := &project.Block{Opcode: "sensing_touchingobject"}
 	for _, name := range []string{"Obstacle", "_edge_", "_mouse_"} {
 		t.Run(name, func(t *testing.T) {
-			// Box the input once; this measures query storage, not string boxing.
 			value := any(name)
 			input := func(string) (any, error) { return value, nil }
 			allocations := testing.AllocsPerRun(100, func() {

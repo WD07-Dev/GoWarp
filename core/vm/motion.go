@@ -264,10 +264,6 @@ func (r *Runtime) setTargetSize(t *target, value float64) {
 	}
 }
 
-/*
-Preserve numeric state internally while making nonfinite values JSON-safe,
-using the same strings already emitted for nonfinite variables/list items.
-*/
 func (s TargetState) MarshalJSON() ([]byte, error) {
 	type plain TargetState
 	safe := func(n float64) any {
@@ -295,7 +291,6 @@ func (s TargetState) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// Glide endpoints are captured once; only interpolation advances across frames.
 type glideState struct {
 	startTime                  float64
 	duration                   float64
@@ -315,7 +310,6 @@ func (r *Runtime) advanceGlide(th *thread) bool {
 	return false
 }
 
-// Prepare both pure inputs together; yielding reporters keep the normal path.
 type coordinateMove struct {
 	x, y *numericExpression
 }

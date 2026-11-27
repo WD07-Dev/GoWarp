@@ -168,7 +168,6 @@ type extensionContext struct {
 	readDeletedTarget bool
 }
 
-// SetExtensions installs a compiled bundle before execution.
 func (r *Runtime) SetExtensions(bundle extension.Bundle) error {
 	if r.frame != 0 || len(r.extensions) != 0 {
 		return fmt.Errorf("extensions must be installed once before execution")
@@ -185,7 +184,6 @@ func (r *Runtime) SetExtensions(bundle extension.Bundle) error {
 			return fmt.Errorf("invalid or duplicate extension ID %q", def.ID)
 		}
 		ids[def.ID] = true
-		// Copy state slots per runtime; factories still own nested values.
 		state := make(map[string]any, len(def.State))
 		for key, value := range def.State {
 			state[key] = value
@@ -295,12 +293,7 @@ func (r *Runtime) invokeExtension(ctx context.Context, th *thread, block *projec
 	} else {
 		invocation = nil
 		prepared := registered.prepare(r, th, block)
-		synchronous := prepared.synchronous && th.reporterSteps == nil &&
-			prepared.blocks <= *budget && depth+prepared.height <= 128
-		/*
-			Complete every input before invoking user code. Suspended reporter
-			inputs are cached by the existing expression continuation.
-		*/
+		synchronous := prepared.synchronous && th.reporterSteps == nil && prepared.blocks <= *budget && depth+prepared.height <= 128
 		if synchronous && !prepared.constant {
 			if err := ctx.Err(); err != nil {
 				return extension.Result{}, true, err

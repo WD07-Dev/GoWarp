@@ -14,10 +14,6 @@ type ListAppend struct {
 	Number                   float64
 }
 
-/*
-SetListObserver observes each add-to-list operation, including an add followed
-by a clear in the same frame. It does not change list contents or execution.
-*/
 func (r *Runtime) SetListObserver(observer func(ListAppend)) {
 	r.listObserver = observer
 	r.listNotes = map[*project.Block]string{}
@@ -54,10 +50,6 @@ func (r *Runtime) SetStageSize(width, height float64) error {
 	return nil
 }
 
-/*
-AppendStageBytes feeds the named terminal input buffer, retaining Scratch's
-list limit. Returns false when the project has no such stage list.
-*/
 func (r *Runtime) AppendStageBytes(name string, data []byte) bool {
 	if r.stage == nil {
 		return false
@@ -78,10 +70,6 @@ func (r *Runtime) AppendStageBytes(name string, data []byte) bool {
 	return false
 }
 
-/*
-WriteDump emits variables and lists as text, sorted by line and
-excluding clones. Structured JSON remains the CLI's normal stdout format.
-*/
 func (r *Runtime) WriteDump(writer io.Writer) error {
 	var lines []string
 	for _, t := range r.targets {

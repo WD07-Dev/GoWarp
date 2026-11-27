@@ -7,16 +7,11 @@ import (
 	"slices"
 )
 
-// DisplayTarget references the original project's asset index, including clones.
 type DisplayTarget struct {
 	Source int
 	State  TargetState
 }
 
-/*
-UsesColorSensing tells display hosts whether they need an exact CPU pen copy.
-Sprite/edge touching only reads costume silhouettes, never the pen layer.
-*/
 func (r *Runtime) UsesColorSensing() bool {
 	if r.project == nil {
 		return true
@@ -35,7 +30,6 @@ func (r *Runtime) Scene() []DisplayTarget {
 	return r.SceneInto(nil)
 }
 
-// SceneInto overwrites dst with a display snapshot. Separate snapshots need separate buffers.
 func (r *Runtime) SceneInto(dst []DisplayTarget) []DisplayTarget {
 	if len(r.visual.layers) > 0 {
 		rank := func(t *target) int {
@@ -94,7 +88,6 @@ func (r *Runtime) MoveSprite(source, cloneID int, x, y float64) {
 	}
 }
 
-// RaiseSprite keeps drag ordering consistent with the front-layer block.
 func (r *Runtime) RaiseSprite(source, cloneID int) {
 	for _, t := range r.targets {
 		if t.sourceIndex == source && t.state.CloneID == cloneID {
@@ -104,7 +97,6 @@ func (r *Runtime) RaiseSprite(source, cloneID int) {
 	}
 }
 
-// AudioCommand captures transitions, including multiple plays within one frame.
 type AudioCommand struct {
 	Kind               string
 	ID, Source, Sound  int
@@ -199,10 +191,6 @@ func (r *Runtime) AudioStarted(id int) {
 	v.startPending = false
 	v.updated = r.audioTime()
 	if v.stepClock != nil {
-		/*
-			BEFORE_EXECUTE-based extensions count from this step's timestamp,
-			while output playback starts at the actual host acknowledgement.
-		*/
 		v.stepClock.updated = r.audioTime()
 	}
 	if r.realtime && !r.realtimeStart.IsZero() {
@@ -226,7 +214,6 @@ func (r *Runtime) AudioFinished(id int) {
 	}
 }
 
-// GreenFlag restarts scripts without resetting project data or sprite positions.
 func (r *Runtime) GreenFlag() {
 	r.syncTime()
 	r.stopAll()
@@ -239,7 +226,6 @@ func (r *Runtime) GreenFlag() {
 	r.extensionEvent("flag", r.stage)
 }
 
-// SetKeyState synchronizes held keys while stopped, without starting event hats.
 func (r *Runtime) SetKeyState(key string, down bool) {
 	r.trackHostKey(key, down)
 	r.keys[normalizeKey(key)] = down
