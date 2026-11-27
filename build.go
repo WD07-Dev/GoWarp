@@ -1,6 +1,5 @@
 //go:build ignore
 
-// build.go is the Go helper used by build.sh to embed the Windows app icon.
 package main
 
 import (
