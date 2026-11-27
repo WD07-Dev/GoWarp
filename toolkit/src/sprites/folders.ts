@@ -1,6 +1,6 @@
-import {tr} from '../translate';
-import type { PaintContext } from '../paint/context';
 import { FolderMenuItem, FolderServices } from './type';
+import { PaintContext } from '../paint/type';
+import { tr } from '../translate';
 
 export function createFolders(context: PaintContext, services: FolderServices) {
     const {window, document} = context;
