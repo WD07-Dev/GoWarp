@@ -1,4 +1,5 @@
 import { LayerServices, PaintContext } from './type';
+import { createIconButton } from '../shared/dom';
 import { tr } from '../translate';
 
 export function createLayers(context: PaintContext, services: LayerServices) {
@@ -189,24 +190,15 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         del: '<path d="M3.4 5.8h13.2"/><path d="M6.6 5.8V4h6.8v1.8"/>' + '<path d="M5 5.8 5.9 16.4h8.2L15 5.8"/><path d="M8.4 8.6v5M11.6 8.6v5"/>',
         pin: '<path d="M7.4 3.4h5.2l-1 4.4 2.4 2.8H6l2.4-2.8z"/><path d="M10 10.6v6"/>'
     };
-    function miniButton(inner: string, title: string) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'gwt-mini';
-        b.title = title;
-        b.setAttribute('aria-label', title);
-        b.innerHTML = icon(inner);
-        return b;
-    }
     function objectRow(item: any, index: number, total: number) {
         var row = document.createElement('div');
         row.className = 'gwt-obj' + (item.selected ? ' gwt-on' : '') + (item.visible ? '' : ' gwt-dim');
-        var eye = miniButton(item.visible ? OBJ_GLYPH.eye : OBJ_GLYPH.eyeOff, tr(item.visible ? 'hide' : 'show'));
+        var eye = createIconButton(document, 'gwt-mini', tr(item.visible ? 'hide' : 'show'), icon(item.visible ? OBJ_GLYPH.eye : OBJ_GLYPH.eyeOff));
         listen(eye, 'click', function () {
             toggleObject(item, 'visible');
             markObjects();
         });
-        var lock = miniButton(item.locked ? OBJ_GLYPH.lock : OBJ_GLYPH.unlock, tr(item.locked ? 'unlock' : 'lock'));
+        var lock = createIconButton(document, 'gwt-mini', tr(item.locked ? 'unlock' : 'lock'), icon(item.locked ? OBJ_GLYPH.lock : OBJ_GLYPH.unlock));
         if (item.locked) lock.classList.add('gwt-strong');
         listen(lock, 'click', function () {
             toggleObject(item, 'locked');
@@ -311,7 +303,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         count.className = 'gwt-count';
         head.appendChild(title);
         head.appendChild(count);
-        var pin = miniButton(OBJ_GLYPH.pin, tr('pin'));
+        var pin = createIconButton(document, 'gwt-mini', tr('pin'), icon(OBJ_GLYPH.pin));
         pin.setAttribute('aria-pressed', 'false');
         listen(pin, 'click', function () {
             var on = rail.classList.toggle('gwt-pin');
@@ -333,8 +325,8 @@ export function createLayers(context: PaintContext, services: LayerServices) {
             ['dup', 'duplicate', OBJ_GLYPH.dup, duplicateObjects],
             ['del', 'Delete', OBJ_GLYPH.del, deleteObjects]
         ] as const).forEach(function (row: readonly [string, string, string, () => void]) {
-            var b = miniButton(row[2], row[0] === 'del'
-                ? tr('delete') : tr(row[1]));
+            var b = createIconButton(document, 'gwt-mini', row[0] === 'del'
+                ? tr('delete') : tr(row[1]), icon(row[2]));
             b.dataset.order = String(row[0]);
             listen(b, 'click', function () {
                 row[3]();
@@ -351,7 +343,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
             ['vcenter', 'alignCenterV', OBJ_GLYPH.vcenter], ['bottom', 'alignBottom', OBJ_GLYPH.bottom],
             ['center', 'alignCenter', OBJ_GLYPH.center]
         ].forEach(function (row: string[]) {
-            var b = miniButton(row[2], tr(row[1]));
+            var b = createIconButton(document, 'gwt-mini', tr(row[1]), icon(row[2]));
             b.dataset.align = String(row[0]);
             listen(b, 'click', function () {
                 alignObjects(row[0]);
@@ -365,7 +357,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         ([
             [-90, 'rotateLeft', OBJ_GLYPH.rotL], [90, 'rotateRight', OBJ_GLYPH.rotR]
         ] as const).forEach(function (row: readonly [number, string, string]) {
-            var b = miniButton(row[2], tr(row[1]));
+            var b = createIconButton(document, 'gwt-mini', tr(row[1]), icon(row[2]));
             b.dataset.rotate = String(row[0]);
             listen(b, 'click', function () {
                 rotateObjects(row[0]);

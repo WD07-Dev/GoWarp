@@ -1,4 +1,5 @@
 import type { PaintContext, PixelEditor, PixelSource, PixelBox, PixelGroup, PixelVectorPath, PixelServices } from './type';
+import { createIconButton, isTextInput } from '../shared/dom';
 import { tr } from '../translate';
 
 export function createPixelEditor(context: PaintContext, services: PixelServices) {
@@ -875,7 +876,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
     }
 
     function pxKeyDown (ed: PixelEditor, e: KeyboardEvent) {
-        if(e.target && /INPUT|TEXTAREA|SELECT/.test((e.target as Element).tagName)) return;
+        if(isTextInput(e.target)) return;
         e.stopPropagation();
         if(e.ctrlKey || e.metaKey) {
             if(e.key.toLowerCase() === 'z') {
@@ -957,19 +958,10 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         var sub = document.createElement('span');
         sub.className = 'gwt-px-sub';
         sub.textContent = tr('pixelSub') + ' · ' + w + '×' + h;
-        var undo = document.createElement('button');
-        undo.type = 'button';
-        undo.className = 'gwt-px-icon';
-        undo.title = tr('undo');
-        undo.setAttribute('aria-label', tr('undo'));
-        undo.innerHTML = GLYPH.undo;
+        var undo = createIconButton(document, 'gwt-px-icon', tr('undo'), GLYPH.undo);
         listen(undo, 'click', function () { pxRestoreHistory(ed, 'undo'); });
-        var redo = document.createElement('button');
-        redo.type = 'button';
-        redo.className = 'gwt-px-icon';
-        redo.title = tr('redo');
-        redo.setAttribute('aria-label', tr('redo'));
-        redo.innerHTML = icon('<path d="M16 8.5H7.5a4 4 0 1 0 0 8H13"/><path d="M16 8.5 13 5.5M16 8.5l-3 3"/>');
+        var redo = createIconButton(document, 'gwt-px-icon', tr('redo'),
+            icon('<path d="M16 8.5H7.5a4 4 0 1 0 0 8H13"/><path d="M16 8.5 13 5.5M16 8.5l-3 3"/>'));
         listen(redo, 'click', function () { pxRestoreHistory(ed, 'redo'); });
         var close = document.createElement('button');
         close.type = 'button';

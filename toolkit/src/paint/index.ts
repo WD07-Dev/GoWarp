@@ -1,5 +1,6 @@
 import type { PaintTools, EditorDocument, EditorWindow, PaintContext, PaintElement, PaintSettings, PaintColor, Shape } from './type';
 import { round, cornerPath, SHAPES, NIBS, PENS } from './shapes';
+import { createIconButton, isTextInput } from '../shared/dom';
 import { createLifecycle } from '../shared/lifecycle';
 import type { ScratchHost } from '../shared/scratch';
 import { createFolders } from '../sprites/folders';
@@ -745,16 +746,6 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         }
     };
 
-    function cell (label: string, html: string) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'gwt-cell';
-        b.title = label;
-        b.setAttribute('aria-label', label);
-        b.innerHTML = html;
-        return b;
-    }
-
     function demoBlend (mode: string) {
         return '<i class="gwt-demo"><b></b><u style="mix-blend-mode:' + mode + '"></u></i>';
     }
@@ -1198,7 +1189,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var masks = document.createElement('div');
         masks.className = 'gwt-grid gwt-maskrow';
         [['on', tr('mask')], ['off', tr('maskOff')]].forEach(function (row: string[]) {
-            var b = cell(row[1], demoMask(row[0] === 'on') + '<span>' + row[1] + '</span>');
+            var b = createIconButton(document, 'gwt-cell', row[1], demoMask(row[0] === 'on') + '<span>' + row[1] + '</span>');
             b.dataset.mask = String(row[0]);
             listen(b, 'click', function () {
                 setMask(row[0] === 'on');
@@ -1212,7 +1203,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var grid = document.createElement('div');
         grid.className = 'gwt-grid gwt-blends';
         BLENDS.forEach(function (mode: string) {
-            var b = cell(mode, demoBlend(mode) + '<span>' + mode.replace(/-/g, ' ') + '</span>');
+            var b = createIconButton(document, 'gwt-cell', mode, demoBlend(mode) + '<span>' + mode.replace(/-/g, ' ') + '</span>');
             b.dataset.blend = String(mode);
             listen(b, 'click', function () {
                 applyBlend(mode);
@@ -1331,7 +1322,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var grid = document.createElement('div');
         grid.className = 'gwt-grid';
         SHAPES.forEach(function (shape: Shape) {
-            var b = cell(tr(shape.nameKey), shapeIcon(shape));
+            var b = createIconButton(document, 'gwt-cell', tr(shape.nameKey), shapeIcon(shape));
             b.dataset.shape = String(shape.id);
             listen(b, 'click', function () {
                 shaper.arm(shape);
@@ -1381,7 +1372,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var grid = document.createElement('div');
         grid.className = 'gwt-grid gwt-nibs';
         NIBS.forEach(function (nib: typeof NIBS[number]) {
-            var b = cell(tr(nib.nameKey) + ' · ' + nib.size, '');
+            var b = createIconButton(document, 'gwt-cell', tr(nib.nameKey) + ' · ' + nib.size, '');
             b.className = 'gwt-cell gwt-nib';
             b.dataset.size = String(nib.size);
             var dot = document.createElement('span');
@@ -1603,7 +1594,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var grid = document.createElement('div');
         grid.className = 'gwt-grid gwt-pens';
         PENS.forEach(function (profile: typeof PENS[number]) {
-            var b = cell(tr(profile.nameKey), nibSwatch(profile));
+            var b = createIconButton(document, 'gwt-cell', tr(profile.nameKey), nibSwatch(profile));
             b.className = 'gwt-cell gwt-pen';
             b.dataset.pen = String(profile.id);
             listen(b, 'click', function () {
@@ -1785,7 +1776,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
     function onKeyDown (e: KeyboardEvent) {
         if (pixels.pxEd) return;
-        if (e.target && /INPUT|TEXTAREA|SELECT/.test((e.target as Element).tagName)) return;
+        if (isTextInput(e.target)) return;
         if (!paintEditorOpen()) return;
         if (e.key === 'Escape') {
             if (openPanel) closePanel();

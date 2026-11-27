@@ -1,5 +1,6 @@
 import { FolderMenuItem, FolderServices, SpriteInfo, FolderData } from './type';
 import { PaintContext, PaintElement } from '../paint/type';
+import { createIconButton } from '../shared/dom';
 import { tr } from '../translate';
 
 export function createFolders(context: PaintContext, services: FolderServices) {
@@ -476,12 +477,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
     function sfDecorate () {
         sfTiles().forEach(function (tile: HTMLElement) {
             if (tile.querySelector('.gwt-sf-tile')) return;
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'gwt-sf-tile';
-            b.title = tr('sfMove');
-            b.setAttribute('aria-label', tr('sfMove'));
-            b.innerHTML = SF_FOLDER;
+            var b = createIconButton(document, 'gwt-sf-tile', tr('sfMove'), SF_FOLDER);
             listen(b, 'click', function (event: PointerEvent) {
                 event.preventDefault();
                 event.stopPropagation();
