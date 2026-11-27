@@ -179,7 +179,7 @@ editor.instructions4,4. Choose the display mode and click Run.,4. 표시 방식�
 editor.connect,Enable / copy address,연결 켜기 / 주소 복사
 action.open_turbowarp,Open TurboWarp,TurboWarp 열기
 editor.opening,Opening TurboWarp…,TurboWarp 여는 중…
-editor.opened,TurboWarp opened with Extension Manager.,Extension Manager와 함께 TurboWarp를 열었습니다.
+editor.opened,TurboWarp opened with GoWarp Toolkit.,GoWarp Toolkit와 함께 TurboWarp를 열었습니다.
 editor.disconnect,Disconnect,연결 끄기
 editor.copying,Copying connection address…,연결 주소 복사 중…
 editor.copied,Connection address copied. Paste it in TurboWarp -> GoWarp Run.,연결 주소를 복사했습니다. TurboWarp -> GoWarp Run에 붙여넣으세요.

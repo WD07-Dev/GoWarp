@@ -1,24 +1,22 @@
-// Name: Extension Manager
-// ID: extensionmanager
-// Description: Review and approve project extensions in the TurboWarp editor.
-// By: wheedo07
-// License: Apache-2.0
-
-/* @gowarp-ignore */
-(function (Scratch) {
-    'use strict';
-
+import type {ScratchHost, PaintTools} from './types';
+interface Project {
+    extensions?: string[];
+    extensionURLs?: Record<string, string>;
+}
+interface Review {
+    project: {extensionURLs: Record<string, string>};
+    resolve: () => void;
+    reject: (error: Error) => void;
+}
+export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () => void {
     const korean = (Scratch.translate.language || 'en').toLowerCase().startsWith('ko');
     const tr = (en, ko) => korean ? ko : en;
 
     if (!Scratch.extensions.unsandboxed) {
-        throw new Error(tr('Extension Manager must run without sandbox.', '확장 관리자는 샌드박스 없이 실행해야 합니다.'));
+        throw new Error(tr('GoWarp Toolkit must run without sandbox.', 'GoWarp Toolkit는 샌드박스 없이 실행해야 합니다.'));
     }
     const vm = Scratch.vm;
     const sm = vm.extensionManager.securityManager;
-    const key = Symbol.for('extension-manager.session');
-    const existing = vm[key];
-    if(existing) return;
     const approvals = new Map();
     if (typeof vm._loadExtensions !== 'function') {
         throw new Error(tr('This TurboWarp version does not expose the extension-loading hook.', '이 TurboWarp 버전은 확장 로딩 연결 기능을 지원하지 않습니다.'));
@@ -47,23 +45,22 @@
         if (sm.canLoadExtensionFromProject === load) sm.canLoadExtensionFromProject = originalLoad;
         if (sm.getSandboxMode === mode) sm.getSandboxMode = originalMode;
     }
-    function node(tag, text, style) {
+    function node<K extends keyof HTMLElementTagNameMap>(tag: K, text = '', style?: Partial<CSSStyleDeclaration>): HTMLElementTagNameMap[K] {
         const e = document.createElement(tag);
         if (text) e.textContent = text;
         if (style) Object.assign(e.style, style);
         return e;
     }
-    let dialog;
-    let dialogClose;
+    let dialog: HTMLDialogElement;
+    let dialogClose: (() => void) | undefined;
     
     const originalExtensionLoad = vm._loadExtensions;
     // This is an editor-session helper. Do not add a reference to newly saved SB3s.
-    // Keep the old marker opcode registered for compatibility with earlier versions.
-    const extensionId = 'extensionmanager';
-    const entriesFor = project => Object.entries(project.extensionURLs || {}).filter(([id, url]) => id !== extensionId && typeof url === 'string' && /^(https?:\/\/|data:)/i.test(url));
+    const extensionId = 'gowarpToolkit';
+    const entriesFor = (project: Project) => Object.entries(project.extensionURLs || {}).filter(([id, url]) => id !== extensionId && typeof url === 'string' && /^(https?:\/\/|data:)/i.test(url));
     // Read the current SB3 serialization directly; no manual file selection.
     function currentProject() {
-        const project = JSON.parse(vm.toJSON(undefined, {allowOptimization: false}));
+        const project: Project = JSON.parse(vm.toJSON(undefined, {allowOptimization: false}));
         const used = new Set(project.extensions || []);
         const loaded = vm.extensionManager.getExtensionURLs();
         for (const id of used) {
@@ -72,51 +69,51 @@
         return project;
     }
     const style = node('style');
-    style.id = 'extension-manager-style';
+    style.id = 'gowarp-toolkit-style';
     style.textContent = `
-        #extension-manager-button {display:flex;align-items:center;align-self:center;gap:7px;min-height:32px;margin:0 8px;padding:0 14px;border:1px solid #ff8187;border-radius:6px;background:#c52f3b;color:#fff;font:700 13px sans-serif;cursor:pointer;white-space:nowrap;box-shadow:0 2px 5px #0003;}
-        #extension-manager-button:hover {background:#e13b48;}
-        #extension-manager-dialog {box-sizing:border-box;width:min(640px,92vw);max-height:88vh;overflow:auto;padding:24px;border:1px solid #666;border-radius:10px;background:#202020;color:#eee;color-scheme:dark;font:14px/1.5 sans-serif;box-shadow:0 12px 50px #0008;}
-        #extension-manager-dialog::backdrop {background:#0008;}
-        #extension-manager-dialog h2 {margin:0;color:#ff4b51;font-size:22px;}
-        #extension-manager-dialog p {margin:10px 0;}
-        #extension-manager-dialog .em-header,#extension-manager-dialog .em-footer,#extension-manager-dialog .em-toolbar,#extension-manager-dialog .em-summary {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-        #extension-manager-dialog .em-header {justify-content:space-between;}
-        #extension-manager-dialog .em-muted {color:#aaa;font-size:12px;}
-        #extension-manager-dialog .em-warning {border-left:3px solid #ff8187;padding:8px 12px;background:#2c2223;color:#e8c2c3;font-size:12px;}
-        #extension-manager-dialog button {padding:8px 12px;border:1px solid #666;border-radius:5px;background:#333;color:#fff;font:inherit;cursor:pointer;}
-        #extension-manager-dialog button:hover:not(:disabled) {background:#444;}
-        #extension-manager-dialog button:disabled {opacity:.45;cursor:default;}
-        #extension-manager-dialog button[data-primary] {background:#a32a31;border-color:#c85e63;}
-        #extension-manager-dialog button[data-primary]:hover:not(:disabled) {background:#c52f3b;}
-        #extension-manager-dialog button:focus-visible,#extension-manager-dialog input:focus-visible,#extension-manager-dialog select:focus-visible,#extension-manager-button:focus-visible {outline:2px solid #ff8187;outline-offset:2px;}
-        #extension-manager-dialog input[type=checkbox] {accent-color:#c52f3b;width:16px;height:16px;margin:0;flex:none;}
-        #extension-manager-dialog select {box-sizing:border-box;max-width:100%;min-width:0;padding:7px 9px;border:1px solid #666;border-radius:5px;background:#111;color:#eee;font:13px sans-serif;}
-        #extension-manager-dialog .em-summary {margin:18px 0 8px;justify-content:space-between;}
-        #extension-manager-dialog .em-toolbar {padding:10px 0;}
-        #extension-manager-dialog .em-toolbar button {font-size:12px;padding:6px 9px;}
-        #extension-manager-dialog .em-list {display:grid;gap:6px;max-height:34vh;overflow:auto;overscroll-behavior:contain;}
-        #extension-manager-dialog .em-item {border:1px solid #484848;border-radius:6px;padding:10px 12px;background:#292929;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;}
-        #extension-manager-dialog .em-item label {display:flex;align-items:center;gap:8px;min-width:0;font-weight:600;overflow-wrap:anywhere;cursor:pointer;}
-        #extension-manager-dialog .em-detail {grid-column:1/-1;color:#aaa;font:12px/1.5 monospace;overflow-wrap:anywhere;}
-        #extension-manager-dialog .em-empty {padding:20px 10px;border:1px dashed #555;border-radius:6px;text-align:center;color:#aaa;}
-        #extension-manager-dialog .em-status {font-size:12px;color:#ccc;overflow-wrap:anywhere;min-height:18px;}
-        #extension-manager-dialog .em-footer {border-top:1px solid #484848;padding-top:14px;margin-top:14px;}
-        #extension-manager-dialog .em-footer .em-spacer {flex:1;}
-        @media(max-width:500px) {#extension-manager-dialog {padding:16px;} #extension-manager-dialog .em-item {grid-template-columns:1fr;} #extension-manager-dialog .em-detail {grid-column:1;}}
+        #gowarp-toolkit-button {display:flex;align-items:center;align-self:center;gap:7px;min-height:32px;margin:0 8px;padding:0 14px;border:1px solid #ff8187;border-radius:6px;background:#c52f3b;color:#fff;font:700 13px sans-serif;cursor:pointer;white-space:nowrap;box-shadow:0 2px 5px #0003;}
+        #gowarp-toolkit-button:hover {background:#e13b48;}
+        #gowarp-toolkit-dialog {box-sizing:border-box;width:min(640px,92vw);max-height:88vh;overflow:auto;padding:24px;border:1px solid #666;border-radius:10px;background:#202020;color:#eee;color-scheme:dark;font:14px/1.5 sans-serif;box-shadow:0 12px 50px #0008;}
+        #gowarp-toolkit-dialog::backdrop {background:#0008;}
+        #gowarp-toolkit-dialog h2 {margin:0;color:#ff4b51;font-size:22px;}
+        #gowarp-toolkit-dialog p {margin:10px 0;}
+        #gowarp-toolkit-dialog .em-header,#gowarp-toolkit-dialog .em-footer,#gowarp-toolkit-dialog .em-toolbar,#gowarp-toolkit-dialog .em-summary {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+        #gowarp-toolkit-dialog .em-header {justify-content:space-between;}
+        #gowarp-toolkit-dialog .em-muted {color:#aaa;font-size:12px;}
+        #gowarp-toolkit-dialog .em-warning {border-left:3px solid #ff8187;padding:8px 12px;background:#2c2223;color:#e8c2c3;font-size:12px;}
+        #gowarp-toolkit-dialog button {padding:8px 12px;border:1px solid #666;border-radius:5px;background:#333;color:#fff;font:inherit;cursor:pointer;}
+        #gowarp-toolkit-dialog button:hover:not(:disabled) {background:#444;}
+        #gowarp-toolkit-dialog button:disabled {opacity:.45;cursor:default;}
+        #gowarp-toolkit-dialog button[data-primary] {background:#a32a31;border-color:#c85e63;}
+        #gowarp-toolkit-dialog button[data-primary]:hover:not(:disabled) {background:#c52f3b;}
+        #gowarp-toolkit-dialog button:focus-visible,#gowarp-toolkit-dialog input:focus-visible,#gowarp-toolkit-dialog select:focus-visible,#gowarp-toolkit-button:focus-visible {outline:2px solid #ff8187;outline-offset:2px;}
+        #gowarp-toolkit-dialog input[type=checkbox] {accent-color:#c52f3b;width:16px;height:16px;margin:0;flex:none;}
+        #gowarp-toolkit-dialog select {box-sizing:border-box;max-width:100%;min-width:0;padding:7px 9px;border:1px solid #666;border-radius:5px;background:#111;color:#eee;font:13px sans-serif;}
+        #gowarp-toolkit-dialog .em-summary {margin:18px 0 8px;justify-content:space-between;}
+        #gowarp-toolkit-dialog .em-toolbar {padding:10px 0;}
+        #gowarp-toolkit-dialog .em-toolbar button {font-size:12px;padding:6px 9px;}
+        #gowarp-toolkit-dialog .em-list {display:grid;gap:6px;max-height:34vh;overflow:auto;overscroll-behavior:contain;}
+        #gowarp-toolkit-dialog .em-item {border:1px solid #484848;border-radius:6px;padding:10px 12px;background:#292929;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;}
+        #gowarp-toolkit-dialog .em-item label {display:flex;align-items:center;gap:8px;min-width:0;font-weight:600;overflow-wrap:anywhere;cursor:pointer;}
+        #gowarp-toolkit-dialog .em-detail {grid-column:1/-1;color:#aaa;font:12px/1.5 monospace;overflow-wrap:anywhere;}
+        #gowarp-toolkit-dialog .em-empty {padding:20px 10px;border:1px dashed #555;border-radius:6px;text-align:center;color:#aaa;}
+        #gowarp-toolkit-dialog .em-status {font-size:12px;color:#ccc;overflow-wrap:anywhere;min-height:18px;}
+        #gowarp-toolkit-dialog .em-footer {border-top:1px solid #484848;padding-top:14px;margin-top:14px;}
+        #gowarp-toolkit-dialog .em-footer .em-spacer {flex:1;}
+        @media(max-width:500px) {#gowarp-toolkit-dialog {padding:16px;} #gowarp-toolkit-dialog .em-item {grid-template-columns:1fr;} #gowarp-toolkit-dialog .em-detail {grid-column:1;}}
     `;
     document.head.appendChild(style);
-    function open(review) {
+    function open(review?: Review) {
         if (dialog && dialog.isConnected) {
             if (!review) return;
             if (dialogClose) dialogClose();
         }
         const panel = node('dialog');
-        panel.id = 'extension-manager-dialog';
-        panel.setAttribute('aria-labelledby','extension-manager-title');
-        const make = (tag, text, cls) => { const e = node(tag,text); if (cls) e.className=cls; return e; };
+        panel.id = 'gowarp-toolkit-dialog';
+        panel.setAttribute('aria-labelledby','gowarp-toolkit-title');
+        const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '', cls = '') => { const e = node(tag,text); if (cls) e.className=cls; return e; };
         const header = make('div','','em-header');
-        const title = make('h2',tr('Extension Manager', '확장 관리자')); title.id='extension-manager-title';
+        const title = make('h2',tr('GoWarp Toolkit', 'GoWarp Toolkit')); title.id='gowarp-toolkit-title';
         const session = make('span','','em-muted');
         header.append(title,session);
         const help = make('p', review ? tr('Review the custom extensions in this project before opening it.', '프로젝트를 열기 전에 포함된 사용자 정의 확장을 확인하세요.') : tr('Review the custom extensions in the current project. Approvals apply to future loads in this editor session.', '현재 프로젝트의 사용자 정의 확장을 확인하세요. 승인은 현재 편집기 세션에서 이후에 불러오는 확장에 적용됩니다.'));
@@ -128,13 +125,13 @@
         const list=make('div','','em-list');
         const controls=make('div','','em-toolbar');
         const footer=make('div','','em-footer');
-        const rows=[];
+        const rows: {check: HTMLInputElement; mode: HTMLSelectElement; url: string}[]=[];
         function button(text,handler) { const b=node('button',text); b.type='button'; b.addEventListener('click',handler); return b; }
         let closed=false;
         const close=(proceed=false)=>{
             if(closed)return; closed=true;
             panel.close(); panel.remove(); dialog=null; dialogClose=null;
-            if(review) { if(proceed===true)review.resolve(); else review.reject(new Error(tr('Project loading cancelled in Extension Manager.', '확장 관리자에서 프로젝트 불러오기를 취소했습니다.'))); }
+            if(review) { if(proceed===true)review.resolve(); else review.reject(new Error(tr('Project loading cancelled in GoWarp Toolkit.', 'GoWarp Toolkit에서 프로젝트 불러오기를 취소했습니다.'))); }
         };
         dialogClose=()=>close(false);
         const approve=button(review?tr('Approve selected & open', '선택 항목 승인 후 열기'):tr('Approve selected', '선택 항목 승인'),()=>{
@@ -167,7 +164,7 @@
             approve.disabled=!review&&!count;
             approve.textContent=review?(count?tr('Approve selected & open', '선택 항목 승인 후 열기'):tr('Open with default policy', '기본 정책으로 열기')):tr('Approve selected', '선택 항목 승인');
         }
-        function showProject(project,name){
+        function showProject(project: Project,name: string){
             list.replaceChildren();rows.length=0;
             projectLabel.textContent=name;
             for(const [id,url] of entriesFor(project)){
@@ -194,7 +191,15 @@
                 status.textContent=String(e.message || e); refresh();
             }
         }
-        panel.append(header,help,warning,summary,controls,list,status,footer);
+        if (!review) {
+            const tools = make('div', '', 'em-toolbar');
+            tools.append(
+                button(tr('Pixel editor', '픽셀 편집기'), () => { close(); paint.openPixelEditor(); }),
+                button(tr('Plan board', '작업 보드'), () => { close(); paint.openBoard(); })
+            );
+            panel.append(header, tools, make('p', tr('Drawing, layers and alignment tools are in the Costumes tab. Sprite folders appear above the sprite list.', '그리기·레이어·중심 정렬 도구는 모양 탭에, 폴더는 스프라이트 목록 위에 표시됩니다.')));
+        } else panel.append(header);
+        panel.append(help,warning,summary,controls,list,status,footer);
         document.body.append(panel);dialog=panel;
         panel.addEventListener('cancel',e=>{e.preventDefault();close(false);});
         panel.addEventListener('close',()=>close(false));
@@ -205,7 +210,7 @@
     }
     // Review the actual extension IDs and URLs before TurboWarp checks permissions.
     // Only explicitly selected URLs are approved; all other checks use the original policy.
-    vm._loadExtensions = async function (extensionIDs, extensionURLs = new Map(), ...args) {
+    const extensionLoad = async function (extensionIDs, extensionURLs = new Map(), ...args) {
         const urls = Object.create(null);
         const manager = this.extensionManager;
         if (extensionIDs && typeof extensionIDs[Symbol.iterator] === 'function' &&
@@ -219,33 +224,38 @@
             }
         }
         if (Object.values(urls).some(url => !approvals.has(url))) {
-            await new Promise((resolve, reject) => open({project: {extensionURLs: urls}, resolve, reject}));
+            await new Promise<void>((resolve, reject) => open({project: {extensionURLs: urls}, resolve, reject}));
         }
         return originalExtensionLoad.call(this, extensionIDs, extensionURLs, ...args);
     };
-    class ExtensionManager {
+    vm._loadExtensions = extensionLoad;
+    class Toolkit {
         getInfo() {
-            return {id:extensionId,name:tr('Extension Manager', '확장 관리자'),color1:'#b52e35',blocks:[
-                {blockType:Scratch.BlockType.BUTTON,text:tr('Extension Manager', '확장 관리자'),func:'open'},
-                {opcode:'installed',blockType:Scratch.BlockType.REPORTER,text:tr('Extension Manager', '확장 관리자'),hideFromPalette:true,disableMonitor:true}
+            return {id:extensionId,name:tr('GoWarp Toolkit', 'GoWarp Toolkit'),color1:'#b52e35',blocks:[
+                {blockType:Scratch.BlockType.BUTTON,text:tr('GoWarp Toolkit', 'GoWarp Toolkit'),func:'open'},
             ]};
         }
         open(){open();}
-        installed(){return '';}
     }
-    Scratch.extensions.register(new ExtensionManager());
-    vm[key]={open};
+    Scratch.extensions.register(new Toolkit());
     // Match GoWarp's menu placement. Reattach if TurboWarp recreates its menu.
     function attachButton(){
-        if(document.getElementById('extension-manager-button'))return;
+        if(document.getElementById('gowarp-toolkit-button'))return;
         const bar=document.querySelector('[class*="menu-bar_main-menu"]')||document.querySelector('[class*="menu-bar_menu-bar_"]');
         if(!bar)return;
-        const launcher=node('button',tr('Extension Manager', '확장 관리자'));
-        launcher.id='extension-manager-button';launcher.type='button';
+        const launcher=node('button',tr('GoWarp Toolkit', 'GoWarp Toolkit'));
+        launcher.id='gowarp-toolkit-button';launcher.type='button';
         launcher.title=tr('Review and approve project extensions', '프로젝트 확장 확인 및 승인');
         launcher.addEventListener('click',()=>open());bar.appendChild(launcher);
     }
     const observer=new MutationObserver(attachButton);
     observer.observe(document.body,{childList:true,subtree:true});attachButton();
-    window.addEventListener('pagehide',()=>observer.disconnect(),{once:true});
-})(Scratch);
+    return () => {
+        observer.disconnect();
+        dialogClose?.();
+        clear();
+        if (vm._loadExtensions === extensionLoad) vm._loadExtensions = originalExtensionLoad;
+        document.getElementById('gowarp-toolkit-button')?.remove();
+        style.remove();
+    };
+}

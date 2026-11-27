@@ -41,6 +41,9 @@ and opens a native preview without manually saving and reopening an SB3. Choose 
 separate window or an experimental streamed preview inside the editor. Block clicks
 and green-flag restarts reuse the running preview until the project changes.
 
+**Open TurboWarp** also loads [GoWarp Toolkit](toolkit/README.md), which adds
+extension review, painting and layer tools, sprite folders, and a plan board.
+
 ### Saved projects and SB3 files
 
 - **Open SB3 file** loads the Scratch or TurboWarp project to run.

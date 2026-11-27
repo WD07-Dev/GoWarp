@@ -129,13 +129,13 @@ func TestDisconnectDiscardsPreviewSnapshot(t *testing.T) {
 	}
 }
 
-func TestExtensionManagerCanLoadWithoutConnectionToken(t *testing.T) {
+func TestToolkitCanLoadWithoutConnectionToken(t *testing.T) {
 	s, err := Start(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(s.Close)
-	res := request(t, s, "GET", "/extension-manager.js", "https://turbowarp.org", "", nil)
+	res := request(t, s, "GET", "/gowarp-toolkit.js", "https://turbowarp.org", "", nil)
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("extension script: status %d", res.StatusCode)
 	}
@@ -143,7 +143,7 @@ func TestExtensionManagerCanLoadWithoutConnectionToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(body, assets.ExtensionManager) || bytes.Contains(body, []byte(s.token)) {
+	if !bytes.Equal(body, assets.Toolkit) || bytes.Contains(body, []byte(s.token)) {
 		t.Fatal("expected extension manager source without connection credentials")
 	}
 	if res.Header.Get("Content-Type") != "text/javascript; charset=utf-8" {
@@ -154,7 +154,7 @@ func TestExtensionManagerCanLoadWithoutConnectionToken(t *testing.T) {
 		status       int
 	}{
 		{"/status", "https://turbowarp.org", http.StatusUnauthorized},
-		{"/extension-manager.js", "https://example.com", http.StatusForbidden},
+		{"/gowarp-toolkit.js", "https://example.com", http.StatusForbidden},
 	} {
 		res := request(t, s, "GET", tc.path, tc.origin, "", nil)
 		if res.StatusCode != tc.status {
@@ -163,7 +163,7 @@ func TestExtensionManagerCanLoadWithoutConnectionToken(t *testing.T) {
 	}
 }
 
-func TestTurboWarpURLLoadsLocalExtensionManager(t *testing.T) {
+func TestTurboWarpURLLoadsLocalToolkit(t *testing.T) {
 	s, err := Start(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -178,7 +178,7 @@ func TestTurboWarpURLLoadsLocalExtensionManager(t *testing.T) {
 		t.Fatal(err)
 	}
 	scriptURL := u.Query().Get("extension")
-	if u.Scheme != "https" || u.Host != "turbowarp.org" || u.Path != "/editor" || scriptURL != "http://localhost:8000/extension-manager.js" || strings.Contains(address, s.token) {
+	if u.Scheme != "https" || u.Host != "turbowarp.org" || u.Path != "/editor" || scriptURL != "http://localhost:8000/gowarp-toolkit.js" || strings.Contains(address, s.token) {
 		t.Fatalf("unexpected editor URL: %s", address)
 	}
 	repeated, err := s.TurboWarpURL()
@@ -190,8 +190,8 @@ func TestTurboWarpURLLoadsLocalExtensionManager(t *testing.T) {
 		method, path string
 		status       int
 	}{
-		{"GET", "/extension-manager.js", http.StatusOK},
-		{"OPTIONS", "/extension-manager.js", http.StatusNoContent},
+		{"GET", "/gowarp-toolkit.js", http.StatusOK},
+		{"OPTIONS", "/gowarp-toolkit.js", http.StatusNoContent},
 		{"GET", "/status", http.StatusForbidden},
 	} {
 		req, err := http.NewRequest(tc.method, "http://localhost:8000"+tc.path, nil)
@@ -208,7 +208,7 @@ func TestTurboWarpURLLoadsLocalExtensionManager(t *testing.T) {
 		if err != nil || res.StatusCode != tc.status {
 			t.Fatalf("%s %s: status %d, %v", tc.method, tc.path, res.StatusCode, err)
 		}
-		if tc.method == "GET" && tc.status == http.StatusOK && !bytes.Equal(body, assets.ExtensionManager) {
+		if tc.method == "GET" && tc.status == http.StatusOK && !bytes.Equal(body, assets.Toolkit) {
 			t.Fatal("browser received a different extension script")
 		}
 	}

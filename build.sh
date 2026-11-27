@@ -3,6 +3,7 @@ set -euo pipefail
 
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 cd "$root"
+npm run build --prefix "$root/toolkit"
 
 declare -A build_targets=(
     [windows]="amd64"

@@ -1,0 +1,7 @@
+// Name: GoWarp Toolkit
+// ID: gowarpToolkit
+// Description: Editor tools for TurboWarp
+// By: wheedo07
+// License: Apache-2.0
+
+/* @gowarp-ignore */

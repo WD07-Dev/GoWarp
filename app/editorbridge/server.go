@@ -125,12 +125,12 @@ func (s *Server) TurboWarpURL() (string, error) {
 	if s.extensions == nil {
 		listener, err := net.Listen("tcp4", "127.0.0.1:8000")
 		if err != nil {
-			return "", fmt.Errorf("serve Extension Manager on localhost:8000: %w", err)
+			return "", fmt.Errorf("serve GoWarp Toolkit on localhost:8000: %w", err)
 		}
 		s.extensions = &http.Server{Handler: s, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
 		go s.extensions.Serve(listener)
 	}
-	query := url.Values{"extension": {"http://localhost:8000/extension-manager.js"}}
+	query := url.Values{"extension": {"http://localhost:8000/gowarp-toolkit.js"}}
 	return "https://turbowarp.org/editor?" + query.Encode(), nil
 }
 
@@ -192,7 +192,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	origin := r.Header.Get("Origin")
-	extensionPath := r.URL.Path == "/extension-manager.js" && (r.Method == http.MethodGet || r.Method == http.MethodOptions)
+	extensionPath := r.URL.Path == "/gowarp-toolkit.js" && (r.Method == http.MethodGet || r.Method == http.MethodOptions)
 	if (r.Host != s.address && !(extensionPath && r.Host == "localhost:8000")) || !allowedOrigin(origin) {
 		http.Error(w, "Untrusted editor origin or host", http.StatusForbidden)
 		return
@@ -203,7 +203,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if extensionPath && r.Method == http.MethodGet {
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
-		w.Write(assets.ExtensionManager)
+		w.Write(assets.Toolkit)
 		return
 	}
 	if r.Method == http.MethodOptions {

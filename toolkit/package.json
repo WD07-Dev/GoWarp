@@ -1,0 +1,19 @@
+{
+  "name": "gowarp-toolkit",
+  "version": "1.0.0",
+  "description": "TurboWarp editor tools for GoWarp",
+  "scripts": {
+    "build": "webpack --mode production"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "private": true,
+  "devDependencies": {
+    "ts-loader": "^9.6.2",
+    "typescript": "5.9.3",
+    "webpack": "^5.113.0",
+    "webpack-cli": "^7.3.1"
+  }
+}

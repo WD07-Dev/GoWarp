@@ -1,2 +1,4 @@
 /output/
 /app/assets/embed/*.zip
+/toolkit/node_modules
+/app/assets/embed/gowarp-toolkit.js
