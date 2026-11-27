@@ -1,4 +1,5 @@
-import type {ScratchHost, PaintTools} from './types';
+import type {ScratchHost} from '../shared/scratch';
+import type {PaintTools} from '../paint/type';
 interface Project {
     extensions?: string[];
     extensionURLs?: Record<string, string>;
@@ -192,8 +193,7 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
         if (!review) {
             const tools = make('div', '', 'em-toolbar');
             tools.append(
-                button(tr('Pixel editor', '픽셀 편집기'), () => { close(); paint.openPixelEditor(); }),
-                button(tr('Plan board', '작업 보드'), () => { close(); paint.openBoard(); })
+                button(tr('Pixel editor', '픽셀 편집기'), () => { close(); paint.openPixelEditor(); })
             );
             panel.append(header, tools, make('p', tr('Drawing, layers and alignment tools are in the Costumes tab. Sprite folders appear above the sprite list.', '그리기·레이어·중심 정렬 도구는 모양 탭에, 폴더는 스프라이트 목록 위에 표시됩니다.')));
         } else panel.append(header);

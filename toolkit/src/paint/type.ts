@@ -1,12 +1,4 @@
-export interface ScratchHost {
-    vm: any;
-    translate: {language: string};
-    extensions: {unsandboxed: boolean; register(extension: object): void};
-    BlockType: {BUTTON: string; REPORTER: string};
-}
-
 export interface PaintTools {
-    openBoard(): void;
     openPixelEditor(): void;
     dispose(): void;
 }
@@ -37,15 +29,6 @@ export interface AlphaStats {
     cx?: number;
     cy?: number;
     box?: number[];
-}
-
-export interface FolderMenuItem {
-    head?: string;
-    label?: string;
-    icon?: string;
-    checked?: boolean;
-    sep?: boolean;
-    run?: () => void;
 }
 
 export interface PixelEditor {
@@ -96,3 +79,14 @@ export type EditorDocument = Omit<Document, 'createElement' | 'querySelector' | 
     getElementById(id: string): PaintElement;
     __gwtGrad?: boolean;
 };
+
+export interface AnchorServices {
+    anchorTarget: () => any;
+    findVM: () => any;
+    readonly railEl: any;
+    markObjects: () => void;
+    keyRow: (chips: any) => PaintElement;
+    readonly openPanel: any;
+    toggleFor: (anchor: any, kind: any, extraClass?: any) => PaintElement;
+    labelEl: (text: any) => PaintElement;
+}

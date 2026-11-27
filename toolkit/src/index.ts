@@ -1,6 +1,6 @@
-import {installExtensions} from './extensions';
+import {installExtensions} from './extensions/manager';
 import {installPaintTools} from './paint';
-import type {ScratchHost} from './types';
+import type {ScratchHost} from './shared/scratch';
 declare const Scratch: ScratchHost;
 
 if (!Scratch.extensions.unsandboxed) {
@@ -9,7 +9,7 @@ if (!Scratch.extensions.unsandboxed) {
 
 const key = Symbol.for('gowarp-toolkit.session');
 const vm = Scratch.vm;
-if (!vm[key]) {
+if(!vm[key]) {
     const paint = installPaintTools(Scratch);
     let removeExtensions: () => void;
     try {
