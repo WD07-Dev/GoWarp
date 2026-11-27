@@ -3,14 +3,14 @@ import type {EditorDocument, EditorWindow, PaintElement, RGBA} from './type';
 export function createTheme(document: EditorDocument, window: EditorWindow) {
     function parseColor(input: string) {
         var s = String(input || '').trim();
-        if (!s) return null;
+        if(!s) return null;
         var hex = s.match(/^#([0-9a-f]{3,8})$/i);
-        if (hex) {
+        if(hex) {
             var h = hex[1];
-            if (h.length === 3 || h.length === 4) {
+            if(h.length === 3 || h.length === 4) {
                 h = h.split('').map(function (c: string) { return c + c; }).join('');
             }
-            if (h.length < 6) return null;
+            if(h.length < 6) return null;
             return {
                 r: parseInt(h.slice(0, 2), 16),
                 g: parseInt(h.slice(2, 4), 16),
@@ -19,7 +19,7 @@ export function createTheme(document: EditorDocument, window: EditorWindow) {
             };
         }
         var rgb = s.match(/rgba?\(([^)]+)\)/i);
-        if (rgb) {
+        if(rgb) {
             var parts = rgb[1].split(/[\s,/]+/).map(Number);
             return {r: parts[0] || 0, g: parts[1] || 0, b: parts[2] || 0, a: parts.length > 3 ? parts[3] : 1};
         }
@@ -62,7 +62,7 @@ export function createTheme(document: EditorDocument, window: EditorWindow) {
             try {
                 rules = document.styleSheets[i].cssRules;
             } catch (e) { continue; }
-            for (var r = 0; r < rules.length; r++) {
+            for(let r=0; r < rules.length; r++) {
                 var text = rules[r].cssText || '';
                 if (text.indexOf(fragment) < 0) continue;
                 var token = text.match(new RegExp('[a-zA-Z0-9_-]*' + fragment + '[a-zA-Z0-9_-]*'));

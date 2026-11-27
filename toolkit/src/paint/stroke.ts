@@ -14,9 +14,7 @@ export function preparePenStroke(path: any): {path: any; previous: any} {
     const clean = path.unite(path, {insert: false});
     clean.data.gwtPenStroke = true;
     const previous = path.previousSibling;
-    if(!previous?.data.gwtPenStroke ||
-        !hasOpaqueFill(clean, clean.fillColor) || !hasOpaqueFill(previous, clean.fillColor) ||
-        !clean.bounds.intersects(previous.bounds)) {
+    if(!previous?.data.gwtPenStroke || !hasOpaqueFill(clean, clean.fillColor) || !hasOpaqueFill(previous, clean.fillColor) || !clean.bounds.intersects(previous.bounds)) {
         return {path: clean, previous: null};
     }
 
