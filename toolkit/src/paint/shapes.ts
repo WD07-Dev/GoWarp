@@ -68,7 +68,7 @@ function starPoints(tips: number, inner: number) {
 }
 function crescentPoints() {
     var points = [];
-    var i;
+    var i: number;
     for(i = 0; i <= 24; i++) {
         var a = (-90 + (i * 180 / 24)) * Math.PI / 180;
         points.push([50 + (50 * Math.cos(a)), 50 + (50 * Math.sin(a))]);
