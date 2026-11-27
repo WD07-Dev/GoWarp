@@ -1,14 +1,14 @@
-import type {EditorDocument, EditorWindow} from './type';
+import type {EditorDocument, EditorWindow, PaintElement, RGBA} from './type';
 
 export function createTheme(document: EditorDocument, window: EditorWindow) {
-    function parseColor (input) {
+    function parseColor(input: string) {
         var s = String(input || '').trim();
         if (!s) return null;
         var hex = s.match(/^#([0-9a-f]{3,8})$/i);
         if (hex) {
             var h = hex[1];
             if (h.length === 3 || h.length === 4) {
-                h = h.split('').map(function (c) { return c + c; }).join('');
+                h = h.split('').map(function (c: string) { return c + c; }).join('');
             }
             if (h.length < 6) return null;
             return {r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16),
@@ -21,18 +21,18 @@ export function createTheme(document: EditorDocument, window: EditorWindow) {
         }
         return null;
     }
-    function rgba (c, a) {
+    function rgba(c: RGBA, a: number) {
         return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + a + ')';
     }
-    function brightness (c) {
+    function brightness(c: RGBA) {
         return (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255;
     }
-    function cssVar (cs, name) {
+    function cssVar(cs: CSSStyleDeclaration, name: string) {
         var v = cs.getPropertyValue(name);
         return v ? v.trim() : '';
     }
-    function paintedColor (node, property) {
-        for (var hops = 0; hops < 8 && node; hops++) {
+    function paintedColor(node: Element, property: 'color' | 'backgroundColor') {
+        for(let hops=0; hops < 8 && node; hops++) {
             var value = window.getComputedStyle(node)[property];
             var parsed = parseColor(value);
             if (parsed && parsed.a > 0.05) return value;
@@ -41,11 +41,11 @@ export function createTheme(document: EditorDocument, window: EditorWindow) {
         return null;
     }
     var hashedClassCache = {};
-    function nativeClass (fragment) {
-        if (hashedClassCache[fragment]) return hashedClassCache[fragment];
+    function nativeClass(fragment: string) {
+        if(hashedClassCache[fragment]) return hashedClassCache[fragment];
         var host = document.querySelector('[class*="' + fragment + '"]');
-        if (host) {
-            var live = Array.prototype.filter.call(host.classList, function (c) {
+        if(host) {
+            var live = Array.prototype.filter.call(host.classList, function (c: string) {
                 return c.indexOf(fragment) >= 0;
             })[0];
             if (live) {
@@ -53,9 +53,11 @@ export function createTheme(document: EditorDocument, window: EditorWindow) {
                 return live;
             }
         }
-        for (var i = 0; i < document.styleSheets.length; i++) {
+        for(let i=0; i < document.styleSheets.length; i++) {
             var rules;
-            try { rules = document.styleSheets[i].cssRules; } catch (e) { continue; }
+            try {
+                rules = document.styleSheets[i].cssRules;
+            } catch (e) { continue; }
             for (var r = 0; r < rules.length; r++) {
                 var text = rules[r].cssText || '';
                 if (text.indexOf(fragment) < 0) continue;
@@ -69,7 +71,7 @@ export function createTheme(document: EditorDocument, window: EditorWindow) {
         return null;
     }
 
-    function readTheme () {
+    function readTheme() {
         var host = document.querySelector('[class*="paint-editor_mode-selector"]') || document.body;
         var cs = window.getComputedStyle(host);
         var selected = document.querySelector('[class*="tool-select-base_is-selected"]');
@@ -78,8 +80,7 @@ export function createTheme(document: EditorDocument, window: EditorWindow) {
 
         var raw = {
             surface: cssVar(cs, '--paint-popover-background') || paintedColor(host, 'backgroundColor'),
-            accent: (selected ? window.getComputedStyle(selected).backgroundColor : '') ||
-                cssVar(cs, '--paint-looks-secondary'),
+            accent: (selected ? window.getComputedStyle(selected).backgroundColor : '') || cssVar(cs, '--paint-looks-secondary'),
             text: cssVar(cs, '--paint-text-primary') || paintedColor(host, 'color'),
             field: cssVar(cs, '--paint-input-background') || (fieldCs ? fieldCs.backgroundColor : ''),
             border: cssVar(cs, '--paint-form-border') || (fieldCs ? fieldCs.borderColor : ''),
@@ -100,8 +101,8 @@ export function createTheme(document: EditorDocument, window: EditorWindow) {
             shadow: dark ? '0 8px 24px rgba(0,0,0,.5)' : '0 8px 24px rgba(148,162,188,.35)'
         };
     }
-    function applyTheme (panel, theme) {
-        var set = function (name, value) {
+    function applyTheme(panel: PaintElement, theme: ReturnType<typeof readTheme>) {
+        var set = function (name: string, value: string) {
             panel.style.setProperty('--gwt-' + name, value);
         };
         panel._gwtAccent = theme.accent;

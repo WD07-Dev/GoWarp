@@ -1,29 +1,29 @@
 import type {Shape} from './type';
 
-export function round (v) {
+export function round(v: number) {
     return Math.round(v * 1000) / 1000;
 }
-function normalizePoints (points) {
-    var xs = points.map(function (p) { return p[0]; });
-    var ys = points.map(function (p) { return p[1]; });
+function normalizePoints(points: number[][]) {
+    var xs = points.map(function (p: number[]) { return p[0]; });
+    var ys = points.map(function (p: number[]) { return p[1]; });
     var minX = Math.min.apply(null, xs);
     var minY = Math.min.apply(null, ys);
     var w = Math.max.apply(null, xs) - minX || 1;
     var h = Math.max.apply(null, ys) - minY || 1;
-    return points.map(function (p) {
+    return points.map(function (p: number[]) {
         return [round((p[0] - minX) / w * 100), round((p[1] - minY) / h * 100)];
     });
 }
-function polygonPath (points) {
-    return points.map(function (p, i) {
+function polygonPath(points: number[][]) {
+    return points.map(function (p: number[], i: number) {
         return (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1];
     }).join(' ') + 'Z';
 }
-export function cornerPath (points, radius) {
-    if (!radius || radius <= 0) return polygonPath(points);
+export function cornerPath(points: number[][], radius: number) {
+    if(!radius || radius <= 0) return polygonPath(points);
     var count = points.length;
     var path = '';
-    for (var i = 0; i < count; i++) {
+    for(let i=0; i < count; i++) {
         var previous = points[(i + count - 1) % count];
         var point = points[i];
         var next = points[(i + 1) % count];
@@ -39,41 +39,41 @@ export function cornerPath (points, radius) {
     }
     return path + 'Z';
 }
-function regularPolygon (sides, startDegrees) {
+function regularPolygon(sides: number, startDegrees: number) {
     var points = [];
-    for (var i = 0; i < sides; i++) {
+    for(let i=0; i < sides; i++) {
         var angle = ((startDegrees + (i * 360 / sides)) * Math.PI) / 180;
         points.push([50 + (50 * Math.cos(angle)), 50 + (50 * Math.sin(angle))]);
     }
     return normalizePoints(points);
 }
-function rotatePoints (points, degrees) {
+function rotatePoints(points: number[][], degrees: number) {
     var radians = degrees * Math.PI / 180;
     var cos = Math.cos(radians);
     var sin = Math.sin(radians);
-    return normalizePoints(points.map(function (p) {
+    return normalizePoints(points.map(function (p: number[]) {
         var x = p[0] - 50;
         var y = p[1] - 50;
         return [50 + (x * cos) - (y * sin), 50 + (x * sin) + (y * cos)];
     }));
 }
-function starPoints (tips, inner) {
+function starPoints(tips: number, inner: number) {
     var points = [];
-    for (var i = 0; i < tips * 2; i++) {
+    for(let i=0; i < tips * 2; i++) {
         var radius = i % 2 === 0 ? 50 : inner;
         var angle = ((-90 + (i * 180 / tips)) * Math.PI) / 180;
         points.push([50 + (radius * Math.cos(angle)), 50 + (radius * Math.sin(angle))]);
     }
     return normalizePoints(points);
 }
-function crescentPoints () {
+function crescentPoints() {
     var points = [];
     var i;
-    for (i = 0; i <= 24; i++) {
+    for(i = 0; i <= 24; i++) {
         var a = (-90 + (i * 180 / 24)) * Math.PI / 180;
         points.push([50 + (50 * Math.cos(a)), 50 + (50 * Math.sin(a))]);
     }
-    for (i = 24; i >= 0; i--) {
+    for(i = 24; i >= 0; i--) {
         var b = (-90 + (i * 180 / 24)) * Math.PI / 180;
         points.push([50 + (50 * Math.cos(b)) + 26 * Math.sin(b), 50 + (50 * Math.sin(b))]);
     }
@@ -101,39 +101,24 @@ export var SHAPES: Shape[] = [
     {id: 'soft-pentagon', nameKey: 'shape.soft-pentagon', points: regularPolygon(5, -90), minRound: 12},
     {id: 'soft-hexagon', nameKey: 'shape.soft-hexagon', points: regularPolygon(6, -90), minRound: 12},
     {id: 'soft-square', nameKey: 'shape.soft-square', points: [[0, 0], [100, 0], [100, 100], [0, 100]], minRound: 22},
-    {id: 'half-circle', nameKey: 'shape.half-circle',
-        path: 'M0,100 L0,50 A50,50 0 0 1 100,50 L100,100 Z'},
-    {id: 'quarter-circle', nameKey: 'shape.quarter-circle',
-        path: 'M0,100 L0,0 A100,100 0 0 1 100,100 Z'},
-    {id: 'ring', nameKey: 'shape.ring', fillRule: 'evenodd',
-        path: 'M50,0 A50,50 0 1 0 50,100 A50,50 0 1 0 50,0 Z M50,30 A20,20 0 1 1 50,70 A20,20 0 1 1 50,30 Z'},
-    {id: 'drop', nameKey: 'shape.drop',
-        path: 'M50,2 C62,20 86,38 86,62 C86,82 70,98 50,98 C30,98 14,82 14,62 C14,38 38,20 50,2 Z'},
+    {id: 'half-circle', nameKey: 'shape.half-circle', path: 'M0,100 L0,50 A50,50 0 0 1 100,50 L100,100 Z'},
+    {id: 'quarter-circle', nameKey: 'shape.quarter-circle', path: 'M0,100 L0,0 A100,100 0 0 1 100,100 Z'},
+    {id: 'ring', nameKey: 'shape.ring', fillRule: 'evenodd', path: 'M50,0 A50,50 0 1 0 50,100 A50,50 0 1 0 50,0 Z M50,30 A20,20 0 1 1 50,70 A20,20 0 1 1 50,30 Z'},
+    {id: 'drop', nameKey: 'shape.drop', path: 'M50,2 C62,20 86,38 86,62 C86,82 70,98 50,98 C30,98 14,82 14,62 C14,38 38,20 50,2 Z'},
     {id: 'crescent', nameKey: 'shape.crescent', points: crescentPoints()},
-    {id: 'arrow-up', nameKey: 'shape.arrow-up',
-        points: [[50, 0], [100, 50], [65, 50], [65, 100], [35, 100], [35, 50], [0, 50]]},
-    {id: 'arrow-down', nameKey: 'shape.arrow-down',
-        points: [[50, 100], [100, 50], [65, 50], [65, 0], [35, 0], [35, 50], [0, 50]]},
-    {id: 'arrow-right', nameKey: 'shape.arrow-right',
-        points: [[0, 35], [50, 35], [50, 0], [100, 50], [50, 100], [50, 65], [0, 65]]},
-    {id: 'arrow-left', nameKey: 'shape.arrow-left',
-        points: [[100, 35], [50, 35], [50, 0], [0, 50], [50, 100], [50, 65], [100, 65]]},
-    {id: 'arrow-double', nameKey: 'shape.arrow-double',
-        points: [[0, 50], [25, 20], [25, 35], [75, 35], [75, 20], [100, 50], [75, 80], [75, 65], [25, 65], [25, 80]]},
-    {id: 'heart', nameKey: 'shape.heart',
-        path: 'M50,90 C20,66 2,48 2,29 C2,13 14,2 28,2 C38,2 46,8 50,17 ' +
-            'C54,8 62,2 72,2 C86,2 98,13 98,29 C98,48 80,66 50,90 Z'},
-    {id: 'cloud', nameKey: 'shape.cloud',
-        path: 'M26,80 C11,80 2,69 2,55 C2,42 11,32 23,30 C27,15 41,4 57,4 ' +
-            'C74,4 88,16 91,32 C97,36 100,43 100,51 C100,67 89,80 73,80 Z'},
-    {id: 'bolt', nameKey: 'shape.bolt',
-        points: [[58, 0], [16, 56], [43, 56], [34, 100], [86, 40], [57, 40], [78, 0]]},
-    {id: 'bubble', nameKey: 'shape.bubble', minRound: 6,
-        points: [[12, 4], [88, 4], [96, 12], [96, 62], [88, 70], [42, 70], [26, 88], [28, 70], [12, 70], [4, 62], [4, 12]]},
+    {id: 'arrow-up', nameKey: 'shape.arrow-up', points: [[50, 0], [100, 50], [65, 50], [65, 100], [35, 100], [35, 50], [0, 50]]},
+    {id: 'arrow-down', nameKey: 'shape.arrow-down', points: [[50, 100], [100, 50], [65, 50], [65, 0], [35, 0], [35, 50], [0, 50]]},
+    {id: 'arrow-right', nameKey: 'shape.arrow-right', points: [[0, 35], [50, 35], [50, 0], [100, 50], [50, 100], [50, 65], [0, 65]]},
+    {id: 'arrow-left', nameKey: 'shape.arrow-left', points: [[100, 35], [50, 35], [50, 0], [0, 50], [50, 100], [50, 65], [100, 65]]},
+    {id: 'arrow-double', nameKey: 'shape.arrow-double', points: [[0, 50], [25, 20], [25, 35], [75, 35], [75, 20], [100, 50], [75, 80], [75, 65], [25, 65], [25, 80]]},
+    {id: 'heart', nameKey: 'shape.heart', path: 'M50,90 C20,66 2,48 2,29 C2,13 14,2 28,2 C38,2 46,8 50,17 ' + 'C54,8 62,2 72,2 C86,2 98,13 98,29 C98,48 80,66 50,90 Z'},
+    {id: 'cloud', nameKey: 'shape.cloud', path: 'M26,80 C11,80 2,69 2,55 C2,42 11,32 23,30 C27,15 41,4 57,4 ' + 'C74,4 88,16 91,32 C97,36 100,43 100,51 C100,67 89,80 73,80 Z'},
+    {id: 'bolt', nameKey: 'shape.bolt', points: [[58, 0], [16, 56], [43, 56], [34, 100], [86, 40], [57, 40], [78, 0]]},
+    {id: 'bubble', nameKey: 'shape.bubble', minRound: 6, points: [[12, 4], [88, 4], [96, 12], [96, 62], [88, 70], [42, 70], [26, 88], [28, 70], [12, 70], [4, 62], [4, 12]]},
     {id: 'plus', nameKey: 'shape.plus', points: PLUS},
     {id: 'cross', nameKey: 'shape.cross', points: rotatePoints(PLUS, 45)}
 ];
-SHAPES.forEach(function (shape) {
+SHAPES.forEach((shape: Shape) => {
     shape.d = shape.points ? cornerPath(shape.points, shape.minRound || 0) : shape.path;
 });
 

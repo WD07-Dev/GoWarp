@@ -1,15 +1,15 @@
-import type { AlphaStats, AnchorServices, PaintContext } from './type';
+import type { AlphaStats, AnchorServices, PaintContext, PaintElement, AnchorMeasurement } from './type';
 import { tr } from '../translate';
 
 export function createAnchors(context: PaintContext, services: AnchorServices) {
-    const {document, window} = context;
-    const {listen} = context.lifecycle;
-    const {anchorTarget, findVM, markObjects, keyRow, toggleFor, labelEl} = services;
+    const { document, window } = context;
+    const { listen } = context.lifecycle;
+    const { anchorTarget, findVM, markObjects, keyRow, toggleFor, labelEl } = services;
 
-    var anchorCache = {};
-    var anchorState = {probing: false, busy: false, list: null, spriteId: '', n: 0, mode: 'match', undo: null, result: null};
+    var anchorCache: Record<string, AlphaStats> = {};
+    var anchorState = {probing: false, busy: false, list: null as AnchorMeasurement[] | null, spriteId: '', n: 0, mode: 'match', undo: null, result: null};
 
-    function alphaStats (img, w, h, scale) {
+    function alphaStats(img: CanvasImageSource, w: number, h: number, scale: number) {
         var s = Math.min(scale, 1400 / Math.max(w, h, 1));
         var cv = document.createElement('canvas');
         cv.width = Math.max(1, Math.round(w * s));
@@ -31,8 +31,13 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
                 if (y > maxY) maxY = y;
             }
         }
-        var out: AlphaStats = {area: sum, w: cv.width / s, h: cv.height / s, thumb: ''};
-        if (!sum) return out;
+        var out: AlphaStats = {
+            area: sum,
+            w: cv.width / s,
+            h: cv.height / s,
+            thumb: ''
+        };
+        if(!sum) return out;
         out.cx = sx / sum / s;
         out.cy = sy / sum / s;
         out.box = [(minX + maxX) / 2 / s, (minY + maxY) / 2 / s];
@@ -45,13 +50,13 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         return out;
     }
 
-    function costumeRaster (c) {
+    function costumeRaster(c: any) {
         var raw = c.asset && (c.asset.data !== undefined ? c.asset.data : c.asset);
         if (c.dataFormat === 'svg' || typeof raw === 'string') {
             var txt = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
             var w = Number((/\swidth="([\d.]+)"/.exec(txt) || [])[1]) || 0;
             var h = Number((/\sheight="([\d.]+)"/.exec(txt) || [])[1]) || 0;
-            return new Promise(function (res, rej) {
+            return new Promise<AlphaStats>(function (res: (value: AlphaStats | PromiseLike<AlphaStats>) => void, rej: (reason?: unknown) => void) {
                 var img = new Image();
                 img.onload = function () {
                     res(alphaStats(img, w || img.naturalWidth, h || img.naturalHeight, 4));
@@ -62,27 +67,27 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         }
         var bytes = raw instanceof ArrayBuffer ? raw : (raw && raw.buffer ? raw.buffer : raw);
         return createImageBitmap(new Blob([bytes], {type: 'image/' + (c.dataFormat || 'png')}))
-            .then(function (bmp) {
-                var s = alphaStats(bmp, bmp.width, bmp.height, 1);
-                var res = Math.max(1, Number(c.bitmapResolution) || 1);
-                if (s.area && res > 1) {
-                    var inUnits = Math.hypot(s.cx / res - c.rotationCenterX, s.cy / res - c.rotationCenterY);
-                    var inPixels = Math.hypot(s.cx - c.rotationCenterX, s.cy - c.rotationCenterY);
-                    if (inUnits <= inPixels) {
-                        s.cx /= res;
-                        s.cy /= res;
-                        s.w /= res;
-                        s.h /= res;
-                    }
+        .then((bmp: ImageBitmap) => {
+            var s = alphaStats(bmp, bmp.width, bmp.height, 1);
+            var res = Math.max(1, Number(c.bitmapResolution) || 1);
+            if (s.area && res > 1) {
+                var inUnits = Math.hypot(s.cx / res - c.rotationCenterX, s.cy / res - c.rotationCenterY);
+                var inPixels = Math.hypot(s.cx - c.rotationCenterX, s.cy - c.rotationCenterY);
+                if (inUnits <= inPixels) {
+                    s.cx /= res;
+                    s.cy /= res;
+                    s.w /= res;
+                    s.h /= res;
                 }
-                return s;
-            });
+            }
+            return s;
+        });
     }
 
-    function measureOne (c) {
+    function measureOne(c: any) {
         var key = (c.md5 || c.assetId || '') + '|' + c.dataFormat + '|' + c.name;
         if (anchorCache[key]) return Promise.resolve(anchorCache[key]);
-        return costumeRaster(c).then(function (s) {
+        return costumeRaster(c).then(function (s: AlphaStats) {
             anchorCache[key] = s;
             var keys = Object.keys(anchorCache);
             if (keys.length > 48) delete anchorCache[keys[0]];
@@ -90,14 +95,14 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         });
     }
 
-    function measureAnchor () {
+    function measureAnchor() {
         var t = anchorTarget();
-        if (!t) return Promise.resolve(null);
+        if(!t) return Promise.resolve(null);
         var costumes = t.getCostumes();
-        if (costumes.length < 2) return Promise.resolve({short: true, n: costumes.length});
+        if(costumes.length < 2) return Promise.resolve({short: true, n: costumes.length});
         anchorState.busy = true;
-        return Promise.all(costumes.map(measureOne)).then(function (stats) {
-            anchorState.list = stats.map(function (s, i) {
+        return Promise.all(costumes.map(measureOne)).then(function (stats: AlphaStats[]) {
+            anchorState.list = stats.map(function (s: AlphaStats, i: number) {
                 return {index: i, name: costumes[i].name, area: s.area || 0, cx: s.cx || 0, cy: s.cy || 0,
                     w: s.w || 0, h: s.h || 0, thumb: s.thumb || '',
                     pivot: [costumes[i].rotationCenterX, costumes[i].rotationCenterY]};
@@ -106,40 +111,40 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             anchorState.n = costumes.length;
             anchorState.busy = false;
             return anchorState.list;
-        }).catch(function (e) {
+        }).catch(function (e: unknown) {
             anchorState.busy = false;
             if (window.console) window.console.warn('GoWarp Toolkit anchor:', e);
             return null;
         });
     }
 
-    function anchorPlan (mode, list) {
-        var live = list.filter(function (s) { return s.area > 0; });
-        if (!live.length) return null;
-        var out = list.map(function (s) { return [s.pivot[0], s.pivot[1]]; });
+    function anchorPlan(mode: string, list: AnchorMeasurement[]) {
+        var live = list.filter(function (s: AnchorMeasurement) { return s.area > 0; });
+        if(!live.length) return null;
+        var out = list.map(function (s: AnchorMeasurement) { return [s.pivot[0], s.pivot[1]]; });
         if (mode === 'own') {
-            list.forEach(function (s, i) { if (s.area > 0) out[i] = [s.cx, s.cy]; });
+            list.forEach(function (s: AnchorMeasurement, i: number) { if (s.area > 0) out[i] = [s.cx, s.cy]; });
             return out;
         }
-        if (mode === 'body') {
+        if(mode === 'body') {
             var w = 0, x = 0, y = 0;
-            live.forEach(function (s) { w += s.area; x += s.cx * s.area; y += s.cy * s.area; });
-            list.forEach(function (s, i) { if (s.area > 0) out[i] = [x / w, y / w]; });
+            live.forEach(function (s: AnchorMeasurement) { w += s.area; x += s.cx * s.area; y += s.cy * s.area; });
+            list.forEach(function (s: AnchorMeasurement, i: number) { if (s.area > 0) out[i] = [x / w, y / w]; });
             return out;
         }
         var base = live[0];
         var d = [base.pivot[0] - base.cx, base.pivot[1] - base.cy];
-        list.forEach(function (s, i) { if (s.area > 0) out[i] = [s.cx + d[0], s.cy + d[1]]; });
+        list.forEach(function (s: AnchorMeasurement, i: number) { if (s.area > 0) out[i] = [s.cx + d[0], s.cy + d[1]]; });
         return out;
     }
 
-    function anchorJump (list, pivots) {
+    function anchorJump (list: AnchorMeasurement[], pivots: number[][]) {
         var pts = [];
-        list.forEach(function (s, i) {
+        list.forEach(function (s: AnchorMeasurement, i: number) {
             if (s.area > 0) pts.push([s.cx - pivots[i][0], s.cy - pivots[i][1]]);
         });
         var tot = 0, max = 0;
-        for (var i = 1; i < pts.length; i++) {
+        for(let i=1; i < pts.length; i++) {
             var j = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
             tot += j;
             if (j > max) max = j;
@@ -147,11 +152,11 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         return {mean: pts.length > 1 ? tot / (pts.length - 1) : 0, max: max, steps: pts.length - 1};
     }
 
-    function px (v) {
+    function px (v: number) {
         return (Math.round(v * 10) / 10).toFixed(1);
     }
 
-    function refreshAnchorView (t) {
+    function refreshAnchorView (t: any) {
         try {
             var idx = t.currentCostume, n = t.getCostumes().length;
             if (n < 2) return;
@@ -161,10 +166,10 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             var vm = findVM();
             if (vm && typeof vm.emitTargetsUpdate === 'function') vm.emitTargetsUpdate();
             if (vm && typeof vm.emitProjectChanged === 'function') vm.emitProjectChanged();
-        } catch (e) { /* the records are already correct; the view catches up on the next switch */ }
+        } catch (e) {}
     }
 
-    function applyAnchor (mode) {
+    function applyAnchor (mode: string) {
         var t = anchorTarget();
         if (!t || !anchorState.list) return null;
         var costumes = t.getCostumes();
@@ -172,24 +177,32 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             anchorState.list = null;
             return null;
         }
-        anchorState.list.forEach(function (s, i) {
+        anchorState.list.forEach(function (s: AnchorMeasurement, i: number) {
             s.pivot = [costumes[i].rotationCenterX, costumes[i].rotationCenterY];
         });
         var plan = anchorPlan(mode, anchorState.list);
         if (!plan) return null;
-        var before = anchorJump(anchorState.list, anchorState.list.map(function (s) { return s.pivot; }));
-        var snapshot = costumes.map(function (c) { return [c.rotationCenterX, c.rotationCenterY]; });
+        var before = anchorJump(anchorState.list, anchorState.list.map(function (s: AnchorMeasurement) { return s.pivot; }));
+        var snapshot = costumes.map(function (c: any) { return [c.rotationCenterX, c.rotationCenterY]; });
         var written = 0;
-        anchorState.list.forEach(function (s, i) {
+        anchorState.list.forEach(function (s: AnchorMeasurement, i: number) {
             if (s.area <= 0) return;
             costumes[i].rotationCenterX = Math.round(plan[i][0] * 1000) / 1000;
             costumes[i].rotationCenterY = Math.round(plan[i][1] * 1000) / 1000;
             s.pivot = [costumes[i].rotationCenterX, costumes[i].rotationCenterY];
             written++;
         });
-        anchorState.undo = {spriteId: t.id, n: snapshot.length, list: snapshot, mode: mode};
-        anchorState.result = {before: before.mean, after: anchorJump(anchorState.list,
-            anchorState.list.map(function (s) { return s.pivot; })).mean, written: written};
+        anchorState.undo = {
+            spriteId: t.id,
+            n: snapshot.length,
+            list: snapshot,
+            mode: mode
+        };
+        anchorState.result = {
+            before: before.mean,
+            after: anchorJump(anchorState.list, anchorState.list.map((s: AnchorMeasurement) => { return s.pivot; })).mean,
+            written: written
+        };
         refreshAnchorView(t);
         return anchorState.result;
     }
@@ -197,17 +210,17 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
     function undoAnchor () {
         var t = anchorTarget();
         var u = anchorState.undo;
-        if (!t || !u || u.spriteId !== t.id) return false;
+        if(!t || !u || u.spriteId !== t.id) return false;
         var costumes = t.getCostumes();
-        if (costumes.length !== u.n) return false;
-        costumes.forEach(function (c, i) {
+        if(costumes.length !== u.n) return false;
+        costumes.forEach(function (c: any, i: number) {
             c.rotationCenterX = u.list[i][0];
             c.rotationCenterY = u.list[i][1];
         });
         anchorState.undo = null;
         anchorState.result = null;
-        if (anchorState.list) {
-            anchorState.list.forEach(function (s, i) {
+        if(anchorState.list) {
+            anchorState.list.forEach(function (s: AnchorMeasurement, i: number) {
                 s.pivot = [costumes[i].rotationCenterX, costumes[i].rotationCenterY];
             });
         }
@@ -215,7 +228,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         return true;
     }
 
-    function anchorBody (panel) {
+    function anchorBody(panel: PaintElement) {
         var jump = document.createElement('div');
         jump.className = 'gwt-jump';
         jump.innerHTML = '<strong>—</strong><span>px</span>';
@@ -227,7 +240,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
 
         var seg = document.createElement('div');
         seg.className = 'gwt-seg';
-        [['body', tr('anchorBody')], ['own', tr('anchorOwn')], ['match', tr('anchorFirst')]].forEach(function (row) {
+        [['body', tr('anchorBody')], ['own', tr('anchorOwn')], ['match', tr('anchorFirst')]].forEach(function (row: string[]) {
             var b = document.createElement('button');
             b.type = 'button';
             b.dataset.mode = String(row[0]);
@@ -272,7 +285,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         markAnchor();
     }
 
-    function markAnchor () {
+    function markAnchor() {
         if (!services.openPanel || services.openPanel._gwtKind !== 'anchor') return;
         var panel = services.openPanel;
         var strong = panel.querySelector('.gwt-jump strong');
@@ -280,26 +293,26 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         var list = panel.querySelector('.gwt-alist');
         var go = panel.querySelector('.gwt-primary');
         var back = panel.querySelector('.gwt-ghost');
-        Array.prototype.forEach.call(panel.querySelectorAll('[data-mode]'), function (b) {
+        Array.prototype.forEach.call(panel.querySelectorAll('[data-mode]'), function (b: HTMLElement) {
             var on = b.dataset.mode === anchorState.mode;
             b.setAttribute('aria-pressed', String(on));
             b.classList.toggle('gwt-on', on);
         });
         var tgt = anchorTarget();
-        if (!tgt || anchorState.busy) {
+        if(!tgt || anchorState.busy) {
             strong.textContent = anchorState.busy ? '…' : '—';
             if (sub) sub.textContent = tgt ? tr('anchorBusy') : tr('anchorNone');
             if (go) go.disabled = true;
             return;
         }
         var costumes = tgt.getCostumes();
-        if (costumes.length < 2 || !anchorState.list || anchorState.n !== costumes.length) {
+        if(costumes.length < 2 || !anchorState.list || anchorState.n !== costumes.length) {
             strong.textContent = '—';
-            if (sub) sub.textContent = costumes.length < 2 ? tr('anchorNone') : tr('anchorBusy');
-            if (list) { list.textContent = ''; list.dataset.sig = String(''); }
-            if (go) go.disabled = true;
-            if (back) back.disabled = true;
-            if (costumes.length > 1 && !anchorState.probing) {
+            if(sub) sub.textContent = costumes.length < 2 ? tr('anchorNone') : tr('anchorBusy');
+            if(list) { list.textContent = ''; list.dataset.sig = String(''); }
+            if(go) go.disabled = true;
+            if(back) back.disabled = true;
+            if(costumes.length > 1 && !anchorState.probing) {
                 anchorState.probing = true;
                 measureAnchor().then(function () {
                     anchorState.probing = false;
@@ -310,44 +323,41 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             }
             return;
         }
-        anchorState.list.forEach(function (s, i) {
+        anchorState.list.forEach((s: AnchorMeasurement, i: number) => {
             s.pivot = [costumes[i].rotationCenterX, costumes[i].rotationCenterY];
         });
-        var now = anchorJump(anchorState.list, anchorState.list.map(function (s) { return s.pivot; }));
+        var now = anchorJump(anchorState.list, anchorState.list.map(function (s: AnchorMeasurement) { return s.pivot; }));
         var plan = anchorPlan(anchorState.mode, anchorState.list);
         var next = plan ? anchorJump(anchorState.list, plan) : now;
         strong.textContent = px(now.mean);
-        if (sub) {
-            sub.textContent = (anchorState.result ? tr('anchorDone') + ' ' + anchorState.result.written + ' · ' : '') +
-                px(now.mean) + ' → ' + px(next.mean) + ' px';
+        if(sub) {
+            sub.textContent = (anchorState.result ? tr('anchorDone') + ' ' + anchorState.result.written + ' · ' : '') + px(now.mean) + ' → ' + px(next.mean) + ' px';
         }
-        if (go) go.disabled = !plan || now.mean < .05;
-        if (back) back.disabled = !anchorState.undo;
-        if (!list || !plan) return;
-        var sig = tr().lang + ';' + anchorState.list.map(function (s, i) {
-            return [s.name, s.area <= 0 ? '-' : px(s.pivot[0]) + ',' + px(s.pivot[1]) +
-                '>' + px(plan[i][0]) + ',' + px(plan[i][1])].join('|');
+        if(go) go.disabled = !plan || now.mean < .05;
+        if(back) back.disabled = !anchorState.undo;
+        if(!list || !plan) return;
+        var sig = tr().lang + ';' + anchorState.list.map(function (s: AnchorMeasurement, i: number) {
+            return [s.name, s.area <= 0 ? '-' : px(s.pivot[0]) + ',' + px(s.pivot[1]) + '>' + px(plan[i][0]) + ',' + px(plan[i][1])].join('|');
         }).join(';');
-        if (list.dataset.sig === sig) return;
+        if(list.dataset.sig === sig) return;
         list.dataset.sig = String(sig);
         list.textContent = '';
-        anchorState.list.forEach(function (s, i) {
+        anchorState.list.forEach(function (s: AnchorMeasurement, i: number) {
             var row = document.createElement('div');
             row.className = 'gwt-arow';
             var th = document.createElement('i');
             th.className = 'gwt-athumb';
-            if (s.thumb) th.style.backgroundImage = 'url(' + s.thumb + ')';
+            if(s.thumb) th.style.backgroundImage = 'url(' + s.thumb + ')';
             var nm = document.createElement('span');
             nm.className = 'gwt-aname';
             nm.textContent = s.name;
             var d = document.createElement('span');
             d.className = 'gwt-adelta';
-            if (s.area <= 0) {
+            if(s.area <= 0) {
                 d.textContent = tr('anchorSkipped');
-            } else {
+            }else {
                 var shift = Math.hypot(plan[i][0] - s.pivot[0], plan[i][1] - s.pivot[1]);
-                d.textContent = (shift < .05 ? '=' : '→ ') + px(s.pivot[0]) + ',' + px(s.pivot[1]) +
-                    (shift < .05 ? '' : ' → ' + px(plan[i][0]) + ',' + px(plan[i][1]));
+                d.textContent = (shift < .05 ? '=' : '→ ') + px(s.pivot[0]) + ',' + px(s.pivot[1]) + (shift < .05 ? '' : ' → ' + px(plan[i][0]) + ',' + px(plan[i][1]));
             }
             row.appendChild(th);
             row.appendChild(nm);
@@ -356,7 +366,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         });
     }
 
-    function showAnchorPanel (anchor) {
+    function showAnchorPanel (anchor: PaintElement) {
         var panel = toggleFor(anchor, 'anchor', 'gwt-wide');
         if (!panel) return;
         panel.appendChild(labelEl(tr('anchorTitle')));

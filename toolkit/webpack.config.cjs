@@ -26,6 +26,7 @@ module.exports = {
         minimize: false
     },
     devtool: false,
+    mode: "production",
     plugins: [
         new webpack.BannerPlugin({
             raw: true,

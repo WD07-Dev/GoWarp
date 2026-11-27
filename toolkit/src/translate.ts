@@ -1,4 +1,4 @@
-import type {ScratchHost} from './shared/scratch';
+import type { ScratchHost } from './shared/scratch';
 
 const strings = {
     "en": {
@@ -431,7 +431,7 @@ export function tr<Key extends string | undefined = undefined>(key?: Key, parame
     const dictionary = strings[lang] as Record<string, string>;
     const native = key === 'delete' ? locale.messages?.['paint.paintEditor.delete'] : undefined;
     const text = native || dictionary[key] || fallback[key] || key;
-    const result = parameters ? text.replace(/\{(\w+)\}/g, (placeholder, name) => Object.hasOwn(parameters, name) ? String(parameters[name]) : placeholder) : text;
+    const result = parameters ? text.replace(/\{(\w+)\}/g, (placeholder: string, name: string) => Object.hasOwn(parameters, name) ? String(parameters[name]) : placeholder) : text;
     return result as TranslationResult<Key>;
 }
 
@@ -443,5 +443,11 @@ interface Locale {
 }
 type TranslationResult<Key> = Key extends undefined ? Locale : string;
 interface EditorStore {
-    getState(): {locales?: {locale?: string; isRtl?: boolean; messages?: Record<string, string>}};
+    getState(): {
+        locales?: {
+            locale?: string;
+            isRtl?: boolean;
+            messages?: Record<string, string>
+        }
+    };
 }

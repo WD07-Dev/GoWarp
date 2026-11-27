@@ -42,8 +42,8 @@ export function createLifecycle() {
             if (disposed) return;
             disposed = true;
             listeners.abort();
-            timers.forEach(id => browser.clearTimeout(id));
-            intervals.forEach(id => browser.clearInterval(id));
+            timers.forEach((id: number) => browser.clearTimeout(id));
+            intervals.forEach((id: number) => browser.clearInterval(id));
             timers.clear();
             intervals.clear();
         }

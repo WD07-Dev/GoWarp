@@ -36,7 +36,7 @@ export interface AlphaStats {
 
 export interface PixelEditor {
     root: PaintElement;
-    src: any;
+    src: PixelSource;
     target: any;
     costume: string;
     w: number;
@@ -88,10 +88,10 @@ export interface AnchorServices {
     findVM: () => any;
     readonly railEl: any;
     markObjects: () => void;
-    keyRow: (chips: any) => PaintElement;
+    keyRow: (chips: string[]) => PaintElement;
     readonly openPanel: any;
-    toggleFor: (anchor: any, kind: any, extraClass?: any) => PaintElement;
-    labelEl: (text: any) => PaintElement;
+    toggleFor: (anchor: PaintElement, kind: string, extraClass?: string) => PaintElement;
+    labelEl: (text: string) => PaintElement;
 }
 
 export interface PaintContext {
@@ -106,8 +106,88 @@ export interface LayerServices {
     paintingLayer: () => any;
     selectedPaths: () => any[];
     commit: () => boolean;
-    eachSelected: (fn: any, live?: any) => boolean;
-    icon: (paths: any) => string;
+    eachSelected: (fn: (item: any) => void, live?: boolean) => boolean;
+    icon: (paths: string) => string;
     paintEditorOpen: () => boolean;
     colorSig: (color: any) => any;
+}
+
+export interface RGBA {
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+}
+
+export interface PaintColor {
+    primary?: string;
+    secondary?: string;
+    gradientType?: string;
+}
+
+export interface PaintSettings {
+    nib: number;
+    eraser: number;
+    bitNib: number;
+    bitEraser: number;
+    shapeSize: number;
+    shapeRound: number;
+    pen: string;
+    penSize: number;
+    penPressure: boolean;
+    pngScale: number;
+    grad: {
+        count: number;
+        offsets: number[];
+        extras: string[];
+        stops?: {p: number; c: string}[];
+    };
+}
+
+export interface AnchorMeasurement extends AlphaStats {
+    index: number;
+    name: string;
+    pivot: number[];
+}
+
+export interface PixelSource {
+    canvas: PaintElement;
+    ctx: CanvasRenderingContext2D;
+    W: number;
+    H: number;
+    s: number;
+    target: any;
+    costume: any;
+    costumeW: number;
+    costumeH: number;
+}
+
+export interface PixelBox {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
+export interface PixelGroup extends RGBA {
+    rects: PixelBox[];
+}
+
+export interface PixelVectorPath {
+    boxes: PixelBox[];
+    color: PixelGroup;
+    runs: number;
+}
+
+export interface PixelServices {
+    anchorTarget: () => any;
+    rasterItem: () => any;
+    commit: () => boolean;
+    paintEditorOpen: () => boolean;
+    icon: (paths: string) => string;
+    clamp: (v: number, a: number, b: number) => number;
+    paintingLayer: () => any;
+    findLayer: (flag: string) => any;
+    refreshAnchorView: (t: any) => void;
+    GLYPH: { size: string; round: string; nib: string; undo: string; wheel: string; plus: string; trash: string; };
 }

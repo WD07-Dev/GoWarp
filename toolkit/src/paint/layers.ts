@@ -2,99 +2,99 @@ import { LayerServices, PaintContext } from './type';
 import { tr } from '../translate';
 
 export function createLayers(context: PaintContext, services: LayerServices) {
-    const {paintState, paper, isBitmapFormat} = context.editor;
-    const {document, window} = context;
-    const {listen} = context.lifecycle;
-    const {applyTheme, readTheme} = context.theme;
-    const {paintingLayer, selectedPaths, commit, eachSelected, icon, paintEditorOpen, colorSig} = services;
+    const { paintState, paper, isBitmapFormat } = context.editor;
+    const { document, window } = context;
+    const { listen } = context.lifecycle;
+    const { applyTheme, readTheme } = context.theme;
+    const { paintingLayer, selectedPaths, commit, eachSelected, icon, paintEditorOpen, colorSig } = services;
 
-    function objectList () {
+    function objectList() {
         var layer = paintingLayer(), out = [];
         if (!layer) return out;
-        (function walk (node) {
-            if (node.guide) return;                       // the editor's locked 1440x1080 guide shape
-            if (node.className === 'CompoundPath') {
+        (function walk(node: any) {
+            if(node.guide) return;
+            if(node.className === 'CompoundPath') {
                 out.push(node);
                 return;
             }
-            if (node !== layer && (!node.children || !node.children.length)) {
+            if(node !== layer && (!node.children || !node.children.length)) {
                 out.push(node);
                 return;
             }
-            if (node.children) node.children.forEach(walk);
+            if(node.children) node.children.forEach(walk);
         })(layer);
         out.reverse();
         return out;
     }
-    function kindName (item) {
+    function kindName(item: any) {
         var cls = item.className;
-        if (cls === 'Group') return tr('group');
-        if (cls === 'PointText' || cls === 'Text') return tr('text');
-        if (cls === 'Raster') return tr('raster');
-        if (cls === 'CompoundPath') return tr('compound');
+        if(cls === 'Group') return tr('group');
+        if(cls === 'PointText' || cls === 'Text') return tr('text');
+        if(cls === 'Raster') return tr('raster');
+        if(cls === 'CompoundPath') return tr('compound');
         return tr('path');
     }
-    function objectName (item, index, total) {
+    function objectName(item: any, index: number, total: number) {
         return item.name || (kindName(item) + ' ' + (total - index));
     }
-    function useSelectTool () {
+    function useSelectTool() {
         if (/^SELECT/.test((paintState() || {}).mode || '')) return;
         var native = document.querySelector('[class*="mode-selector"] [class*="mod-tool-select"]');
         if (native && !native.classList.contains('gwt-tool')) native.click();
     }
-    function selectObject (item) {
+    function selectObject(item: any) {
         var p = paper();
-        if (!p) return false;
-        if (item.locked) return false;
+        if(!p) return false;
+        if(item.locked) return false;
         useSelectTool();
-        objectList().forEach(function (it) { it.selected = false; });
+        objectList().forEach(function (it: any) { it.selected = false; });
         item.selected = true;
         p.view.update();
         return true;
     }
-    function toggleSelectObject (item) {
+    function toggleSelectObject(item: any) {
         var p = paper();
-        if (!p) return false;
-        if (item.locked) return false;
+        if(!p) return false;
+        if(item.locked) return false;
         useSelectTool();
         item.selected = !item.selected;
         p.view.update();
         return true;
     }
-    function reorderObjects (dir) {
+    function reorderObjects (dir: string) {
         var p = paper();
         var items = selectedPaths();
-        if (!p || !items.length) return false;
+        if(!p || !items.length) return false;
         var list = objectList();
-        if (!list.length) return false;
-        if (dir === 'front') {
-            items.forEach(function (it) { it.bringToFront(); });
-        } else if (dir === 'back') {
+        if(!list.length) return false;
+        if(dir === 'front') {
+            items.forEach(function (it: any) { it.bringToFront(); });
+        }else if(dir === 'back') {
             var bottomItem = list[list.length - 1];
-            if (bottomItem) {
-                for (var bIdx = items.length - 1; bIdx >= 0; bIdx--) {
+            if(bottomItem) {
+                for(var bIdx = items.length - 1; bIdx >= 0; bIdx--) {
                     var it = items[bIdx];
-                    if (it !== bottomItem) {
+                    if(it !== bottomItem) {
                         it.insertBelow(bottomItem);
                         bottomItem = it;
                     }
                 }
             }
-        } else if (dir === 'forward') {
-            items.forEach(function (it) {
+        }else if(dir === 'forward') {
+            items.forEach(function (it: any) {
                 var idx = list.indexOf(it);
-                if (idx > 0) {
+                if(idx > 0) {
                     var above = list[idx - 1];
-                    if (items.indexOf(above) < 0) it.insertAbove(above);
+                    if(items.indexOf(above) < 0) it.insertAbove(above);
                 }
             });
-        } else if (dir === 'backward') {
+        }else if(dir === 'backward') {
             for (var i = items.length - 1; i >= 0; i--) {
                 var it = items[i];
                 var idx = list.indexOf(it);
-                if (idx >= 0 && idx < list.length - 1) {
+                if(idx >= 0 && idx < list.length - 1) {
                     var below = list[idx + 1];
-                    if (items.indexOf(below) < 0) it.insertBelow(below);
+                    if(items.indexOf(below) < 0) it.insertBelow(below);
                 }
             }
         }
@@ -103,7 +103,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         markObjects();
         return true;
     }
-    function toggleObject (item, flag) {
+    function toggleObject (item: any, flag: 'visible' | 'locked') {
         item[flag] = !item[flag];
         var p = paper();
         if (p) p.view.update();
@@ -112,57 +112,57 @@ export function createLayers(context: PaintContext, services: LayerServices) {
     function duplicateObjects () {
         var p = paper();
         var items = selectedPaths();
-        if (!p || !items.length) return false;
-        items.forEach(function (it) { it.selected = false; });
-        var copies = items.map(function (item) {
+        if(!p || !items.length) return false;
+        items.forEach(function (it: any) { it.selected = false; });
+        var copies = items.map(function (item: any) {
             var copy = item.clone(false);
             copy.insertAbove(item);
             return copy;
         });
-        copies.forEach(function (it) { it.selected = true; });
+        copies.forEach(function (it: any) { it.selected = true; });
         p.view.update();
         return commit();
     }
-    function deleteObjects () {
+    function deleteObjects() {
         var items = selectedPaths();
         if (!items.length) return false;
-        items.forEach(function (item) { item.remove(); });
+        items.forEach(function (item: any) { item.remove(); });
         var p = paper();
         if (p) p.view.update();
         return commit();
     }
-    function artboardRect (p) {
+    function artboardRect(p: any) {
         return new p.Rectangle(0, 0, 960, 720);
     }
-    function alignObjects (where) {
+    function alignObjects(where: string) {
         var p = paper();
         var items = selectedPaths();
         if (!p || !items.length) return false;
         var box = artboardRect(p);
         var b = null;
-        items.forEach(function (item) {
+        items.forEach(function (item: any) {
             var r = item.bounds;
             b = b ? b.unite(r) : r.clone();
         });
-        if (!b) return false;
+        if(!b) return false;
         var dx = 0, dy = 0;
-        if (where === 'left') dx = box.x - b.x;
-        if (where === 'hcenter' || where === 'center') dx = box.x + (box.width - b.width) / 2 - b.x;
-        if (where === 'right') dx = box.x + box.width - (b.x + b.width);
-        if (where === 'top') dy = box.y - b.y;
-        if (where === 'vcenter' || where === 'center') dy = box.y + (box.height - b.height) / 2 - b.y;
-        if (where === 'bottom') dy = box.y + box.height - (b.y + b.height);
-        items.forEach(function (item) {
+        if(where === 'left') dx = box.x - b.x;
+        if(where === 'hcenter' || where === 'center') dx = box.x + (box.width - b.width) / 2 - b.x;
+        if(where === 'right') dx = box.x + box.width - (b.x + b.width);
+        if(where === 'top') dy = box.y - b.y;
+        if(where === 'vcenter' || where === 'center') dy = box.y + (box.height - b.height) / 2 - b.y;
+        if(where === 'bottom') dy = box.y + box.height - (b.y + b.height);
+        items.forEach(function (item: any) {
             item.position = item.position.add(new p.Point(dx, dy));
         });
         p.view.update();
         return commit();
     }
-    function rotateObjects (deg) {
-        return eachSelected(function (item) { item.rotate(deg); });
+    function rotateObjects (deg: number) {
+        return eachSelected(function (item: any) { item.rotate(deg); });
     }
-    function setObjectOpacity (value, live?: any) {
-        return eachSelected(function (item) {
+    function setObjectOpacity (value: number, live?: boolean) {
+        return eachSelected(function (item: any) {
             item.opacity = value / 100;
         }, live);
     }
@@ -174,14 +174,10 @@ export function createLayers(context: PaintContext, services: LayerServices) {
     }
 
     var OBJ_GLYPH = {
-        eye: '<path d="M2.6 10S5.3 5.5 10 5.5 17.4 10 17.4 10 14.7 14.5 10 14.5 2.6 10 2.6 10z"/>' +
-            '<circle cx="10" cy="10" r="2.1"/>',
-        eyeOff: '<path d="M3.6 3.6 16.4 16.4"/><path d="M7.2 7.1C4.4 8.3 2.6 10 2.6 10s2.7 4.5 7.4 4.5' +
-            'c1 0 1.9-.2 2.7-.6"/><path d="M10 5.5c4.7 0 7.4 4.5 7.4 4.5s-.8 1.4-2.3 2.6"/>',
-        lock: '<rect x="4.6" y="8.8" width="10.8" height="7.8" rx="1.4"/>' +
-            '<path d="M7.2 8.8V6.7a2.8 2.8 0 0 1 5.6 0v2.1"/>',
-        unlock: '<rect x="4.6" y="8.8" width="10.8" height="7.8" rx="1.4"/>' +
-            '<path d="M7.2 8.8V6.7a2.8 2.8 0 0 1 5.2-1.2"/>',
+        eye: '<path d="M2.6 10S5.3 5.5 10 5.5 17.4 10 17.4 10 14.7 14.5 10 14.5 2.6 10 2.6 10z"/>' + '<circle cx="10" cy="10" r="2.1"/>',
+        eyeOff: '<path d="M3.6 3.6 16.4 16.4"/><path d="M7.2 7.1C4.4 8.3 2.6 10 2.6 10s2.7 4.5 7.4 4.5' + 'c1 0 1.9-.2 2.7-.6"/><path d="M10 5.5c4.7 0 7.4 4.5 7.4 4.5s-.8 1.4-2.3 2.6"/>',
+        lock: '<rect x="4.6" y="8.8" width="10.8" height="7.8" rx="1.4"/>' + '<path d="M7.2 8.8V6.7a2.8 2.8 0 0 1 5.6 0v2.1"/>',
+        unlock: '<rect x="4.6" y="8.8" width="10.8" height="7.8" rx="1.4"/>' + '<path d="M7.2 8.8V6.7a2.8 2.8 0 0 1 5.2-1.2"/>',
         left: '<path d="M3.2 2.6v14.8"/><rect x="6.4" y="6.2" width="10" height="7.6" rx="1"/>',
         hcenter: '<path d="M10 2.6v14.8"/><rect x="4.8" y="6.2" width="10.4" height="7.6" rx="1"/>',
         right: '<path d="M16.8 2.6v14.8"/><rect x="3.6" y="6.2" width="10" height="7.6" rx="1"/>',
@@ -195,13 +191,11 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         forward: '<path d="M10 4.5v11M6.5 8l3.5-3.5 3.5 3.5"/>',
         backward: '<path d="M10 15.5v-11M6.5 12l3.5 3.5 3.5-3.5"/>',
         back: '<path d="M4 16.5h12M10 12.5v-9M6.5 9l3.5 3.5 3.5-3.5"/>',
-        dup: '<rect x="3.4" y="3.4" width="8.8" height="8.8" rx="1.4"/>' +
-            '<path d="M7.4 13.4v1.6a1.6 1.6 0 0 0 1.6 1.6h4.4a1.6 1.6 0 0 0 1.6-1.6v-4.4a1.6 1.6 0 0 0-1.6-1.6h-1.6"/>',
-        del: '<path d="M3.4 5.8h13.2"/><path d="M6.6 5.8V4h6.8v1.8"/>' +
-            '<path d="M5 5.8 5.9 16.4h8.2L15 5.8"/><path d="M8.4 8.6v5M11.6 8.6v5"/>',
+        dup: '<rect x="3.4" y="3.4" width="8.8" height="8.8" rx="1.4"/>' + '<path d="M7.4 13.4v1.6a1.6 1.6 0 0 0 1.6 1.6h4.4a1.6 1.6 0 0 0 1.6-1.6v-4.4a1.6 1.6 0 0 0-1.6-1.6h-1.6"/>',
+        del: '<path d="M3.4 5.8h13.2"/><path d="M6.6 5.8V4h6.8v1.8"/>' + '<path d="M5 5.8 5.9 16.4h8.2L15 5.8"/><path d="M8.4 8.6v5M11.6 8.6v5"/>',
         pin: '<path d="M7.4 3.4h5.2l-1 4.4 2.4 2.8H6l2.4-2.8z"/><path d="M10 10.6v6"/>'
     };
-    function miniButton (inner, title) {
+    function miniButton(inner: string, title: string) {
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'gwt-mini';
@@ -210,17 +204,15 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         b.innerHTML = icon(inner);
         return b;
     }
-    function objectRow (item, index, total) {
+    function objectRow(item: any, index: number, total: number) {
         var row = document.createElement('div');
         row.className = 'gwt-obj' + (item.selected ? ' gwt-on' : '') + (item.visible ? '' : ' gwt-dim');
-        var eye = miniButton(item.visible ? OBJ_GLYPH.eye : OBJ_GLYPH.eyeOff,
-            tr(item.visible ? 'hide' : 'show'));
+        var eye = miniButton(item.visible ? OBJ_GLYPH.eye : OBJ_GLYPH.eyeOff, tr(item.visible ? 'hide' : 'show'));
         listen(eye, 'click', function () {
             toggleObject(item, 'visible');
             markObjects();
         });
-        var lock = miniButton(item.locked ? OBJ_GLYPH.lock : OBJ_GLYPH.unlock,
-            tr(item.locked ? 'unlock' : 'lock'));
+        var lock = miniButton(item.locked ? OBJ_GLYPH.lock : OBJ_GLYPH.unlock, tr(item.locked ? 'unlock' : 'lock'));
         if (item.locked) lock.classList.add('gwt-strong');
         listen(lock, 'click', function () {
             toggleObject(item, 'locked');
@@ -231,15 +223,15 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         name.className = 'gwt-objname';
         name.textContent = objectName(item, index, total);
         name.title = name.textContent;
-        listen(name, 'click', function (e) {
-            if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        listen(name, 'click', function (e: PointerEvent) {
+            if(e.shiftKey || e.ctrlKey || e.metaKey) {
                 toggleSelectObject(item);
-            } else {
+            }else {
                 selectObject(item);
             }
             markObjects();
         });
-        listen(name, 'dblclick', function (e) {
+        listen(name, 'dblclick', (e: MouseEvent) => {
             e.stopPropagation();
             var input = railEl && railEl.querySelector('.gwt-rname');
             if (input && !input.disabled) {
@@ -253,25 +245,25 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         row.appendChild(lock);
         return row;
     }
-    function objectColor (item) {
-        if (!item) return '';
+    function objectColor (item: any) {
+        if(!item) return '';
         var color = item.fillColor || item.strokeColor;
         var css = '';
-        if (color && color.gradient && color.gradient.stops) {
+        if(color && color.gradient && color.gradient.stops) {
             try {
-                css = 'linear-gradient(135deg, ' + color.gradient.stops.map(function (s) {
+                css = 'linear-gradient(135deg, ' + color.gradient.stops.map(function (s: any) {
                     return s.color && s.color.toCSS ? s.color.toCSS() : '#855cd6';
                 }).join(', ') + ')';
             } catch (e) { css = ''; }
         }
-        if (!css) {
+        if(!css) {
             try {
                 css = color && color.toCSS ? color.toCSS() : '';
             } catch (e) { css = ''; }
         }
         return css;
     }
-    function objectThumb (item, cls) {
+    function objectThumb (item: any, cls: string) {
         var el = document.createElement('i');
         el.className = cls;
         el.setAttribute('aria-hidden', 'true');
@@ -280,39 +272,37 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         if (one) {
             var b = item.bounds;
             var box = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"' +
-                ' viewBox="' + [b.x, b.y, Math.max(b.width, 1), Math.max(b.height, 1)].join(' ') +
-                '" preserveAspectRatio="xMidYMid meet">';
+            ' viewBox="' + [b.x, b.y, Math.max(b.width, 1), Math.max(b.height, 1)].join(' ') + '" preserveAspectRatio="xMidYMid meet">';
             one = /^<svg/i.test(one) ? one.replace(/^<svg[^>]*>/i, box) : box + one + '</svg>';
-            el.style.backgroundImage = 'url("data:image/svg+xml;charset=utf-8,' +
-                encodeURIComponent(one) + '")';
+            el.style.backgroundImage = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(one) + '")';
         } else {
             var css = objectColor(item);
-            if (css) el.style.background = css; else el.classList.add('gwt-swatch-empty');
+            if(css) el.style.background = css; else el.classList.add('gwt-swatch-empty');
         }
         el.classList.toggle('gwt-off', !item.visible);
         return el;
     }
-    function objectChip (item) {
+    function objectChip (item: any) {
         return objectThumb(item, 'gwt-chip');
     }
 
     var railEl = null;
 
-    function railRect () {
+    function railRect() {
         var canvas = document.querySelector('canvas[class*="paper-canvas"]');
         var host = document.querySelector('[class*="paint-editor_canvas-container"]');
         var r = (host && host.getBoundingClientRect()) || (canvas && canvas.getBoundingClientRect());
         return r && r.width > 40 && r.height > 40 ? r : null;
     }
 
-    function railRow (children, cls?: any) {
+    function railRow(children: HTMLElement[], cls?: any) {
         var row = document.createElement('div');
         row.className = cls || 'gwt-rtools';
-        children.forEach(function (b) { row.appendChild(b); });
+        children.forEach(function (b: HTMLElement) { row.appendChild(b); });
         return row;
     }
 
-    function buildRail () {
+    function buildRail() {
         var rail = document.createElement('div');
         rail.className = 'gwt-rail';
         rail.setAttribute('dir', tr().isRtl ? 'rtl' : 'ltr');
@@ -345,12 +335,14 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         rail.appendChild(list);
 
         var acts = [];
-        ([['front', 'bringToFront', OBJ_GLYPH.front, function () { reorderObjects('front'); }],
+        ([
+            ['front', 'bringToFront', OBJ_GLYPH.front, function () { reorderObjects('front'); }],
             ['forward', 'bringForward', OBJ_GLYPH.forward, function () { reorderObjects('forward'); }],
             ['backward', 'sendBackward', OBJ_GLYPH.backward, function () { reorderObjects('backward'); }],
             ['back', 'sendToBack', OBJ_GLYPH.back, function () { reorderObjects('back'); }],
             ['dup', 'duplicate', OBJ_GLYPH.dup, duplicateObjects],
-            ['del', 'Delete', OBJ_GLYPH.del, deleteObjects]] as const).forEach(function (row) {
+            ['del', 'Delete', OBJ_GLYPH.del, deleteObjects]
+        ] as const).forEach(function (row: readonly [string, string, string, () => void]) {
             var b = miniButton(row[2], row[0] === 'del'
                 ? tr('delete') : tr(row[1]));
             b.dataset.order = String(row[0]);
@@ -363,10 +355,12 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         rail.appendChild(railRow(acts));
 
         var aligns = [];
-        [['left', 'alignLeft', OBJ_GLYPH.left], ['hcenter', 'alignCenterH', OBJ_GLYPH.hcenter],
+        [
+            ['left', 'alignLeft', OBJ_GLYPH.left], ['hcenter', 'alignCenterH', OBJ_GLYPH.hcenter],
             ['right', 'alignRight', OBJ_GLYPH.right], ['top', 'alignTop', OBJ_GLYPH.top],
             ['vcenter', 'alignCenterV', OBJ_GLYPH.vcenter], ['bottom', 'alignBottom', OBJ_GLYPH.bottom],
-            ['center', 'alignCenter', OBJ_GLYPH.center]].forEach(function (row) {
+            ['center', 'alignCenter', OBJ_GLYPH.center]
+        ].forEach(function (row: string[]) {
             var b = miniButton(row[2], tr(row[1]));
             b.dataset.align = String(row[0]);
             listen(b, 'click', function () {
@@ -378,7 +372,9 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         rail.appendChild(railRow(aligns));
 
         var last = [];
-        ([[-90, 'rotateLeft', OBJ_GLYPH.rotL], [90, 'rotateRight', OBJ_GLYPH.rotR]] as const).forEach(function (row) {
+        ([
+            [-90, 'rotateLeft', OBJ_GLYPH.rotL], [90, 'rotateRight', OBJ_GLYPH.rotR]
+        ] as const).forEach(function (row: readonly [number, string, string]) {
             var b = miniButton(row[2], tr(row[1]));
             b.dataset.rotate = String(row[0]);
             listen(b, 'click', function () {
@@ -395,16 +391,16 @@ export function createLayers(context: PaintContext, services: LayerServices) {
             var items = selectedPaths();
             if (!items.length) return;
             var value = nameInput.value.replace(/\s+/g, ' ').trim();
-            items.forEach(function (item) { item.name = value; });
+            items.forEach(function (item: any) { item.name = value; });
             if (paper()) paper().view.update();
             commit();
             markObjects();
         });
-        listen(nameInput, 'keydown', function (e) {
-            if (e.key === 'Enter') {
+        listen(nameInput, 'keydown', function (e: KeyboardEvent) {
+            if(e.key === 'Enter') {
                 e.preventDefault();
                 nameInput.blur();
-            } else if (e.key === 'Escape') {
+            }else if(e.key === 'Escape') {
                 e.preventDefault();
                 var s = selectedPaths()[0];
                 nameInput.value = s ? (s.name || '') : '';
@@ -442,7 +438,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
 
     function syncRail () {
         var r = paintEditorOpen() && paper() && !isBitmapFormat() ? railRect() : null;
-        if (!r) {
+        if(!r) {
             destroyRail();
             return;
         }
@@ -460,53 +456,53 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         var total = items.length;
         var list = railEl.querySelector('.gwt-objs');
         var spine = railEl.querySelector('.gwt-spine');
-        if (list) {
-            var sig = items.map(function (it) {
+        if(list) {
+            var sig = items.map((it: any) => {
                 var b = it.bounds;
                 return it.id + '|' + (it.name || '') + '|' + (it.visible ? 1 : 0) + '|' +
-                    (it.locked ? 1 : 0) + '|' + colorSig(it.fillColor) + '>' + colorSig(it.strokeColor) +
-                    '|' + Math.round(b.x) + ' ' + Math.round(b.y) + ' ' +
-                    Math.round(b.width) + ' ' + Math.round(b.height);
+                (it.locked ? 1 : 0) + '|' + colorSig(it.fillColor) + '>' + colorSig(it.strokeColor) +
+                '|' + Math.round(b.x) + ' ' + Math.round(b.y) + ' ' +
+                Math.round(b.width) + ' ' + Math.round(b.height);
             }).join('/');
             if (list._gwtSig !== sig) {
                 var prevScroll = list.scrollTop;
                 list._gwtSig = sig;
                 list.textContent = '';
                 if (spine) spine.textContent = '';
-                items.forEach(function (item, i) {
+                items.forEach(function (item: any, i: number) {
                     list.appendChild(objectRow(item, i, total));
                     if (spine) spine.appendChild(objectChip(item));
                 });
                 list.scrollTop = prevScroll;
             }
-            Array.prototype.forEach.call(list.children, function (row, i) {
+            Array.prototype.forEach.call(list.children, function (row: HTMLElement, i: number) {
                 var it = items[i];
                 if (!it) return;
                 row.classList.toggle('gwt-on', !!it.selected);
                 row.classList.toggle('gwt-dim', !it.visible);
             });
-            if (spine) Array.prototype.forEach.call(spine.children, function (chip, i) {
+            if (spine) Array.prototype.forEach.call(spine.children, function (chip: HTMLElement, i: number) {
                 chip.classList.toggle('gwt-on', !!(items[i] && items[i].selected));
             });
         }
         var count = railEl.querySelector('.gwt-count');
-        if (count) count.textContent = String(total);
+        if(count) count.textContent = String(total);
         var sel = selectedPaths()[0];
         var some = !!sel;
         var nameInput = railEl.querySelector('.gwt-rname');
-        if (nameInput) {
+        if(nameInput) {
             nameInput.disabled = !some;
-            if (document.activeElement !== nameInput) nameInput.value = sel ? (sel.name || '') : '';
+            if(document.activeElement !== nameInput) nameInput.value = sel ? (sel.name || '') : '';
         }
         var opRange = railEl.querySelector('.gwt-rops input[type=range]');
-        if (opRange) {
+        if(opRange) {
             opRange.disabled = !some;
-            if (document.activeElement !== opRange) {
+            if(document.activeElement !== opRange) {
                 opRange.value = opacityOfSelection();
-                if (opRange.nextSibling) opRange.nextSibling.textContent = opRange.value + '%';
+                if(opRange.nextSibling) opRange.nextSibling.textContent = opRange.value + '%';
             }
         }
-        Array.prototype.forEach.call(railEl.querySelectorAll('.gwt-rtools .gwt-mini'), function (b) {
+        Array.prototype.forEach.call(railEl.querySelectorAll('.gwt-rtools .gwt-mini'), function (b: HTMLButtonElement) {
             b.disabled = !some;
         });
     }

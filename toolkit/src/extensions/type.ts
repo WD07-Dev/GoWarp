@@ -8,3 +8,9 @@ export interface Review {
     resolve: () => void;
     reject: (error: Error) => void;
 }
+
+export interface ExtensionRow {
+    check: HTMLInputElement;
+    mode: HTMLSelectElement;
+    url: string;
+}

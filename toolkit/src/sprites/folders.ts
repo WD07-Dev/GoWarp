@@ -1,12 +1,12 @@
-import { FolderMenuItem, FolderServices } from './type';
-import { PaintContext } from '../paint/type';
+import { FolderMenuItem, FolderServices, SpriteInfo, FolderData } from './type';
+import { PaintContext, PaintElement } from '../paint/type';
 import { tr } from '../translate';
 
 export function createFolders(context: PaintContext, services: FolderServices) {
-    const {window, document} = context;
-    const {paintedColor, parseColor, brightness, cssVar, applyTheme, rgba} = context.theme;
-    const {listen} = context.lifecycle;
-    const {findVM, pageToast, ensureStyle} = services;
+    const { window, document } = context;
+    const { paintedColor, parseColor, brightness, cssVar, applyTheme, rgba } = context.theme;
+    const { listen } = context.lifecycle;
+    const { findVM, pageToast, ensureStyle } = services;
 
     var SF_KEY = 'gowarp-toolkit.folders';
     var SF_FOLDER = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' + '<path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></svg>';
@@ -24,7 +24,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         shown: '',
         active: '',
         project: '',
-        data: null,
+        data: null as FolderData | null,
         links: {},
         theme: '',
         editing: false,
@@ -62,16 +62,16 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         if (sf.project !== key) {
             sf.project = key;
             var raw = sfAll()[key];
-            var data = {folders: [], marks: []};
+            var data: FolderData = {folders: [], marks: []};
             if (raw && Array.isArray(raw.folders)) {
-                raw.folders.forEach(function (f) {
+                raw.folders.forEach(function (f: {id: string; name: string}) {
                     if (f && typeof f.id === 'string' && typeof f.name === 'string') {
                         data.folders.push({id: f.id, name: f.name.slice(0, 24)});
                     }
                 });
             }
             if (raw && Array.isArray(raw.marks)) {
-                raw.marks.forEach(function (m) {
+                raw.marks.forEach(function (m: {n: string; f: string}) {
                     if (m && typeof m.n === 'string' && typeof m.f === 'string') data.marks.push({n: m.n, f: m.f});
                 });
             }
@@ -89,44 +89,44 @@ export function createFolders(context: PaintContext, services: FolderServices) {
     function sfPane () {
         return document.querySelector('[class*="sprite-selector_sprite-selector"]');
     }
-    function sfTiles () {
+    function sfTiles (): HTMLElement[] {
         var scroll = document.querySelector('[class*="sprite-selector_scroll-wrapper"]');
         if (!scroll) return [];
         return Array.prototype.slice.call(
             scroll.querySelectorAll('[class*="sprite-selector-item_sprite-selector-item"]'));
     }
-    function sfTileName (tile) {
+    function sfTileName (tile: Element) {
         var n = tile && tile.querySelector('[class*="sprite-selector-item_sprite-name"]');
         return n ? (n.textContent || '').trim() : '';
     }
-    function sfSprites () {
+    function sfSprites (): SpriteInfo[] {
         var out = [];
         var vm = findVM();
         if(vm && vm.runtime && vm.runtime.targets) {
-            vm.runtime.targets.forEach(function (t) {
+            vm.runtime.targets.forEach(function (t: any) {
                 if(t && t.isOriginal !== false && !t.isStage && t.sprite && t.sprite.name) {
                     out.push({id: t.id, name: String(t.sprite.name)});
                 }
             });
             if (out.length) return out;
         }
-        sfTiles().forEach(function (tile) {
+        sfTiles().forEach(function (tile: HTMLElement) {
             var name = sfTileName(tile);
             if (name) out.push({id: 'dom:' + name, name: name});
         });
         return out;
     }
 
-    function sfLink(sprites) {
+    function sfLink(sprites: SpriteInfo[]) {
         var data = sfLoad();
         var live = {};
-        sprites.forEach(function (s) { live[s.id] = true; });
-        Object.keys(sf.links).forEach(function (id) {
+        sprites.forEach(function (s: SpriteInfo) { live[s.id] = true; });
+        Object.keys(sf.links).forEach(function (id: string) {
             if (!live[id]) delete sf.links[id];
         });
         var used = [];
-        Object.keys(sf.links).forEach(function (id) { used.push(sf.links[id]); });
-        sprites.forEach(function (s) {
+        Object.keys(sf.links).forEach(function (id: string) { used.push(sf.links[id]); });
+        sprites.forEach(function (s: SpriteInfo) {
             var link = sf.links[s.id];
             if(link) {
                 if(link.n !== s.name) {
@@ -144,7 +144,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             }
         });
     }
-    function sfFolderOf(sprite): string {
+    function sfFolderOf(sprite: SpriteInfo): string {
         var link = sf.links[sprite.id];
         if(!link) return '';
         for(let i=0; i < sf.data.folders.length; i++) {
@@ -152,19 +152,19 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         }
         return '';
     }
-    function sfFolderName(id) {
+    function sfFolderName(id: string) {
         for(let i=0; i < sf.data.folders.length; i++) {
             if(sf.data.folders[i].id === id) return sf.data.folders[i].name;
         }
         return '';
     }
-    function sfNameTaken(name, exceptId?: any) {
+    function sfNameTaken(name: string, exceptId?: string) {
         var lower = name.toLowerCase();
-        return sfLoad().folders.some(function (f) {
+        return sfLoad().folders.some(function (f: { id: string; name: string; }) {
             return f.id !== exceptId && f.name.toLowerCase() === lower;
         });
     }
-    function sfAssign(sprite, folderId) {
+    function sfAssign(sprite: SpriteInfo, folderId: string) {
         var data = sfLoad();
         var link = sf.links[sprite.id];
         if(!link) {
@@ -182,7 +182,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         sf.sig = '';
         sfSync();
     }
-    function sfMakeFolder(name) {
+    function sfMakeFolder(name: string) {
         var data = sfLoad();
         if(!name || sfNameTaken(name)) {
             var base = tr('sfDefault');
@@ -197,7 +197,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         return folder;
     }
 
-    function sfPaint(node) {
+    function sfPaint(node: PaintElement) {
         var pane = sfPane() || document.body;
         var surface = paintedColor(pane, 'backgroundColor') || '#ffffff';
         var c = parseColor(surface) || {r: 255, g: 255, b: 255, a: 1};
@@ -223,7 +223,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         node.style.colorScheme = dark ? 'dark' : 'light';
     }
 
-    function sfEnsureBar(scroll) {
+    function sfEnsureBar(scroll: Element) {
         if (sf.bar && sf.bar.parentElement === scroll) return;
         if (sf.bar) sf.bar.remove();
         var bar = document.createElement('div');
@@ -235,7 +235,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         scroll.insertBefore(bar, scroll.firstChild);
         sfPaint(bar);
     }
-    function sfEnsureHint(scroll) {
+    function sfEnsureHint(scroll: Element) {
         if(sf.hint && sf.hint.parentElement === scroll) return sf.hint;
         if(sf.hint) sf.hint.remove();
         sf.hint = document.createElement('div');
@@ -245,7 +245,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         sfPaint(sf.hint);
         return sf.hint;
     }
-    function sfChip(folderId, label, count, active, isFolder) {
+    function sfChip(folderId: string, label: string, count: number, active: boolean, isFolder: boolean) {
         var chip = document.createElement('button');
         chip.type = 'button';
         chip.className = 'gwt-fchip';
@@ -261,19 +261,19 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         name.textContent = label;
         var num = document.createElement('span');
         num.className = 'gwt-fnum';
-        num.textContent = count;
+        num.textContent = String(count);
         chip.append(name, num);
-        listen(chip, 'click', function (event) {
+        listen(chip, 'click', function (event: PointerEvent) {
             if(event.detail > 1) return;
             sf.active = folderId;
             sfSync();
         });
         if(isFolder) {
-            listen(chip, 'dblclick', function (event) {
+            listen(chip, 'dblclick', function (event: MouseEvent) {
                 event.preventDefault();
                 sfRenameChip(chip, folderId);
             });
-            listen(chip, 'contextmenu', function (event) {
+            listen(chip, 'contextmenu', function (event: PointerEvent) {
                 event.preventDefault();
                 event.stopPropagation();
                 sfChipMenu(event.clientX, event.clientY, folderId);
@@ -281,20 +281,20 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         }
         return chip;
     }
-    function sfRenderBar(sprites) {
+    function sfRenderBar(sprites: SpriteInfo[]) {
         if(!sf.bar || sf.editing) return;
         var data = sfLoad();
-        if(sf.active && !data.folders.some(function (f) { return f.id === sf.active; })) sf.active = '';
+        if(sf.active && !data.folders.some(function (f: { id: string; name: string; }) { return f.id === sf.active; })) sf.active = '';
         var counts = {};
-        sprites.forEach(function (s) {
+        sprites.forEach(function (s: SpriteInfo) {
             var f = sfFolderOf(s);
             counts[f] = (counts[f] || 0) + 1;
         });
-        var sig = JSON.stringify([tr().lang, sprites.length, counts, data.folders.map((f) => [f.id, f.name])]);
+        var sig = JSON.stringify([tr().lang, sprites.length, counts, data.folders.map((f: { id: string; name: string; }) => [f.id, f.name])]);
         if(sig === sf.sig) {
             if(sf.shown !== sf.active) {
                 sf.shown = sf.active;
-                Array.prototype.forEach.call(sf.bar.querySelectorAll('.gwt-fchip[data-folder]'), function (chip) {
+                Array.prototype.forEach.call(sf.bar.querySelectorAll('.gwt-fchip[data-folder]'), function (chip: HTMLElement) {
                     chip.setAttribute('aria-selected', String((chip.dataset.folder || '') === sf.active));
                 });
             }
@@ -304,7 +304,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         sf.shown = sf.active;
         sf.bar.textContent = '';
         sf.bar.appendChild(sfChip('', tr('sfAll'), sprites.length, sf.active === '', false));
-        data.folders.forEach(function (f) {
+        data.folders.forEach(function (f: { id: string; name: string; }) {
             sf.bar.appendChild(sfChip(f.id, f.name, counts[f.id] || 0, sf.active === f.id, true));
         });
         var add = document.createElement('button');
@@ -316,7 +316,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         listen(add, 'click', function () { sfNewChip(add); });
         sf.bar.appendChild(add);
     }
-    function sfNameInput(holder, initial, commit, cancel?: any) {
+    function sfNameInput(holder: HTMLElement, initial: string, commit: (name: string) => void, cancel?: () => void) {
         if(sf.editing) return;
         sf.editing = true;
         var input = document.createElement('input');
@@ -330,7 +330,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         input.focus();
         input.select();
         var done = false;
-        function finish (ok) {
+        function finish (ok: boolean) {
             if (done) return;
             done = true;
             sf.editing = false;
@@ -340,21 +340,21 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             sf.sig = '';
             sfSync();
         }
-        listen(input, 'keydown', function (event) {
+        listen(input, 'keydown', function (event: KeyboardEvent) {
             event.stopPropagation();
             if (event.key === 'Enter') { event.preventDefault(); finish(true); }
             else if (event.key === 'Escape') { event.preventDefault(); finish(false); }
         });
         listen(input, 'blur', function () { finish(true); });
-        listen(input, 'pointerdown', function (event) { event.stopPropagation(); });
-        listen(input, 'click', function (event) { event.stopPropagation(); });
+        listen(input, 'pointerdown', function (event: PointerEvent) { event.stopPropagation(); });
+        listen(input, 'click', function (event: PointerEvent) { event.stopPropagation(); });
     }
-    function sfNewChip(addBtn) {
+    function sfNewChip(addBtn: HTMLElement) {
         if(!sf.bar || sf.editing) return;
         var holder = document.createElement('span');
         holder.className = 'gwt-fchip gwt-fhold';
         sf.bar.insertBefore(holder, addBtn);
-        sfNameInput(holder, '', function (name) {
+        sfNameInput(holder, '', function (name: string) {
             if (sfNameTaken(name)) { pageToast(tr('sfDup'), true); return; }
             sfMakeFolder(name);
             sf.active = '';
@@ -363,21 +363,21 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             holder.remove();
         });
     }
-    function sfRenameChip(chip, folderId) {
-        var folder = sfLoad().folders.filter(function (f) { return f.id === folderId; })[0];
+    function sfRenameChip(chip: HTMLElement, folderId: string) {
+        var folder = sfLoad().folders.filter(function (f: { id: string; name: string; }) { return f.id === folderId; })[0];
         if(!folder) return;
-        sfNameInput(chip, folder.name, function (name) {
+        sfNameInput(chip, folder.name, function (name: string) {
             if (sfNameTaken(name, folderId)) { pageToast(tr('sfDup'), true); return; }
             folder.name = name;
             sfSave();
             pageToast(tr('sfRenamed'));
         });
     }
-    function sfDeleteFolder (folderId) {
+    function sfDeleteFolder (folderId: string) {
         var data = sfLoad();
-        data.folders = data.folders.filter(function (f) { return f.id !== folderId; });
-        data.marks = data.marks.filter(function (m) { return m.f !== folderId; });
-        Object.keys(sf.links).forEach(function (id) {
+        data.folders = data.folders.filter(function (f: { id: string; name: string; }) { return f.id !== folderId; });
+        data.marks = data.marks.filter(function (m: { n: string; f: string; }) { return m.f !== folderId; });
+        Object.keys(sf.links).forEach(function (id: string) {
             if (sf.links[id].f === folderId) delete sf.links[id];
         });
         if (sf.active === folderId) sf.active = '';
@@ -393,12 +393,12 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             sf.menu = null;
         }
     }
-    function sfMenu (x, y, rows) {
+    function sfMenu (x: number, y: number, rows: FolderMenuItem[]) {
         sfCloseMenu();
         var menu = document.createElement('div');
         menu.className = 'gwt-fmenu';
         sfPaint(menu);
-        rows.forEach(function (row) {
+        rows.forEach(function (row: FolderMenuItem) {
             if (row.sep) {
                 menu.appendChild(document.createElement('hr'));
                 return;
@@ -438,7 +438,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         menu.style.top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8)) + 'px';
         sf.menu = menu;
     }
-    function sfChipMenu (x, y, folderId) {
+    function sfChipMenu (x: number, y: number, folderId: string) {
         sfMenu(x, y, [
             {head: sfFolderName(folderId)},
             {label: tr('sfRename'), icon: SF_FOLDER, run: function () {
@@ -448,14 +448,14 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             {label: tr('sfDelete'), run: function () { sfDeleteFolder(folderId); }}
         ]);
     }
-    function sfSpriteMenu (tile, anchor) {
+    function sfSpriteMenu (tile: Element, anchor: Element) {
         var name = sfTileName(tile);
-        var sprite = sfSprites().filter(function (s) { return s.name === name; })[0];
+        var sprite = sfSprites().filter(function (s: SpriteInfo) { return s.name === name; })[0];
         if (!sprite) return;
         var current = sfFolderOf(sprite);
         var data = sfLoad();
         var rows: FolderMenuItem[] = [{head: sprite.name}];
-        data.folders.forEach(function (f) {
+        data.folders.forEach(function (f: { id: string; name: string; }) {
             rows.push({label: f.name, icon: SF_FOLDER, checked: f.id === current, run: function () {
                 sfAssign(sprite, f.id);
                 pageToast(tr('sfMoved').replace('{s}', sprite.name).replace('{f}', f.name));
@@ -474,7 +474,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         sfMenu(r.left, r.bottom + 4, rows);
     }
     function sfDecorate () {
-        sfTiles().forEach(function (tile) {
+        sfTiles().forEach(function (tile: HTMLElement) {
             if (tile.querySelector('.gwt-sf-tile')) return;
             var b = document.createElement('button');
             b.type = 'button';
@@ -482,20 +482,20 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             b.title = tr('sfMove');
             b.setAttribute('aria-label', tr('sfMove'));
             b.innerHTML = SF_FOLDER;
-            listen(b, 'click', function (event) {
+            listen(b, 'click', function (event: PointerEvent) {
                 event.preventDefault();
                 event.stopPropagation();
                 sfSpriteMenu(tile, b);
             });
-            listen(b, 'pointerdown', function (event) { event.stopPropagation(); });
-            listen(b, 'dblclick', function (event) { event.stopPropagation(); });
+            listen(b, 'pointerdown', function (event: PointerEvent) { event.stopPropagation(); });
+            listen(b, 'dblclick', function (event: MouseEvent) { event.stopPropagation(); });
             tile.appendChild(b);
         });
     }
-    function sfApplyFilter (sprites) {
+    function sfApplyFilter (sprites: SpriteInfo[]) {
         var byName = {};
-        sprites.forEach(function (s) { byName[s.name] = s; });
-        sfTiles().forEach(function (tile) {
+        sprites.forEach(function (s: SpriteInfo) { byName[s.name] = s; });
+        sfTiles().forEach(function (tile: HTMLElement) {
             var sprite = byName[sfTileName(tile)];
             var show = !sf.active || (sprite && sfFolderOf(sprite) === sf.active);
             var wrap = tile.parentElement;
@@ -507,7 +507,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             }
         });
     }
-    function sfWatch (items) {
+    function sfWatch (items: Node) {
         if (!window.MutationObserver) return;
         if (sf.obs && sf.obsItems === items) return;
         if (sf.obs) sf.obs.disconnect();
@@ -548,7 +548,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         var hint = sfEnsureHint(scroll);
         var inFolder = 0;
         if (sf.active) {
-            sprites.forEach(function (s) { if (sfFolderOf(s) === sf.active) inFolder++; });
+            sprites.forEach(function (s: SpriteInfo) { if (sfFolderOf(s) === sf.active) inFolder++; });
         }
         if (sf.active && !inFolder && sfFolderName(sf.active)) {
             hint.textContent = tr('sfEmpty');
@@ -579,20 +579,20 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         sf.active = '';
         sf.count = 0;
         sf.theme = '';
-        Array.prototype.forEach.call(document.querySelectorAll('.gwt-sf-tile'), function (b) { b.remove(); });
+        Array.prototype.forEach.call(document.querySelectorAll('.gwt-sf-tile'), function (b: HTMLElement) { b.remove(); });
         var scroll = document.querySelector('[class*="sprite-selector_scroll-wrapper"]');
         if (!scroll) return;
-        Array.prototype.forEach.call(scroll.querySelectorAll('[class*="sprite-selector_sprite-wrapper"]'), function (w) {
+        Array.prototype.forEach.call(scroll.querySelectorAll('[class*="sprite-selector_sprite-wrapper"]'), function (w: HTMLElement) {
             if (w.style.display === 'none') w.style.display = '';
         });
     }
 
-    listen(document, 'pointerdown', function (event) {
+    listen(document, 'pointerdown', function (event: PointerEvent) {
         if(sf.menu && !sf.menu.contains(event.target)) sfCloseMenu();
     }, true);
     listen(window, 'resize', sfCloseMenu);
     listen(window, 'scroll', sfCloseMenu, true);
-    listen(document, 'keydown', function (event) {
+    listen(document, 'keydown', function (event: KeyboardEvent) {
         if (event.key === 'Escape') sfCloseMenu();
     }, true);
     return {

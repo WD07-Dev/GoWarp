@@ -9,6 +9,16 @@ export interface FolderMenuItem {
 
 export interface FolderServices {
     findVM: () => any;
-    pageToast: (text: any, bad?: any) => void;
+    pageToast: (text: string, bad?: boolean) => void;
     ensureStyle: () => void;
+}
+
+export interface SpriteInfo {
+    id: string;
+    name: string;
+}
+
+export interface FolderData {
+    folders: {id: string; name: string}[];
+    marks: {n: string; f: string}[];
 }

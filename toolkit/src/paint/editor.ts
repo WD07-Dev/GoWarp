@@ -4,7 +4,7 @@ export function createEditorAccess(document: EditorDocument, window: EditorWindo
     var paperRef = null;
     var storeRef = null;
 
-    function isPaperScope(candidate) {
+    function isPaperScope(candidate: any) {
         if (!candidate || typeof candidate.setup !== 'function') return false;
         var project = candidate.project;
         return !!(project && project.view && project.layers && project.layers.length);
@@ -16,7 +16,7 @@ export function createEditorAccess(document: EditorDocument, window: EditorWindo
             if(!chunk || typeof chunk.push !== 'function') continue;
             var req = null;
             try {
-                chunk.push([[Date.now()], {}, function (r) { req = r; }]);
+                chunk.push([[Date.now()], {}, function (r: any) { req = r; }]);
             } catch (e) { continue; }
             if(!req || !req.m) continue;
             for(var id in req.m) {
@@ -69,7 +69,7 @@ export function createEditorAccess(document: EditorDocument, window: EditorWindo
         var state = s.getState();
         return state && state.scratchPaint ? state.scratchPaint : null;
     }
-    function dispatch (action) {
+    function dispatch (action: {type: string; [key: string]: unknown}) {
         var s = store();
         if (s) s.dispatch(action);
     }
@@ -94,11 +94,11 @@ export function createEditorAccess(document: EditorDocument, window: EditorWindo
     };
 }
 
-function fiberOf(el) {
-    var key = Object.keys(el).find(function (k) {
+function fiberOf(el: Element) {
+    var key = Object.keys(el).find(function (k: string) {
         return k.indexOf('__reactInternalInstance$') === 0 || k.indexOf('__reactFiber$') === 0;
     });
-    return key ? el[key] : null;
+    return key ? (el as Element & Record<string, any>)[key] : null;
 }
 
 function paintCanvas() {
