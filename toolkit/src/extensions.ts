@@ -55,10 +55,8 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
     let dialogClose: (() => void) | undefined;
     
     const originalExtensionLoad = vm._loadExtensions;
-    // This is an editor-session helper. Do not add a reference to newly saved SB3s.
     const extensionId = 'gowarpToolkit';
     const entriesFor = (project: Project) => Object.entries(project.extensionURLs || {}).filter(([id, url]) => id !== extensionId && typeof url === 'string' && /^(https?:\/\/|data:)/i.test(url));
-    // Read the current SB3 serialization directly; no manual file selection.
     function currentProject() {
         const project: Project = JSON.parse(vm.toJSON(undefined, {allowOptimization: false}));
         const used = new Set(project.extensions || []);
@@ -208,8 +206,6 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
         panel.showModal();
         (rows[0]?.check||approve).focus();
     }
-    // Review the actual extension IDs and URLs before TurboWarp checks permissions.
-    // Only explicitly selected URLs are approved; all other checks use the original policy.
     const extensionLoad = async function (extensionIDs, extensionURLs = new Map(), ...args) {
         const urls = Object.create(null);
         const manager = this.extensionManager;
@@ -238,7 +234,6 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
         open(){open();}
     }
     Scratch.extensions.register(new Toolkit());
-    // Match GoWarp's menu placement. Reattach if TurboWarp recreates its menu.
     function attachButton(){
         if(document.getElementById('gowarp-toolkit-button'))return;
         const bar=document.querySelector('[class*="menu-bar_main-menu"]')||document.querySelector('[class*="menu-bar_menu-bar_"]');

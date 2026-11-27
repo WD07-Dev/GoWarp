@@ -1,7 +1,6 @@
 import {installExtensions} from './extensions';
 import {installPaintTools} from './paint';
 import type {ScratchHost} from './types';
-
 declare const Scratch: ScratchHost;
 
 if (!Scratch.extensions.unsandboxed) {
