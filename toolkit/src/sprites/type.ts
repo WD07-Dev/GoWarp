@@ -9,7 +9,6 @@ export interface FolderMenuItem {
 
 export interface FolderServices {
     findVM: () => any;
-    pageToast: (text: string, bad?: boolean) => void;
     ensureStyle: () => void;
 }
 

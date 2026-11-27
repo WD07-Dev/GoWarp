@@ -6,8 +6,27 @@ import { tr } from '../translate';
 export function createFolders(context: PaintContext, services: FolderServices) {
     const { window, document } = context;
     const { paintedColor, parseColor, brightness, cssVar, applyTheme, rgba } = context.theme;
-    const { listen } = context.lifecycle;
-    const { findVM, pageToast, ensureStyle } = services;
+    const { listen, later } = context.lifecycle;
+    const { findVM, ensureStyle } = services;
+
+    var pageToastEl = null;
+    var pageToastTimer = 0;
+
+    function pageToast(text: string, bad?: boolean) {
+        if (!text) return;
+        if (!pageToastEl) {
+            pageToastEl = document.createElement('div');
+            pageToastEl.className = 'gwt-toast';
+            document.body.appendChild(pageToastEl);
+        }
+        pageToastEl.textContent = text;
+        pageToastEl.classList.toggle('gwt-bad', !!bad);
+        pageToastEl.classList.add('gwt-on');
+        window.clearTimeout(pageToastTimer);
+        pageToastTimer = later(function () {
+            if (pageToastEl) pageToastEl.classList.remove('gwt-on');
+        }, 2400);
+    }
 
     var SF_KEY = 'gowarp-toolkit.folders';
     var SF_FOLDER = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' + '<path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></svg>';

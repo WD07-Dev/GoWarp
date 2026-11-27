@@ -5,11 +5,11 @@ import { createLifecycle } from '../shared/lifecycle';
 import type { ScratchHost } from '../shared/scratch';
 import { createFolders } from '../sprites/folders';
 import { createEditorAccess } from './editor';
-import { createPixelEditor } from './pixels';
 import { paintStyle as CSS } from './style';
 import { createAnchors } from './anchors';
 import { createLayers } from './layers';
 import { createTheme } from './theme';
+import { preparePenStroke } from './stroke';
 import { tr } from '../translate';
 
 export function installPaintTools(Scratch: ScratchHost): PaintTools {
@@ -433,41 +433,36 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             'stroke-linejoin="round">' + inner + '</g></svg>');
     }
     var SHAPE_TOOL_ICON = lineIcon('<path d="M6.6 8 11.6 16.2H1.6z"/><circle cx="14.2" cy="6.2" r="3.9"/>');
-    var PEN_TOOL_ICON = lineIcon('<path d="M10 2.4c2.7 3 4 5.4 4 7.6a4 4 0 0 1-8 0c0-2.2 1.3-4.6 4-7.6z"/>' +
-        '<path d="M10 7.6v3.4"/><circle cx="10" cy="13.6" r=".9" fill="' + ICON_FILL + '" stroke="none"/>');
+    var PEN_TOOL_ICON = lineIcon('<path d="M10 2.4c2.7 3 4 5.4 4 7.6a4 4 0 0 1-8 0c0-2.2 1.3-4.6 4-7.6z"/>' + '<path d="M10 7.6v3.4"/><circle cx="10" cy="13.6" r=".9" fill="' + ICON_FILL + '" stroke="none"/>');
     var FX_TOOL_ICON = lineIcon('<circle cx="7.8" cy="10" r="4.9"/><circle cx="12.2" cy="10" r="4.9"/>');
     var ANCHOR_TOOL_ICON = lineIcon('<circle cx="10" cy="10" r="3.5"/>' +
-        '<path d="M10 1.9v2.8M10 15.3v2.8M1.9 10h2.8M15.3 10h2.8"/>' +
-        '<circle cx="10" cy="10" r=".95" fill="' + ICON_FILL + '" stroke="none"/>');
+    '<path d="M10 1.9v2.8M10 15.3v2.8M1.9 10h2.8M15.3 10h2.8"/>' + '<circle cx="10" cy="10" r=".95" fill="' + ICON_FILL + '" stroke="none"/>');
     var TOOL_ICON = {shapes: SHAPE_TOOL_ICON, pen: PEN_TOOL_ICON, fx: FX_TOOL_ICON, anchor: ANCHOR_TOOL_ICON};
 
     function icon (paths: string) {
         return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" ' +
-            'stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>';
+        'stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>';
     }
     var GLYPH = {
         size: icon('<path d="M2.5 10h15"/><path d="M5.5 7 2.5 10l3 3"/><path d="M14.5 7l3 3-3 3"/>'),
         round: icon('<path d="M3 6.5A3.5 3.5 0 0 1 6.5 3h11v14h-11A3.5 3.5 0 0 1 3 13.5z"/>'),
-        nib: icon('<path d="M10 3c2.4 2.7 3.6 5 3.6 7.2A3.6 3.6 0 0 1 6.4 10.2C6.4 8 7.6 5.7 10 3z"/>' +
-            '<path d="M10 16.4v1.6"/>'),
+        nib: icon('<path d="M10 3c2.4 2.7 3.6 5 3.6 7.2A3.6 3.6 0 0 1 6.4 10.2C6.4 8 7.6 5.7 10 3z"/>' + '<path d="M10 16.4v1.6"/>'),
         undo: icon('<path d="M4 8.5h8.5a4 4 0 1 1 0 8H7"/><path d="M4 8.5 7 5.5M4 8.5l3 3"/>'),
         wheel: icon('<rect x="6.5" y="2.5" width="7" height="15" rx="3.5"/><path d="M10 5.2v2.6"/>'),
         plus: icon('<path d="M10 4v12M4 10h12"/>'),
         trash: icon('<path d="M4.5 6h11M8 6V4.5h4V6M6 6l.7 10h6.6L14 6"/>')
     };
-    function shapeIcon (shape: Shape) {
-        return '<svg viewBox="-8 -8 116 116"><path d="' + (shape.d || shape.path) + '" fill="currentColor" fill-rule="' +
-            (shape.fillRule || 'nonzero') + '"/></svg>';
+    function shapeIcon(shape: Shape) {
+        return '<svg viewBox="-8 -8 116 116"><path d="' + (shape.d || shape.path) + '" fill="currentColor" fill-rule="' + (shape.fillRule || 'nonzero') + '"/></svg>';
     }
 
-    function addToolButton (grid: HTMLElement, key: string, iconUrl: string, onClick: () => void) {
+    function addToolButton(grid: HTMLElement, key: string, iconUrl: string, onClick: () => void) {
         var proto = grid.querySelector('[class*="tool-select-base_mod-tool-select"]');
-        if (!proto) return null;
+        if(!proto) return null;
         var btn = proto.cloneNode(false) as PaintElement;
-        btn.className = btn.className.replace(/tool-select-base_is-selected\S*/g, '').replace(/\s+/g, ' ').trim() +
-            ' gwt-tool';
-        if (!btn.hasAttribute('tabindex')) btn.setAttribute('tabindex', '0');
-        if (!btn.getAttribute('role')) btn.setAttribute('role', 'button');
+        btn.className = btn.className.replace(/tool-select-base_is-selected\S*/g, '').replace(/\s+/g, ' ').trim() + ' gwt-tool';
+        if(!btn.hasAttribute('tabindex')) btn.setAttribute('tabindex', '0');
+        if(!btn.getAttribute('role')) btn.setAttribute('role', 'button');
         btn._gwtKey = key;
         btn.dataset.gwtKey = String(key);
         btn.setAttribute('title', tr(key));
@@ -482,7 +477,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         btn.appendChild(img);
         listen(btn, 'click', onClick);
         listen(btn, 'keydown', function (e: KeyboardEvent) {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if(e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 btn.click();
             }
@@ -496,7 +491,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }
     function refreshToolLabels () {
         toolButtons.forEach(function (btn: PaintElement & {_gwtKey: string}) {
-            if (!btn.isConnected) return;
+            if(!btn.isConnected) return;
             var armed = btn === pen.button && pen.active && pen.profile;
             var stamp = btn === shaper.button && shaper.shape;
             var text = armed ? tr(pen.profile.nameKey) : stamp ? tr(shaper.shape.nameKey) : tr(btn._gwtKey);
@@ -538,7 +533,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var row = document.createElement('div');
         row.className = 'gwt-keys';
         chips.forEach(function (chip: string) {
-            if (chip.charAt(0) === '<') {
+            if(chip.charAt(0) === '<') {
                 var glyph = document.createElement('span');
                 glyph.innerHTML = chip;
                 row.appendChild(glyph);
@@ -565,11 +560,11 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var d = shape.points ? cornerPath(shape.points, radius) : shape.path;
         var path = new p.Path(d);
         path.closed = true;
-        if (shape.fillRule) path.fillRule = shape.fillRule;
+        if(shape.fillRule) path.fillRule = shape.fillRule;
         var scale = settings.shapeSize / 100;
         path.scale(scale);
         path.applyMatrix = true;
-        if (where && typeof where.width === 'number') path.bounds = where;
+        if(where && typeof where.width === 'number') path.bounds = where;
         else path.position = where || viewCenter();
         styleShapePath(path);
         return path;
@@ -583,7 +578,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             style = style || {};
             return gwtGradient(key) || usable(style.primary) || usable(style.secondary) || !!lastPaint[key];
         };
-        if (!p || !layer || (!paints(color.fillColor, 'fill') && !paints(color.strokeColor, 'stroke'))) return false;
+        if(!p || !layer || (!paints(color.fillColor, 'fill') && !paints(color.strokeColor, 'stroke'))) return false;
         var path = buildShapePath(shape, where);
         try {
             return isBitmapFormat() ? bakeIntoRaster(path) : addVectorShape(path, layer);
@@ -596,7 +591,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
     function bakeIntoRaster (path: any) {
         var raster = rasterItem();
-        if (!raster || !raster.canvas) {
+        if(!raster || !raster.canvas) {
             path.remove();
             return false;
         }
@@ -629,26 +624,26 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
     function clearShapePreview () {
         previewed = null;
-        if (!shapePreview) return;
+        if(!shapePreview) return;
         shapePreview.remove();
         shapePreview = null;
         var art = paintingLayer();
-        if (art) art.activate();
+        if(art) art.activate();
     }
 
     function sweepGhosts () {
-        if (shaper.shape || pen.active || shapePreview) return;
+        if(shaper.shape || pen.active || shapePreview) return;
         var layer = findLayer('isGuideLayer');
-        if (!layer) return;
-        for (var i = layer.children.length - 1; i >= 0; i--) {
+        if(!layer) return;
+        for(var i = layer.children.length - 1; i >= 0; i--) {
             if (layer.children[i]._gwtGhost) layer.children[i].remove();
         }
     }
     function previewShape (shape: Shape, box?: {x: number; y: number; width?: number; height?: number}) {
         var p = paper();
         var layer = guideLayer();
-        if (!p || !layer) return;
-        if (shapePreview) {
+        if(!p || !layer) return;
+        if(shapePreview) {
             shapePreview.remove();
             shapePreview = null;
         }
@@ -667,7 +662,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         previewed = shape;
     }
     function refreshPreview () {
-        if (!previewed) return;
+        if(!previewed) return;
         previewShape(previewed);
     }
 
@@ -1588,6 +1583,13 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             }
             layer.activate();
             layer.addChild(path);
+            const prepared = preparePenStroke(path);
+            path.remove();
+            path = prepared.path;
+            const previous = prepared.previous;
+            const previousIndex = previous?.index;
+            previous?.remove();
+            layer.addChild(path);
             path.selected = true;
             dispatch({
                 type: 'scratch-paint/select/CHANGE_SELECTED_ITEMS',
@@ -1595,8 +1597,22 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
                 bitmapMode: false
             });
             p.view.update();
-            if (!commit()) path.remove();
-            this.points = [];
+            let saved = false;
+            try {
+                saved = commit();
+            } finally {
+                if (!saved) {
+                    path.remove();
+                    if (previous) layer.insertChild(previousIndex, previous);
+                    dispatch({
+                        type: 'scratch-paint/select/CHANGE_SELECTED_ITEMS',
+                        selectedItems: p.project.selectedItems,
+                        bitmapMode: false
+                    });
+                    p.view.update();
+                }
+                this.points = [];
+            }
         }
     };
 
@@ -1791,7 +1807,6 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }
 
     function onKeyDown (e: KeyboardEvent) {
-        if(pixels.pxEd) return;
         if(isTextInput(e.target)) return;
         if(!paintEditorOpen()) return;
         if(e.key === 'Escape') {
@@ -1822,9 +1837,6 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
                 } else if (anchorBtn) {
                     showAnchorPanel(anchorBtn);
                 }
-            }else if(e.code === 'KeyP') {
-                e.preventDefault();
-                openPixelEditor();
             }else if(e.code === 'KeyX') {
                 e.preventDefault();
                 exportPng(settings.pngScale || 1);
@@ -1838,21 +1850,13 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             sfSync();
             if (!paintEditorOpen()) {
                 closePanel();
-                closePixelEditor();
                 pen.deactivate();
                 shaper.disarm();
                 destroyRail();
-                pixels.removeButton();
                 return;
             }
             mount();
             sweepGhosts();
-            syncPixelButton();
-            if (pixels.pxEd) {
-                var nowTarget = anchorTarget();
-                var nowCostume = nowTarget && nowTarget.getCostumes()[nowTarget.currentCostume];
-                if(!nowCostume || nowCostume.name !== pixels.pxEd.costume) closePixelEditor();
-            }
             syncGradStrip();
             syncRail();
             syncToolButtons();
@@ -1914,23 +1918,9 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         toggleFor,
         labelEl
     });
-    const {refreshAnchorView, showAnchorPanel, applyAnchor, markAnchor, anchorState} = anchors;
-    const pixels = createPixelEditor(context, {
-        anchorTarget,
-        rasterItem,
-        commit,
-        paintEditorOpen,
-        icon,
-        clamp,
-        paintingLayer,
-        findLayer,
-        refreshAnchorView,
-        GLYPH
-    });
-    const {openPixelEditor, pageToast, closePixelEditor, syncPixelButton} = pixels;
+    const {showAnchorPanel, applyAnchor, markAnchor, anchorState} = anchors;
     const folders = createFolders(context, {
         findVM,
-        pageToast,
         ensureStyle
     });
     const { sfSync, sfTeardown } = folders;
@@ -1948,7 +1938,6 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     tick();
     repeat(tick, 900);
     return {
-        openPixelEditor,
         dispose() {
             if(disposed) return;
             disposed = true;
@@ -1956,10 +1945,9 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             unsubscribe?.();
             if(editor.storeRef) delete editor.storeRef.__gwtWatch;
             delete document.__gwtGrad;
-            closePanel(); closePixelEditor();
+            closePanel();
             pen.deactivate(); shaper.disarm(); destroyRail(); dropGradStrip(); sfTeardown();
             document.querySelectorAll('.gwt-tool, .gwt-toast').forEach((element: Element) => element.remove());
-            pixels.removeButton();
             document.querySelectorAll('[data-gwt-mounted], [data-gwt-wheel]').forEach((element: HTMLElement) => {
                 delete element.dataset.gwtMounted; delete element.dataset.gwtWheel;
             });
