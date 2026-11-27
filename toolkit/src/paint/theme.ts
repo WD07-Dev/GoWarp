@@ -11,8 +11,12 @@ export function createTheme(document: EditorDocument, window: EditorWindow) {
                 h = h.split('').map(function (c: string) { return c + c; }).join('');
             }
             if (h.length < 6) return null;
-            return {r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16),
-                a: h.length >= 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1};
+            return {
+                r: parseInt(h.slice(0, 2), 16),
+                g: parseInt(h.slice(2, 4), 16),
+                b: parseInt(h.slice(4, 6), 16),
+                a: h.length >= 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1
+            };
         }
         var rgb = s.match(/rgba?\(([^)]+)\)/i);
         if (rgb) {
