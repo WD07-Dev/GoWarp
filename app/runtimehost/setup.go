@@ -1,4 +1,3 @@
-// Package runtimehost wires shared project services into headless and desktop hosts.
 package runtimehost
 
 import (

@@ -69,10 +69,7 @@ func startRuntimeLog(dir, appID string) (*runtimeLog, error) {
 	}
 	memory := func() {
 		metrics.Read(samples)
-		// Cumulative allocation and GC counters reveal churn between samples.
-		writer.Printf("memory heap_objects_bytes=%d go_committed_bytes=%d gc_cycles=%d goroutines=%d heap_allocated_bytes=%d gc_cpu_seconds=%.6f gc_assist_cpu_seconds=%.6f",
-			samples[0].Value.Uint64(), samples[1].Value.Uint64()-samples[2].Value.Uint64(), samples[3].Value.Uint64(), runtime.NumGoroutine(),
-			samples[4].Value.Uint64(), samples[5].Value.Float64(), samples[6].Value.Float64())
+		writer.Printf("memory heap_objects_bytes=%d go_committed_bytes=%d gc_cycles=%d goroutines=%d heap_allocated_bytes=%d gc_cpu_seconds=%.6f gc_assist_cpu_seconds=%.6f", samples[0].Value.Uint64(), samples[1].Value.Uint64()-samples[2].Value.Uint64(), samples[3].Value.Uint64(), runtime.NumGoroutine(), samples[4].Value.Uint64(), samples[5].Value.Float64(), samples[6].Value.Float64())
 	}
 	memory()
 	go func() {
@@ -80,7 +77,6 @@ func startRuntimeLog(dir, appID string) (*runtimeLog, error) {
 		defer file.Close()
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
-		// Keep profiling and file I/O off the game thread.
 		profilePath := filepath.Join(dir, appID+".cpu.pprof")
 		profile, profileErr := os.OpenFile(profilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 		if profileErr == nil {
@@ -109,10 +105,6 @@ func startRuntimeLog(dir, appID string) (*runtimeLog, error) {
 			profile = nil
 		}
 		defer stopProfile()
-		/*
-			Bound routine diagnostics per run. The runtime's crash descriptor
-			can still append its complete stack trace after this budget is used.
-		*/
 		remaining := 4 << 20
 		write := func(message string) {
 			if remaining <= 0 {

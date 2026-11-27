@@ -1,4 +1,3 @@
-// Package player runs a packaged project without the packager UI.
 package player
 
 import (
@@ -189,7 +188,6 @@ func runPrepared(ctx context.Context, path string, s config.Settings, preview bo
 		service, err = cloud.Open(loadCtx, cloudOptions(s, p), root)
 		return p, err
 	}
-	// These callbacks are first used after Prepare's result reaches the window.
 	options.Status = func() string {
 		return service.Status()
 	}

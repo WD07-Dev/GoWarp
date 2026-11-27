@@ -1,4 +1,3 @@
-// Package ui provides the shared TurboTrim visual style and embedded font.
 package ui
 
 import (
