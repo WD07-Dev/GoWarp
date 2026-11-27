@@ -1,7 +1,7 @@
-import {tr} from '../translate';
-import type {ScratchHost} from '../shared/scratch';
-import type {PaintTools} from '../paint/type';
+import type { ScratchHost } from '../shared/scratch';
+import type { PaintTools } from '../paint/type';
 import { Project, Review } from './type';
+import { tr } from '../translate';
 
 export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () => void {
 

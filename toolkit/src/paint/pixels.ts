@@ -1,6 +1,5 @@
-import {tr} from '../translate';
-import type {PixelEditor} from './type';
-import type {PaintContext} from './context';
+import type { PaintContext, PixelEditor } from './type';
+import { tr } from '../translate';
 
 interface PixelServices {
     anchorTarget: () => any;

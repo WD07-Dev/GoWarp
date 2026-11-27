@@ -1,15 +1,5 @@
-import {tr} from '../translate';
-import type {PaintContext} from './context';
-
-interface LayerServices {
-    paintingLayer: () => any;
-    selectedPaths: () => any[];
-    commit: () => boolean;
-    eachSelected: (fn: any, live?: any) => boolean;
-    icon: (paths: any) => string;
-    paintEditorOpen: () => boolean;
-    colorSig: (color: any) => any;
-}
+import { LayerServices, PaintContext } from './type';
+import { tr } from '../translate';
 
 export function createLayers(context: PaintContext, services: LayerServices) {
     const {paintState, paper, isBitmapFormat} = context.editor;

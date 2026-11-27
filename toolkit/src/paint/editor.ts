@@ -1,40 +1,33 @@
 import type {EditorDocument, EditorWindow} from './type';
 
 export function createEditorAccess(document: EditorDocument, window: EditorWindow) {
-
-    function fiberOf (el) {
-        var key = Object.keys(el).find(function (k) {
-            return k.indexOf('__reactInternalInstance$') === 0 || k.indexOf('__reactFiber$') === 0;
-        });
-        return key ? el[key] : null;
-    }
-    function paintCanvas () {
-        return document.querySelector('canvas[class*="paper-canvas"]');
-    }
-
     var paperRef = null;
     var storeRef = null;
 
-    function isPaperScope (candidate) {
+    function isPaperScope(candidate) {
         if (!candidate || typeof candidate.setup !== 'function') return false;
         var project = candidate.project;
         return !!(project && project.view && project.layers && project.layers.length);
     }
-    function findPaperInBundle () {
+    function findPaperInBundle() {
         var chunks = [window.webpackChunkGUI, window.webpackJsonpGUI];
-        for (var c = 0; c < chunks.length; c++) {
+        for(let c=0; c < chunks.length; c++) {
             var chunk = chunks[c];
-            if (!chunk || typeof chunk.push !== 'function') continue;
+            if(!chunk || typeof chunk.push !== 'function') continue;
             var req = null;
             try {
                 chunk.push([[Date.now()], {}, function (r) { req = r; }]);
             } catch (e) { continue; }
-            if (!req || !req.m) continue;
-            for (var id in req.m) {
-                if (!Object.prototype.hasOwnProperty.call(req.m, id)) continue;
+            if(!req || !req.m) continue;
+            for(var id in req.m) {
+                if(!Object.prototype.hasOwnProperty.call(req.m, id)) continue;
                 var src = '';
-                try { src = String(req.m[id]); } catch (e) { continue; }
-                if (src.indexOf('PaperScope') < 0) continue;
+                try {
+                    src = String(req.m[id]);
+                } catch (e) {
+                    continue;
+                }
+                if(src.indexOf('PaperScope') < 0) continue;
                 try {
                     var mod = req(id);
                     if (isPaperScope(mod)) return mod;
@@ -99,4 +92,15 @@ export function createEditorAccess(document: EditorDocument, window: EditorWindo
         store,
         get storeRef() { return storeRef; },
     };
+}
+
+function fiberOf(el) {
+    var key = Object.keys(el).find(function (k) {
+        return k.indexOf('__reactInternalInstance$') === 0 || k.indexOf('__reactFiber$') === 0;
+    });
+    return key ? el[key] : null;
+}
+
+function paintCanvas() {
+    return document.querySelector('canvas[class*="paper-canvas"]');
 }

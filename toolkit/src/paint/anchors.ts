@@ -1,6 +1,5 @@
-import {tr} from '../translate';
-import type { AlphaStats, AnchorServices } from './type';
-import type { PaintContext } from './context';
+import type { AlphaStats, AnchorServices, PaintContext } from './type';
+import { tr } from '../translate';
 
 export function createAnchors(context: PaintContext, services: AnchorServices) {
     const {document, window} = context;

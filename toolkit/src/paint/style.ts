@@ -347,4 +347,4 @@ export const paintStyle = [
         '.gwt-fxbox{width:min(19rem,92vw)}}',
         '@media (prefers-reduced-motion:reduce){.gwt-panel,.gwt-px{animation:none}.gwt-cell,.gwt-dot,.gwt-close,',
         '.gwt-seg button,.gwt-toast{transition:none}}'
-    ].join('');
+].join('');

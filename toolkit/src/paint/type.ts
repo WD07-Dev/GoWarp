@@ -1,3 +1,7 @@
+import { createLifecycle } from "../shared/lifecycle";
+import { createEditorAccess } from "./editor";
+import { createTheme } from "./theme";
+
 export interface PaintTools {
     openPixelEditor(): void;
     dispose(): void;
@@ -88,4 +92,22 @@ export interface AnchorServices {
     readonly openPanel: any;
     toggleFor: (anchor: any, kind: any, extraClass?: any) => PaintElement;
     labelEl: (text: any) => PaintElement;
+}
+
+export interface PaintContext {
+    document: EditorDocument;
+    window: EditorWindow;
+    editor: ReturnType<typeof createEditorAccess>;
+    lifecycle: ReturnType<typeof createLifecycle>;
+    theme: ReturnType<typeof createTheme>;
+}
+
+export interface LayerServices {
+    paintingLayer: () => any;
+    selectedPaths: () => any[];
+    commit: () => boolean;
+    eachSelected: (fn: any, live?: any) => boolean;
+    icon: (paths: any) => string;
+    paintEditorOpen: () => boolean;
+    colorSig: (color: any) => any;
 }

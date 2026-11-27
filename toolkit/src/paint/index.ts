@@ -1,16 +1,15 @@
-import {tr} from '../translate';
-import {createFolders} from '../sprites/folders';
-import {createAnchors} from './anchors';
-import {createPixelEditor} from './pixels';
-import {createLayers} from './layers';
-import {createTheme} from './theme';
-import {round, cornerPath, SHAPES, NIBS, PENS} from './shapes';
-import {createEditorAccess} from './editor';
-import {paintStyle as CSS} from './style';
-import type {ScratchHost} from '../shared/scratch';
-import type {PaintTools, EditorDocument, EditorWindow} from './type';
-import type {PaintContext} from './context';
-import {createLifecycle} from '../shared/lifecycle';
+import type { PaintTools, EditorDocument, EditorWindow, PaintContext } from './type';
+import { round, cornerPath, SHAPES, NIBS, PENS } from './shapes';
+import { createLifecycle } from '../shared/lifecycle';
+import type { ScratchHost } from '../shared/scratch';
+import { createFolders } from '../sprites/folders';
+import { createEditorAccess } from './editor';
+import { createPixelEditor } from './pixels';
+import { paintStyle as CSS } from './style';
+import { createAnchors } from './anchors';
+import { createLayers } from './layers';
+import { createTheme } from './theme';
+import { tr } from '../translate';
 
 export function installPaintTools(Scratch: ScratchHost): PaintTools {
     const document = globalThis.document as EditorDocument;
@@ -30,10 +29,10 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     var LS_KEY = 'gowarp-toolkit.paint';
     var ART_CENTER = {x: 480, y: 360};
 
-    function clamp (v, a, b) {
+    function clamp(v, a, b) {
         return Math.min(b, Math.max(a, v));
     }
-    function load (fallback) {
+    function load(fallback) {
         try {
             var raw = window.localStorage.getItem(LS_KEY);
             return raw ? Object.assign({}, fallback, JSON.parse(raw)) : fallback;
@@ -48,7 +47,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         }
     }
 
-    function findUpdateImage () {
+    function findUpdateImage() {
         var canvas = paintCanvas();
         var fiber = canvas ? fiberOf(canvas) : null;
         for (var i = 0; i < 45 && fiber; i++) {
@@ -59,18 +58,18 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         return null;
     }
 
-    function commit () {
+    function commit() {
         var fn = findUpdateImage();
         if (!fn) return false;
         fn(false);
         return true;
     }
 
-    function findLayer (flag) {
+    function findLayer(flag) {
         var p = paper();
-        if (!p) return null;
+        if(!p) return null;
         var layers = p.project.layers;
-        for (var i = 0; i < layers.length; i++) {
+        for(let i=0; i < layers.length; i++) {
             if (layers[i].data && layers[i].data[flag]) return layers[i];
         }
         return null;
@@ -84,19 +83,19 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }
     function guideLayer () {
         var p = paper();
-        if (!p) return null;
+        if(!p) return null;
         var layer = findLayer('isGuideLayer');
-        if (!layer) {
+        if(!layer) {
             layer = new p.Layer();
             layer.data = {isGuideLayer: true};
             var art = paintingLayer();
-            if (art) art.activate();
+            if(art) art.activate();
         }
         return layer;
     }
 
     var CSS_COLOR = /^(#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|rgba?\(|hsla?\(|hwb\()/i;
-    function colorOf (style) {
+    function colorOf(style) {
         var p = paper();
         var v = style && style.primary;
         if (!p || typeof v !== 'string') return null;
@@ -108,8 +107,11 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             return null;
         }
     }
-    var lastPaint = {fill: null, stroke: null};
-    function pickColor (style, key) {
+    var lastPaint = {
+        fill: null,
+        stroke: null
+    };
+    function pickColor(style, key) {
         var color = colorOf(style);
         if (color) {
             lastPaint[key] = style.primary;
@@ -117,7 +119,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         }
         return lastPaint[key] ? colorOf({primary: lastPaint[key]}) : null;
     }
-    function currentColors () {
+    function currentColors() {
         var ps = paintState();
         var color = ps && ps.color ? ps.color : {};
         return {
@@ -126,7 +128,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             strokeWidth: color.strokeWidth || 0
         };
     }
-    function applyStyle (path, useStroke) {
+    function applyStyle(path, useStroke) {
         var colors = currentColors();
         var mine = gwtPaint('fill', path.bounds, 0);
         var stroke = useStroke && colors.stroke;
@@ -137,7 +139,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         path.strokeJoin = 'round';
     }
 
-    function usable (v) {
+    function usable(v) {
         return typeof v === 'string' && CSS_COLOR.test(v.trim());
     }
     function transparentLike (p, css) {
@@ -145,7 +147,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         c.alpha = 0;
         return c.toCSS();
     }
-    function gradientColor (p, stops, type, bounds, minSize) {
+    function gradientColor(p, stops, type, bounds, minSize) {
         var list = stops.map(function (s, i) {
             var c = s[1];
             if (c === null) {
@@ -175,11 +177,11 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             destination: end
         };
     }
-    function nativeStyle (key) {
+    function nativeStyle(key) {
         var color = (paintState() || {}).color || {};
         return color[key === 'stroke' ? 'strokeColor' : 'fillColor'] || {};
     }
-    function gradType (key) {
+    function gradType(key) {
         var type = nativeStyle(key).gradientType;
         return type === 'RADIAL' || type === 'HORIZONTAL' || type === 'VERTICAL' ? type : null;
     }
@@ -293,12 +295,12 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var eraser = isEraserMode();
         if (bitmap) {
             return eraser
-                ? {type: 'scratch-paint/eraser-mode/CHANGE_BIT_ERASER_SIZE', brushSize: size}
-                : {type: 'scratch-paint/brush-mode/CHANGE_BIT_BRUSH_SIZE', brushSize: size};
+            ? {type: 'scratch-paint/eraser-mode/CHANGE_BIT_ERASER_SIZE', brushSize: size}
+            : {type: 'scratch-paint/brush-mode/CHANGE_BIT_BRUSH_SIZE', brushSize: size};
         }
         return eraser
-            ? {type: 'scratch-paint/eraser-mode/CHANGE_ERASER_SIZE', brushSize: size}
-            : {type: 'scratch-paint/brush-mode/CHANGE_BRUSH_SIZE', brushSize: size};
+        ? {type: 'scratch-paint/eraser-mode/CHANGE_ERASER_SIZE', brushSize: size}
+        : {type: 'scratch-paint/brush-mode/CHANGE_BRUSH_SIZE', brushSize: size};
     }
     function currentNibSize () {
         var ps = paintState();
@@ -374,8 +376,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             if (Math.abs(x - rect.left) > box.width + rect.width + 60) return;
             tops.forEach(function (y) {
                 if (!fits(x, y)) return;
-                cands.push({x: x, y: y, d: Math.abs(x - rect.left),
-                    hit: overlapArea(boxOf(x, y, box.width, box.height), art)});
+                cands.push({x: x, y: y, d: Math.abs(x - rect.left), hit: overlapArea(boxOf(x, y, box.width, box.height), art)});
             });
         });
         if (!cands.length) cands.push({x: xs[0], y: tops[0], d: 0, hit: 0});
