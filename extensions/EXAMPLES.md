@@ -8,8 +8,6 @@ These are the extension implementations currently available in the repository. T
 
 Each **JavaScript** link opens a complete extension file with an embedded Go implementation. Download the raw file to load it into TurboWarp, or use its raw URL. The **Go module** links point to the corresponding test implementations for reference. Example files are maintained alongside the English documentation in `extensions/examples`.
 
-Original-author credits come from the author headers in the JavaScript sources used for these ports. Where the available metadata did not establish authorship, the entry is marked “Not verified” rather than inferring an author from an extension ID. The names identify the original extension authors, not necessarily the authors of its GoWarp port.
-
 | Extension | Original authors / credited contributors | GoWarp example / implementation |
 | --- | --- | --- |
 | Window API (`gowarpWindows`) | wheedo07 | [JavaScript](examples/gowarpWindows.js) · [Go module](../test/extensions/gowarpWindows/module.go) · [SB3 demo](../test/fixtures/projects/native-windows.sb3) |
