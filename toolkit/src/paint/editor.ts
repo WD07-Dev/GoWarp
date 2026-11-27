@@ -33,20 +33,19 @@ export function createEditorAccess(window: EditorWindow) {
                 try {
                     var mod = req(id);
                     if(isPaperScope(mod)) return mod;
-                } catch (e) {
-                }
+                } catch (e) {}
             }
         }
         return null;
     }
-    function paper () {
+    function paper() {
         if(isPaperScope(paperRef)) return paperRef;
         var candidate = (window.paper && window.paper.project) ? window.paper : findPaperInBundle();
         paperRef = isPaperScope(candidate) ? candidate : null;
         return paperRef;
     }
 
-    function findStoreInTree () {
+    function findStoreInTree() {
         var canvas = paintCanvas();
         var fiber = canvas ? fiberOf(canvas) : null;
         for(let i=0; i < 60 && fiber; i++) {
@@ -58,28 +57,27 @@ export function createEditorAccess(window: EditorWindow) {
         }
         return null;
     }
-    function store () {
-        if (storeRef && typeof storeRef.getState === 'function') return storeRef;
-        var candidate = window.ReduxStore && typeof window.ReduxStore.getState === 'function'
-            ? window.ReduxStore : findStoreInTree();
+    function store() {
+        if(storeRef && typeof storeRef.getState === 'function') return storeRef;
+        var candidate = window.ReduxStore && typeof window.ReduxStore.getState === 'function' ? window.ReduxStore : findStoreInTree();
         storeRef = candidate || null;
         return storeRef;
     }
-    function paintState () {
+    function paintState() {
         var s = store();
-        if (!s) return null;
+        if(!s) return null;
         var state = s.getState();
         return state && state.scratchPaint ? state.scratchPaint : null;
     }
-    function dispatch (action: {type: string; [key: string]: unknown}) {
+    function dispatch(action: {type: string; [key: string]: unknown}) {
         var s = store();
-        if (s) s.dispatch(action);
+        if(s) s.dispatch(action);
     }
-    function isBitmapFormat () {
+    function isBitmapFormat() {
         var p = paintState();
         return !!p && /^BITMAP/.test(p.format || '');
     }
-    function isEraserMode () {
+    function isEraserMode() {
         var p = paintState();
         return !!p && /ERASER/.test(p.mode || '');
     }
