@@ -111,14 +111,26 @@ export function installExtensions(Scratch: ScratchHost): () => void {
         const controls = node('div','','em-toolbar');
         const footer = node('div','','em-footer');
         const rows: ExtensionRow[]=[];
-        function button(text: string,handler: (event: MouseEvent) => void) { const b=node('button',text); b.type='button'; b.addEventListener('click',handler); return b; }
+        function button(text: string, handler: (event: MouseEvent) => void) {
+            const b = node('button',text);
+            b.type='button';
+            b.addEventListener('click', handler);
+            return b;
+        }
         let closed=false;
-        const close=(proceed: boolean=false)=>{
-            if(closed)return; closed=true;
-            panel.close(); panel.remove(); dialog=null; dialogClose=null;
-            if(review) { if(proceed===true)review.resolve(); else review.reject(new Error(tr('extensions.cancelled'))); }
+        const close = (proceed: boolean=false) => {
+            if(closed) return;
+            closed=true;
+            panel.close();
+            panel.remove();
+            dialog=null;
+            dialogClose=null;
+            if(review) {
+                if(proceed===true) review.resolve();
+                else review.reject(new Error(tr('extensions.cancelled')));
+            }
         };
-        dialogClose=()=>close(false);
+        dialogClose = () => close(false);
         const approve = button(review ? tr('extensions.approveAndOpen') : tr('extensions.approve'), () => {
             const chosen = rows.filter((r: ExtensionRow) => r.check.checked);
             if(!chosen.length && !review) {
@@ -163,32 +175,42 @@ export function installExtensions(Scratch: ScratchHost): () => void {
         const clearButton = button(tr('extensions.clearApprovals'),()=>{clear();rows.forEach((r: ExtensionRow)=>{r.check.checked=false;r.mode.value='default';});status.textContent=tr('extensions.policyRestored');refresh();});
         footer.append(clearButton, node('span','','em-spacer'), button(review ? tr('cancel') : tr('close'), ()=> close(false)), approve);
         function refresh() {
-            const count=rows.filter((r: ExtensionRow)=>r.check.checked).length;
-            session.textContent=tr('extensions.sessionApproved', {count: approvals.size});
-            selection.textContent=tr('extensions.selected', {count, total: rows.length});
-            selectAll.disabled=!rows.length||count===rows.length;
-            selectNone.disabled=!count;
-            sandboxed.disabled=unsandboxed.disabled=!count;
-            clearButton.disabled=!approvals.size;
-            approve.disabled=!review&&!count;
-            approve.textContent=review?(count?tr('extensions.approveAndOpen'):tr('extensions.openDefault')):tr('extensions.approve');
+            const count = rows.filter((r: ExtensionRow) => r.check.checked).length;
+            session.textContent = tr('extensions.sessionApproved', {count: approvals.size});
+            selection.textContent = tr('extensions.selected', {count, total: rows.length});
+            selectAll.disabled = !rows.length||count===rows.length;
+            selectNone.disabled = !count;
+            sandboxed.disabled = unsandboxed.disabled=!count;
+            clearButton.disabled = !approvals.size;
+            approve.disabled = !review&&!count;
+            approve.textContent = review?(count?tr('extensions.approveAndOpen'):tr('extensions.openDefault')):tr('extensions.approve');
         }
-        function showProject(project: Project,name: string) {
+        function showProject(project: Project, name: string) {
             list.replaceChildren();rows.length=0;
             projectLabel.textContent=name;
             for(const [id,url] of entriesFor(project)){
-                const item=node('div','','em-item');
-                const label=node('label');
-                const check=node('input');check.type='checkbox';check.checked=approvals.has(url);check.addEventListener('change',refresh);
+                const item = node('div','','em-item');
+                const label = node('label');
+                const check = node('input');
+                check.type = 'checkbox';
+                check.checked = approvals.has(url);
+                check.addEventListener('change', refresh);
                 label.append(check,node('span',id));
-                const detail=node('div',url.startsWith('data:')?tr('extensions.embedded', {count: url.length.toLocaleString()}):url,'em-detail');
-                const select=node('select');
-                for(const [value,text] of [['default',tr('extensions.defaultPolicy')],['iframe',tr('extensions.sandboxed')],['unsandboxed',tr('extensions.unsandboxed')]]){const option=node('option',text);option.value=value;select.append(option);}
-                select.value=approvals.get(url)||'default';select.setAttribute('aria-label',tr('extensions.sandboxMode', {id}));
+                const detail = node('div', url.startsWith('data:') ? tr('extensions.embedded', {
+                    count: url.length.toLocaleString()
+                }) : url, 'em-detail');
+                const select = node('select');
+                for(const [value,text] of [['default',tr('extensions.defaultPolicy')],['iframe',tr('extensions.sandboxed')],['unsandboxed',tr('extensions.unsandboxed')]]) {
+                    const option = node('option',text);
+                    option.value = value;
+                    select.append(option);
+                }
+                select.value = approvals.get(url) || 'default';
+                select.setAttribute('aria-label',tr('extensions.sandboxMode', {id}));
                 item.append(label,select,detail);list.append(item);rows.push({check,mode:select,url});
             }
-            if(!rows.length)list.append(node('div',tr('extensions.empty'),'em-empty'));
-            status.textContent=review?tr('extensions.unselectedPolicy'):tr('extensions.futureLoads');
+            if(!rows.length) list.append(node('div',tr('extensions.empty'),'em-empty'));
+            status.textContent= review ? tr('extensions.unselectedPolicy') : tr('extensions.futureLoads');
             refresh();
         }
         function showCurrentProject() {
@@ -203,14 +225,17 @@ export function installExtensions(Scratch: ScratchHost): () => void {
         }
         panel.append(header,help,warning,summary,controls,list,status,footer);
         document.body.append(panel);dialog=panel;
-        panel.addEventListener('cancel',(e: Event)=>{e.preventDefault();close(false);});
-        panel.addEventListener('close',()=>close(false));
+        panel.addEventListener('cancel', (e: Event) => {
+            e.preventDefault();
+            close(false);
+        });
+        panel.addEventListener('close', () => close(false));
         if(review)showProject(review.project,tr('extensions.incomingProject'));
         else showCurrentProject();
         panel.showModal();
         (rows[0]?.check||approve).focus();
     }
-    const extensionLoad = async function (this: typeof vm, extensionIDs: Iterable<string>, extensionURLs: Map<string, string> = new Map(), ...args: unknown[]) {
+    const extensionLoad = async function(this: typeof vm, extensionIDs: Iterable<string>, extensionURLs: Map<string, string> = new Map(), ...args: unknown[]) {
         const urls: Record<string, string> = Object.create(null);
         const manager = this.extensionManager;
         if(extensionIDs && typeof extensionIDs[Symbol.iterator] === 'function' && typeof extensionURLs?.get === 'function') {
@@ -243,10 +268,12 @@ export function installExtensions(Scratch: ScratchHost): () => void {
         if(document.getElementById('gowarp-toolkit-button'))return;
         const bar=document.querySelector('[class*="menu-bar_main-menu"]')||document.querySelector('[class*="menu-bar_menu-bar_"]');
         if(!bar)return;
-        const launcher=node('button',tr('toolkitName'));
-        launcher.id='gowarp-toolkit-button';launcher.type='button';
-        launcher.title=tr('extensions.launcherHint');
-        launcher.addEventListener('click',()=>open());bar.appendChild(launcher);
+        const launcher = node('button',tr('toolkitName'));
+        launcher.id = 'gowarp-toolkit-button';
+        launcher.type = 'button';
+        launcher.title = tr('extensions.launcherHint');
+        launcher.addEventListener('click', () => open());
+        bar.appendChild(launcher);
     }
     const observer = new MutationObserver(attachButton);
     observer.observe(document.body,{childList:true,subtree:true});attachButton();
