@@ -5,7 +5,7 @@ export function createEditorAccess(document: EditorDocument, window: EditorWindo
     var storeRef = null;
 
     function isPaperScope(candidate: any) {
-        if (!candidate || typeof candidate.setup !== 'function') return false;
+        if(!candidate || typeof candidate.setup !== 'function') return false;
         var project = candidate.project;
         return !!(project && project.view && project.layers && project.layers.length);
     }
@@ -17,7 +17,9 @@ export function createEditorAccess(document: EditorDocument, window: EditorWindo
             var req = null;
             try {
                 chunk.push([[Date.now()], {}, function (r: any) { req = r; }]);
-            } catch (e) { continue; }
+            } catch (e) {
+                continue;
+            }
             if(!req || !req.m) continue;
             for(var id in req.m) {
                 if(!Object.prototype.hasOwnProperty.call(req.m, id)) continue;
@@ -30,7 +32,7 @@ export function createEditorAccess(document: EditorDocument, window: EditorWindo
                 if(src.indexOf('PaperScope') < 0) continue;
                 try {
                     var mod = req(id);
-                    if (isPaperScope(mod)) return mod;
+                    if(isPaperScope(mod)) return mod;
                 } catch (e) {
                 }
             }
@@ -38,7 +40,7 @@ export function createEditorAccess(document: EditorDocument, window: EditorWindo
         return null;
     }
     function paper () {
-        if (isPaperScope(paperRef)) return paperRef;
+        if(isPaperScope(paperRef)) return paperRef;
         var candidate = (window.paper && window.paper.project) ? window.paper : findPaperInBundle();
         paperRef = isPaperScope(candidate) ? candidate : null;
         return paperRef;
