@@ -1,4 +1,20 @@
 export const paintStyle = [
+        '.gwt-animation{width:22rem;max-width:calc(100vw - 2rem);box-sizing:border-box}',
+        '.gwt-animation h3{margin:.2rem 1.5rem .6rem 0;font-size:.9rem}',
+        '.gwt-animation-preview{display:block;width:100%;aspect-ratio:8/5;background-color:var(--gwt-field);background-image:conic-gradient(#80808025 25%,transparent 0 50%,#80808025 0 75%,transparent 0);background-size:16px 16px;border:1px solid var(--gwt-field-border);box-sizing:border-box}',
+        '.gwt-animation-status{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:.4rem 0;min-height:1.2em}',
+        '.gwt-animation-controls{display:flex;gap:.35rem}',
+        '.gwt-animation-controls button{flex:1;padding:.4rem;border-radius:.25rem;border:1px solid var(--gwt-field-border);color:var(--gwt-text);background:var(--gwt-field);cursor:pointer}',
+        '.gwt-animation-controls button[aria-pressed]{background:var(--gwt-accent);color:white}',
+        '.gwt-animation-range{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin:.65rem 0}',
+        '.gwt-animation-range input{display:block;box-sizing:border-box;width:100%;padding:.35rem;margin-top:.2rem;background:var(--gwt-field);color:var(--gwt-text);border:1px solid var(--gwt-field-border);border-radius:.25rem}',
+        '.gwt-animation fieldset{margin:0;padding:.5rem;border:1px solid var(--gwt-field-border);border-radius:.25rem}',
+        '.gwt-animation fieldset label{display:flex;align-items:center;gap:.35rem;margin:.25rem 0}',
+        '.gwt-animation fieldset input{accent-color:var(--gwt-accent)}',
+        '.gwt-animation-alpha input{flex:1;min-width:0}.gwt-animation-alpha output{min-width:3em;text-align:right}',
+        '.gwt-animation-hint{margin:.5rem 0 0;opacity:.7;font-size:.7rem}',
+        '.gwt-onion-overlay{position:fixed;pointer-events:none;z-index:1}',
+
         // tool buttons live inside the editor's own tool row and inherit its box, radius, icon filter
         // and press tint; only the icon geometry is ours
         '.gwt-tool img.gwt-icon{width:2rem;height:2rem;display:block;flex-grow:1;vertical-align:middle}',

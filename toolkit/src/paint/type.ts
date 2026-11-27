@@ -107,3 +107,29 @@ export interface AnchorMeasurement extends AlphaStats {
     name: string;
     pivot: number[];
 }
+
+export interface CostumeFrame {
+    name?: string;
+    dataFormat?: string;
+    bitmapResolution?: number;
+    rotationCenterX?: number;
+    rotationCenterY?: number;
+    asset?: {
+        encodeDataURI(): string
+    };
+}
+
+export interface AnimationServices {
+    target: () => any;
+    stageSize: () => {
+        width: number;
+        height: number
+    };
+    toggleFor: (anchor: PaintElement, kind: string, extraClass?: string) => PaintElement;
+}
+
+export interface LoadedFrame {
+    image: HTMLImageElement;
+    state: 'loading' | 'ready' | 'error';
+    id: number;
+}

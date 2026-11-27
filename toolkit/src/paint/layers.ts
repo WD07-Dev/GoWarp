@@ -84,7 +84,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
                 }
             });
         }else if(dir === 'backward') {
-            for (var i = items.length - 1; i >= 0; i--) {
+            for(var i = items.length - 1; i >= 0; i--) {
                 var it = items[i];
                 var idx = list.indexOf(it);
                 if(idx >= 0 && idx < list.length - 1) {
@@ -241,7 +241,9 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         if(!css) {
             try {
                 css = color && color.toCSS ? color.toCSS() : '';
-            } catch (e) { css = ''; }
+            } catch (e) {
+                css = '';
+            }
         }
         return css;
     }
@@ -325,8 +327,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
             ['dup', 'duplicate', OBJ_GLYPH.dup, duplicateObjects],
             ['del', 'Delete', OBJ_GLYPH.del, deleteObjects]
         ] as const).forEach(function (row: readonly [string, string, string, () => void]) {
-            var b = createIconButton(document, 'gwt-mini', row[0] === 'del'
-                ? tr('delete') : tr(row[1]), icon(row[2]));
+            var b = createIconButton(document, 'gwt-mini', row[0] === 'del' ? tr('delete') : tr(row[1]), icon(row[2]));
             b.dataset.order = String(row[0]);
             listen(b, 'click', function () {
                 row[3]();
@@ -354,9 +355,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         rail.appendChild(railRow(aligns));
 
         var last = [];
-        ([
-            [-90, 'rotateLeft', OBJ_GLYPH.rotL], [90, 'rotateRight', OBJ_GLYPH.rotR]
-        ] as const).forEach(function (row: readonly [number, string, string]) {
+        ([[-90, 'rotateLeft', OBJ_GLYPH.rotL], [90, 'rotateRight', OBJ_GLYPH.rotR]] as const).forEach(function (row: readonly [number, string, string]) {
             var b = createIconButton(document, 'gwt-mini', tr(row[1]), icon(row[2]));
             b.dataset.rotate = String(row[0]);
             listen(b, 'click', function () {

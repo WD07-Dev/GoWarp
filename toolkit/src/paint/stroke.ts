@@ -24,5 +24,8 @@ export function preparePenStroke(path: any): {path: any; previous: any} {
         return {path: clean, previous: null};
     }
     clean.remove();
-    return {path: merged, previous};
+    return {
+        path: merged,
+        previous
+    };
 }

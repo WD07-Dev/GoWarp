@@ -3,13 +3,14 @@ import { round, cornerPath, SHAPES, NIBS, PENS } from './shapes';
 import { createIconButton, isTextInput } from '../shared/dom';
 import { createLifecycle } from '../shared/lifecycle';
 import type { ScratchHost } from '../shared/scratch';
+import { createAnimationTools } from './animation';
 import { createFolders } from '../sprites/folders';
 import { createEditorAccess } from './editor';
+import { preparePenStroke } from './stroke';
 import { paintStyle as CSS } from './style';
 import { createAnchors } from './anchors';
 import { createLayers } from './layers';
 import { createTheme } from './theme';
-import { preparePenStroke } from './stroke';
 import { tr } from '../translate';
 
 export function installPaintTools(Scratch: ScratchHost): PaintTools {
@@ -438,9 +439,9 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     var SHAPE_TOOL_ICON = lineIcon('<path d="M6.6 8 11.6 16.2H1.6z"/><circle cx="14.2" cy="6.2" r="3.9"/>');
     var PEN_TOOL_ICON = lineIcon('<path d="M10 2.4c2.7 3 4 5.4 4 7.6a4 4 0 0 1-8 0c0-2.2 1.3-4.6 4-7.6z"/>' + '<path d="M10 7.6v3.4"/><circle cx="10" cy="13.6" r=".9" fill="' + ICON_FILL + '" stroke="none"/>');
     var FX_TOOL_ICON = lineIcon('<circle cx="7.8" cy="10" r="4.9"/><circle cx="12.2" cy="10" r="4.9"/>');
-    var ANCHOR_TOOL_ICON = lineIcon('<circle cx="10" cy="10" r="3.5"/>' +
-    '<path d="M10 1.9v2.8M10 15.3v2.8M1.9 10h2.8M15.3 10h2.8"/>' + '<circle cx="10" cy="10" r=".95" fill="' + ICON_FILL + '" stroke="none"/>');
-    var TOOL_ICON = {shapes: SHAPE_TOOL_ICON, pen: PEN_TOOL_ICON, fx: FX_TOOL_ICON, anchor: ANCHOR_TOOL_ICON};
+    var ANCHOR_TOOL_ICON = lineIcon('<circle cx="10" cy="10" r="3.5"/>' + '<path d="M10 1.9v2.8M10 15.3v2.8M1.9 10h2.8M15.3 10h2.8"/>' + '<circle cx="10" cy="10" r=".95" fill="' + ICON_FILL + '" stroke="none"/>');
+    var ANIMATION_TOOL_ICON = lineIcon('<rect x="2" y="3" width="16" height="14" rx="2"/><path d="m8 7 6 3-6 3z"/>');
+    var TOOL_ICON = {shapes: SHAPE_TOOL_ICON, pen: PEN_TOOL_ICON, fx: FX_TOOL_ICON, anchor: ANCHOR_TOOL_ICON, animation: ANIMATION_TOOL_ICON};
 
     function icon (paths: string) {
         return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" ' +
@@ -1746,7 +1747,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     function syncToolButtons() {
         var grid = document.querySelector('[class*="paint-editor_mode-selector"]');
         toolButtons = toolButtons.filter(function (b: HTMLElement) { return b.isConnected; });
-        ['shapes', 'pen', 'fx', 'anchor'].forEach(function (key: string) {
+        ['shapes', 'pen', 'fx', 'anchor', 'animation'].forEach(function (key: string) {
             var btn = toolButton(key);
             if(btn || !grid) return;
             addToolButton(grid, key, TOOL_ICON[key], function () {
@@ -1755,6 +1756,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
                 if(key === 'shapes') showShapePanel(self);
                 else if(key === 'pen') showPenPanel(self);
                 else if(key === 'anchor') showAnchorPanel(self);
+                else if(key === 'animation') animation.showPanel(self);
                 else showFxPanel(self);
             });
         });
@@ -1851,6 +1853,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         try {
             ensureStyle();
             sfSync();
+            animation.sync();
             if (!paintEditorOpen()) {
                 closePanel();
                 pen.deactivate();
@@ -1871,8 +1874,8 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             }else if(openPanel && !openAnchor.isConnected) {
                 closePanel();
             }
-            if (openPanel && openPanel._gwtKind === 'fx') markFx();
-            else if (openPanel && openPanel._gwtKind === 'anchor') markAnchor();
+            if(openPanel && openPanel._gwtKind === 'fx') markFx();
+            else if(openPanel && openPanel._gwtKind === 'anchor') markAnchor();
         } catch (e) {
             if(window.console) window.console.warn('GoWarp Toolkit:', e);
         }
@@ -1880,8 +1883,8 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
     var styleInjected = false;
     function ensureStyle() {
-        if (styleInjected || !document.head) return;
-        if (window.CSSStyleSheet && CSSStyleSheet.prototype.replaceSync && document.adoptedStyleSheets !== undefined) {
+        if(styleInjected || !document.head) return;
+        if(window.CSSStyleSheet && CSSStyleSheet.prototype.replaceSync && document.adoptedStyleSheets !== undefined) {
             try {
                 sheet = new CSSStyleSheet();
                 sheet.replaceSync(CSS);
@@ -1922,6 +1925,11 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         labelEl
     });
     const { showAnchorPanel, applyAnchor, markAnchor, anchorState } = anchors;
+    const animation = createAnimationTools(context, {
+        target: anchorTarget,
+        stageSize: () => ({width: Scratch.vm.runtime.stageWidth || 480, height: Scratch.vm.runtime.stageHeight || 360}),
+        toggleFor
+    });
     const folders = createFolders(context, {
         findVM,
         ensureStyle
@@ -1945,6 +1953,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             if(disposed) return;
             disposed = true;
             lifecycle.dispose();
+            animation.dispose();
             unsubscribe?.();
             if(editor.storeRef) delete editor.storeRef.__gwtWatch;
             delete document.__gwtGrad;
