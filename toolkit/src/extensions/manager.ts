@@ -1,5 +1,5 @@
-import type { ScratchHost } from '../shared/scratch';
 import { Project, Review, ExtensionRow } from './type';
+import type { ScratchHost } from '../shared/scratch';
 import { tr } from '../translate';
 
 export function installExtensions(Scratch: ScratchHost): () => void {

@@ -1,4 +1,4 @@
-import type {EditorDocument, EditorWindow, PaintElement, RGBA} from './type';
+import type { EditorDocument, EditorWindow, PaintElement, RGBA } from './type';
 
 export function createTheme(document: EditorDocument, window: EditorWindow) {
     function parseColor(input: string) {

@@ -1,4 +1,4 @@
-import type {Shape} from './type';
+import type { Shape } from './type';
 
 export function round(v: number) {
     return Math.round(v * 1000) / 1000;

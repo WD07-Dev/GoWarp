@@ -1,5 +1,7 @@
 export function createIconButton(
-    document: {createElement(tag: 'button'): HTMLElement},
+    document: {
+        createElement(tag: 'button'): HTMLElement
+    },
     className: string,
     title: string,
     html: string
