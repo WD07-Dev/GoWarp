@@ -86,7 +86,6 @@ func (m *windowManager) startDrag(id string) error {
 			err = fmt.Errorf("unknown native window %q", id)
 			return
 		}
-		// The native move loop must start after this task releases its caller.
 		if win.PostMessage(win.HWND(w.handle), win.WM_APP+2, 0, 0) == 0 {
 			err = fmt.Errorf("could not start dragging window %q", id)
 		}
@@ -392,7 +391,6 @@ func windowBounds(v window.View, dpi uint32) (win.RECT, error) {
 	return bounds, nil
 }
 
-// monitorInfo uses physical pixels on the per-monitor DPI-aware window thread.
 func monitorInfo(v window.View, w *nativeWindow) (win.MONITORINFO, error) {
 	var monitor uintptr
 	if w != nil {
@@ -703,7 +701,6 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 		}
 		for id, w := range m.items {
 			if !active[id] {
-				// Keep the previous coverage until the replacement frame is composed.
 				m.retired[w.handle] = m.revision.Load()
 				delete(m.items, id)
 			}
@@ -712,7 +709,6 @@ func (m *windowManager) setViews(views []window.View) ([]uintptr, []window.View,
 	return handles, actual, result
 }
 
-// Apply frame changes with their bounds, after the replacement image is ready.
 func (w *nativeWindow) applyFrame() error {
 	v := w.view
 	hwnd := win.HWND(w.handle)
@@ -831,10 +827,6 @@ func (m *windowManager) presented(revision uint64, flush func() error) (bool, er
 	return applied, result
 }
 
-/*
-updateGeometry runs on the window thread. The backend receives immutable snapshots
-and updates resized tiles with the next frame.
-*/
 func (m *windowManager) updateGeometry(w *nativeWindow) {
 	if w.pendingBounds || win.IsIconic(win.HWND(w.handle)) {
 		return
@@ -849,10 +841,6 @@ func (m *windowManager) updateGeometry(w *nativeWindow) {
 }
 
 func (m *windowManager) destroyRetiredWindows(active map[uintptr]*output, revision uint64) {
-	/*
-		GPU resources must be released first. Copy the active handles so the
-		window thread never reads the render thread's map.
-	*/
 	keep := make(map[uintptr]bool, len(active))
 	for hwnd := range active {
 		keep[hwnd] = true

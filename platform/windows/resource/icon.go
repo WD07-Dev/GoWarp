@@ -12,10 +12,6 @@ import (
 	"gowarp/app/assets"
 )
 
-/*
-Windows resources use a type/name/language directory tree. All offsets in
-directories are relative to the resource root; data entries contain RVAs.
-*/
 func iconResources(icon []byte, rva uint32) ([]byte, error) {
 	images, err := assets.IconImages(icon)
 	if err != nil {
@@ -83,10 +79,6 @@ func iconResources(icon []byte, rva uint32) ([]byte, error) {
 	return data, nil
 }
 
-/*
-AddWindowsIcon patches an unsigned, resource-free Windows executable.
-Existing sections and their file/RVA offsets stay unchanged.
-*/
 func AddWindowsIcon(file *os.File, icon []byte) error {
 	binaryFile, err := pe.NewFile(file)
 	if err != nil {

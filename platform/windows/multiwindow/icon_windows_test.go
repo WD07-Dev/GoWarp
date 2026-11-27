@@ -39,8 +39,6 @@ func TestPreparedSourceIconsReachExistingAndNewWindows(t *testing.T) {
 			user32.NewProc("SendMessageW").Call(sourceWindow, 0x80, kind, source)
 		}
 	})
-	// Ebitengine applies its queued icon after the first Update. The next
-	// Prepare must copy it even though rendering was already prepared.
 	b := &Backend{manager: m, prepared: true, sourceWindow: sourceWindow}
 	if err := b.Prepare(); err != nil {
 		t.Fatal(err)

@@ -1,8 +1,7 @@
 package native
 
 const (
-	HasDrives = true
-	// DirectX tests an occluded swap chain before presenting the next Draw.
+	HasDrives         = true
 	FocusRestoreDraws = 2
 	ClipboardUsesMeta = false
 )

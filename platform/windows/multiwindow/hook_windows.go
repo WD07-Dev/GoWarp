@@ -105,8 +105,6 @@ func (b *bridge) capture(desc *[2]uint32, result **comObject) {
 	if !b.armed.Load() || b.source.Load() != nil || b.err() != nil || desc == nil || result == nil {
 		return
 	}
-	// Both swap-chain descriptors begin with Width and Height. Ebitengine's
-	// 1x1 composition capability probe is deliberately excluded.
 	if desc[0] <= 1 && desc[1] <= 1 {
 		return
 	}
@@ -143,7 +141,6 @@ func (b *bridge) onPresent(swap *comObject, interval, flags uintptr) uintptr {
 		b.fail(b.copyFrame(swap))
 		b.presents.Add(1)
 	}
-	// Preserve the source result, including occlusion and device loss.
 	hr, _, _ := syscall.SyscallN(b.present.original, uintptr(unsafe.Pointer(swap)), interval, flags)
 	return hr
 }
@@ -181,8 +178,6 @@ func (b *bridge) syncOutputs(source *comObject, f *frame) error {
 				return err
 			}
 		}
-		// Keep capacity when shrinking: the old pixels cover the old HWND until
-		// its geometry changes, and repeated split/join cycles reuse the buffer.
 		if o.swap == nil || tile.Dx() > o.capacity.X || tile.Dy() > o.capacity.Y {
 			o.nextSize = image.Pt(max(tile.Dx(), o.capacity.X), max(tile.Dy(), o.capacity.Y))
 			desc := swapDesc{Width: uint32(o.nextSize.X), Height: uint32(o.nextSize.Y), Format: 87, SampleCount: 1, Usage: 0x20, BufferCount: 2, SwapEffect: 3, AlphaMode: 1}
@@ -261,7 +256,6 @@ func (b *bridge) copyFrame(source *comObject) error {
 	if !transition {
 		return nil
 	}
-	// Only structural changes wait for composition; normal frames do not.
 	if err := hresult("Commit prepared outputs", call(b.composition, 3)); err != nil {
 		return err
 	}
@@ -312,7 +306,6 @@ func (b *bridge) copyFrame(source *comObject) error {
 }
 
 func (b *bridge) close() error {
-	// RunGame has returned, so no source Present is executing during teardown.
 	err := errors.Join(b.present.restore(), b.createComposition.restore(), b.create.restore())
 	for _, o := range b.outputs {
 		if o.target != nil {
