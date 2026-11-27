@@ -12,7 +12,7 @@ Original-author credits come from the author headers in the JavaScript sources u
 
 | Extension | Original authors / credited contributors | GoWarp example / implementation |
 | --- | --- | --- |
-| Window API (`gowarpWindows`) | wheedo07 | [JavaScript](examples/gowarpWindows.js) · [Go module](../test/extensions/gowarpWindows/module.go) · [Usage](WINDOWS.md) · [SB3 demo](../test/fixtures/projects/native-windows.sb3) |
+| Window API (`gowarpWindows`) | wheedo07 | [JavaScript](examples/gowarpWindows.js) · [Go module](../test/extensions/gowarpWindows/module.go) · [SB3 demo](../test/fixtures/projects/native-windows.sb3) |
 | Delta Time (`dtbyxeroname`) | [XeroName](https://scratch.mit.edu/users/plant2014/) | [JavaScript](examples/Deltatime.js) · [Go module](../test/extensions/dtbyxeroname/module.go) |
 | Camera V1 (Buggy) (`DTcameracontrols`) | DT | [JavaScript](examples/DTcameracontrols.js) · [Go module](../test/extensions/DTcameracontrols/module.go) |
 | Shaded (`OACShaded`) | [ObviousAlexC](https://scratch.mit.edu/users/pinksheep2917/) | [JavaScript](examples/OACShaded.js) · [Go module](../test/extensions/OACShaded/module.go) |
