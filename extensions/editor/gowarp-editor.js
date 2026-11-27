@@ -79,7 +79,6 @@
         if (!project.extensions.includes("gowarpEditor")) project.extensions.push("gowarpEditor");
         project.extensionURLs ||= {};
         project.extensionURLs.gowarpEditor = url;
-        // TurboWarp reloads extensions referenced by monitors, even hidden ones.
         project.monitors ||= [];
         if (!project.monitors.some(m => m.opcode === "gowarpEditor_installed")) {
             project.monitors.push({
@@ -313,7 +312,6 @@
             const blocks = target.blocks || {};
             for (const block of Object.values(blocks)) {
                 if (Array.isArray(block)) {
-                    // Serialized standalone variable/list reporters carry workspace coordinates.
                     if (block[0] === 12 || block[0] === 13) block.length = 3;
                 }else {
                     delete block.x;
@@ -758,12 +756,12 @@
     }
     
     function greenFlag() {
-        if (!connection) return originalFlag.call(this);
+        if (!connection || phase === "ready" || phase === "error") return originalFlag.call(this);
         run();
     }
     
     function stopScripts() {
-        if (!connection) return originalStop.call(this);
+        if (!connection || phase === "ready" || phase === "error") return originalStop.call(this);
         if (phase === "running") send({action: "stop"});
         else if (busy) stop();
     }
