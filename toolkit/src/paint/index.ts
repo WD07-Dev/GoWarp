@@ -1002,8 +1002,11 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         });
         g.offsets = rows.map(function (row: { p: number; i: number; extra: number; }) { return row.p; });
         g.extras = extras;
-        for (var i = 0; i < rows.length; i++) {
-            if (rows[i].i === dragged) { gradPick = i; break; }
+        for(let i=0; i < rows.length; i++) {
+            if(rows[i].i === dragged) {
+                gradPick = i;
+                break;
+            }
         }
     }
 
@@ -1014,11 +1017,10 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         for (var i = 1; i < g.count - 1; i++) middles.push({p: g.offsets[i], c: g.extras[i - 1]});
         if (n > g.count) {
             while (middles.length < n - 2) {
-                var all = [g.offsets[0]].concat(middles.map(function (m: {p: number; c: string}) { return m.p; }),
-                    [g.offsets[g.count - 1]]);
+                var all = [g.offsets[0]].concat(middles.map(function (m: {p: number; c: string}) { return m.p; }), [g.offsets[g.count - 1]]);
                 var at = 0, gap = -1;
-                for (i = 0; i < all.length - 1; i++) {
-                    if (all[i + 1] - all[i] > gap) { gap = all[i + 1] - all[i]; at = i; }
+                for (i=0; i < all.length - 1; i++) {
+                    if(all[i + 1] - all[i] > gap) { gap = all[i + 1] - all[i]; at = i; }
                 }
                 middles.push({p: all[at] + gap / 2, c: '#8899aa'});
             }
@@ -1047,12 +1049,12 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var rect = bar.getBoundingClientRect();
         gradPick = i;
         paintGradStrip();
-        var move = function (ev: PointerEvent) {
+        var move = function(ev: PointerEvent) {
             g.offsets[i] = clamp((ev.clientX - rect.left) / rect.width, 0, 1);
             thumb.style.left = (g.offsets[i] * 100) + '%';
             bar.style.background = gradBarCss();
         };
-        var up = function () {
+        var up = function() {
             document.removeEventListener('pointermove', move);
             document.removeEventListener('pointerup', up);
             orderOffsets(i);
@@ -1069,7 +1071,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var g = settings.grad;
         var bar = gradStrip.bar;
         bar.textContent = '';
-        for (var i = 0; i < g.count; i++) {
+        for(let i=0; i < g.count; i++) {
             var b = document.createElement('b');
             b.dataset.i = String(i);
             b.setAttribute('role', 'slider');
@@ -1080,7 +1082,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }
 
     function paintGradStrip () {
-        if (!gradStrip || !gradStrip.el.isConnected) return;
+        if(!gradStrip || !gradStrip.el.isConnected) return;
         var g = settings.grad;
         gradStrip.bar.style.background = gradBarCss();
         Array.prototype.forEach.call(gradStrip.bar.childNodes, function (b: HTMLElement, i: number) {
@@ -1133,7 +1135,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         apply.className = 'gwt-gapply';
         apply.textContent = tr('apply');
         listen(apply, 'click', function () {
-            if (applyGradientToSelection()) paintGradStrip();
+            if(applyGradientToSelection()) paintGradStrip();
         });
         foot.appendChild(counts);
         foot.appendChild(well);
@@ -1142,17 +1144,24 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
         var row = body.querySelector('[class*="color-picker_gradient-picker-row"]');
         row.parentNode.insertBefore(wrap, row.nextSibling);
-        gradStrip = {el: wrap, body: body, bar: bar, counts: counts, well: well, apply: apply};
+        gradStrip = {
+            el: wrap,
+            body: body,
+            bar: bar,
+            counts: counts,
+            well: well,
+            apply: apply
+        };
         buildThumbs();
     }
 
     function syncGradStrip () {
         var body = pickerBody();
-        if (!body) {
+        if(!body) {
             gradStrip = null;
             return;
         }
-        if (gradStrip && gradStrip.el.isConnected && gradStrip.body === body) {
+        if(gradStrip && gradStrip.el.isConnected && gradStrip.body === body) {
             paintGradStrip();
             return;
         }
@@ -1163,27 +1172,27 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }
 
     function dropGradStrip () {
-        if (gradStrip && gradStrip.el.isConnected) gradStrip.el.remove();
+        if(gradStrip && gradStrip.el.isConnected) gradStrip.el.remove();
         gradStrip = null;
     }
 
     function watchColorTarget () {
         if (document.__gwtGrad) return;
         document.__gwtGrad = true;
-        listen(document, 'pointerdown', function (e: PointerEvent) {
+        listen(document, 'pointerdown', function(e: PointerEvent) {
             var t = e.target as Element;
-            if (!t || !t.closest) return;
-            if (t.closest('[class*="color-button_outline-swatch"]')) gradTarget = 'stroke';
-            else if (t.closest('[class*="color-button_color-button-swatch"]')) gradTarget = 'fill';
+            if(!t || !t.closest) return;
+            if(t.closest('[class*="color-button_outline-swatch"]')) gradTarget = 'stroke';
+            else if(t.closest('[class*="color-button_color-button-swatch"]')) gradTarget = 'fill';
             else return;
             gradPick = 0;
             later(syncGradStrip, 60);
         }, true);
     }
 
-    function showFxPanel (anchor: PaintElement) {
+    function showFxPanel(anchor: PaintElement) {
         var panel = toggleFor(anchor, 'fx', 'gwt-fxbox');
-        if (!panel) return;
+        if(!panel) return;
 
         panel.appendChild(labelEl(tr('mask')));
         var masks = document.createElement('div');
@@ -1216,8 +1225,8 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var row = document.createElement('div');
         row.className = 'gwt-row';
         row.innerHTML = '<span class="gwt-tag">' + tr('joint') + '</span>' +
-            '<i class="gwt-demo gwt-corner"><svg viewBox="0 0 30 24" aria-hidden="true">' +
-            '<path d="M3 21 15 3 27 21"/></svg></i>';
+        '<i class="gwt-demo gwt-corner"><svg viewBox="0 0 30 24" aria-hidden="true">' +
+        '<path d="M3 21 15 3 27 21"/></svg></i>';
         var corner = row.querySelector('path');
         var slider = document.createElement('input');
         slider.type = 'range';
@@ -1268,8 +1277,8 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         markFx();
     }
 
-    function markFx () {
-        if (!openPanel || openPanel._gwtKind !== 'fx') return;
+    function markFx() {
+        if(!openPanel || openPanel._gwtKind !== 'fx') return;
         var some = selectedPaths().length > 0;
         var blend = blendOfSelection();
         var masked = isMasked();
@@ -1292,11 +1301,11 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             b.title = art ? tr('png') + ' ' + b.dataset.scale + '×' : tr('empty');
         });
         var slider = openPanel.querySelector('.gwt-row input[type=range]');
-        if (slider && document.activeElement !== slider) {
+        if(slider && document.activeElement !== slider) {
             slider.value = miterOfSelection();
             slider.nextSibling.textContent = Number(slider.value).toFixed(1);
             var corner = openPanel.querySelector('.gwt-corner path');
-            if (corner) corner.setAttribute('stroke-miterlimit', slider.value);
+            if(corner) corner.setAttribute('stroke-miterlimit', slider.value);
         }
         Array.prototype.forEach.call(openPanel.querySelectorAll('[data-blend], [data-mask]'), function (b: HTMLButtonElement) {
             var ready = some && (b.dataset.mask !== 'on' || maskable);
@@ -1306,22 +1315,22 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         });
     }
 
-    function refreshPanels () {
-        if (openPanel && document.contains(openPanel._gwtAnchor)) fitPanel(openPanel);
-        if (openPanel && openPanel._gwtKind === 'fx') later(markFx, 0);
-        if (layers.railEl) later(markObjects, 0);
+    function refreshPanels() {
+        if(openPanel && document.contains(openPanel._gwtAnchor)) fitPanel(openPanel);
+        if(openPanel && openPanel._gwtKind === 'fx') later(markFx, 0);
+        if(layers.railEl) later(markObjects, 0);
     }
 
-    function showShapePanel (anchor: PaintElement) {
+    function showShapePanel(anchor: PaintElement) {
         var panel = toggleFor(anchor, 'shape', 'gwt-wide');
-        if (!panel) return;
+        if(!panel) return;
 
         panel.appendChild(sliderRow(GLYPH.size, 40, 400, 4, 'shapeSize', refreshPreview));
         panel.appendChild(sliderRow(GLYPH.round, 0, 40, 1, 'shapeRound', refreshPreview));
 
         var grid = document.createElement('div');
         grid.className = 'gwt-grid';
-        SHAPES.forEach(function (shape: Shape) {
+        SHAPES.forEach(function(shape: Shape) {
             var b = createIconButton(document, 'gwt-cell', tr(shape.nameKey), shapeIcon(shape));
             b.dataset.shape = String(shape.id);
             listen(b, 'click', function () {
@@ -1344,12 +1353,12 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }
 
     function refreshNibUi () {
-        if (!openPanel) return;
+        if(!openPanel) return;
         var cells = openPanel.querySelectorAll('.gwt-nib');
-        if (!cells.length) return;
+        if(!cells.length) return;
         var size = currentNibSize();
         var eraser = isEraserMode();
-        for (var i = 0; i < cells.length; i++) {
+        for(let i=0; i < cells.length; i++) {
             var on = Number(cells[i].dataset.size) === size;
             cells[i].classList.toggle('gwt-on', on);
             var mark = cells[i].firstChild;
@@ -1359,7 +1368,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             mark.style.height = px + 'px';
         }
         var slider = openPanel.querySelector('.gwt-nib-slider');
-        if (slider && document.activeElement !== slider) {
+        if(slider && document.activeElement !== slider) {
             slider.value = size;
             slider.nextSibling.textContent = size;
         }
@@ -1367,11 +1376,11 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
     function showNibPanel (anchor: PaintElement) {
         var panel = toggleFor(anchor, 'nib');
-        if (!panel) return;
+        if(!panel) return;
 
         var grid = document.createElement('div');
         grid.className = 'gwt-grid gwt-nibs';
-        NIBS.forEach(function (nib: typeof NIBS[number]) {
+        NIBS.forEach(function(nib: typeof NIBS[number]) {
             var b = createIconButton(document, 'gwt-cell', tr(nib.nameKey) + ' · ' + nib.size, '');
             b.className = 'gwt-cell gwt-nib';
             b.dataset.size = String(nib.size);
@@ -1401,7 +1410,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         input.setAttribute('aria-label', tr('size'));
         var out = document.createElement('output');
         out.textContent = currentNibSize();
-        listen(input, 'input', function () {
+        listen(input, 'input', function() {
             out.textContent = input.value;
             applyNib(Number(input.value));
         });
@@ -1423,7 +1432,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         activate: function (profile: typeof PENS[number]) {
             this.deactivate();
             shaper.disarm();
-            if (!paper()) return;
+            if(!paper()) return;
             this.active = true;
             this.profile = profile;
             this.armedInMode = (paintState() || {}).mode;
@@ -1434,7 +1443,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         deactivate: function () {
             document.removeEventListener('pointerdown', this.onDown, true);
             markArmed(this.button, false);
-            if (!this.active) return;
+            if(!this.active) return;
             this.active = false;
             this.endStroke();
             this.clearPreview();
@@ -1442,7 +1451,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             refreshToolLabels();
         },
         clearPreview: function () {
-            if (this.preview) {
+            if(this.preview) {
                 this.preview.remove();
                 this.preview = null;
             }
@@ -1452,7 +1461,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             var base = settings.penSize;
             var pr = settings.penPressure ? clamp(pressure, 0.05, 1) : 0.6;
             var width = base * (prof.min + (1 - prof.min) * Math.pow(pr, prof.exponent));
-            if (prof.chisel) {
+            if(prof.chisel) {
                 var nib = -Math.PI / 5;
                 width *= 0.3 + 0.7 * Math.abs(Math.sin(angle - nib));
             }
@@ -1462,34 +1471,34 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         toProject: function (e: MouseEvent) {
             var p = paper();
             var canvas = document.querySelector('canvas[class*="paper-canvas"]');
-            if (!p || !canvas) return null;
+            if(!p || !canvas) return null;
             var rect = canvas.getBoundingClientRect();
             return p.project.view.viewToProject(new p.Point(e.clientX - rect.left, e.clientY - rect.top));
         },
         onDown: function (e: PointerEvent) {
-            if (!pen.active) return;
+            if(!pen.active) return;
             var canvas = e.target && (e.target as Element).closest ? (e.target as Element).closest('canvas[class*="paper-canvas"]') : null;
-            if (!canvas) return;
+            if(!canvas) return;
             closePanel();
             e.stopPropagation();
             e.preventDefault();
             var point = pen.toProject(e);
-            if (!point) return;
+            if(!point) return;
             pen.points = [{x: point.x, y: point.y, p: e.pressure || 0.5}];
             listen(document, 'pointermove', pen.onMove, true);
             listen(document, 'pointerup', pen.onUp, true);
             listen(document, 'pointercancel', pen.onUp, true);
         },
         onMove: function (e: PointerEvent) {
-            if (!pen.active || !pen.points.length) return;
+            if(!pen.active || !pen.points.length) return;
             e.stopPropagation();
             var raw = pen.toProject(e);
-            if (!raw) return;
+            if(!raw) return;
             var last = pen.points[pen.points.length - 1];
             var k = 1 - pen.profile.smoothing;
             var x = last.x + (raw.x - last.x) * k;
             var y = last.y + (raw.y - last.y) * k;
-            if (Math.hypot(x - last.x, y - last.y) < 1.2) return;
+            if(Math.hypot(x - last.x, y - last.y) < 1.2) return;
             pen.points.push({x: x, y: y, p: e.pressure || last.p});
             pen.drawPreview();
         },
@@ -1502,10 +1511,10 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         },
         outline: function () {
             var pts = this.points;
-            if (pts.length < 2) return [];
+            if(pts.length < 2) return [];
             var left = [];
             var right = [];
-            for (var i = 0; i < pts.length; i++) {
+            for(let i=0; i < pts.length; i++) {
                 var prev = pts[Math.max(0, i - 1)];
                 var next = pts[Math.min(pts.length - 1, i + 1)];
                 var dx = next.x - prev.x;
@@ -1523,10 +1532,10 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         drawPreview: function () {
             var p = paper();
             var pts = this.outline();
-            if (!p || pts.length < 4) return;
+            if(!p || pts.length < 4) return;
             this.clearPreview();
             var layer = guideLayer();
-            if (!layer) return;
+            if(!layer) return;
             var accent = (openPanel && openPanel._gwtAccent) || '#575e75';
             var path = new p.Path(pts);
             path.closed = true;
@@ -1543,7 +1552,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             var p = paper();
             var pts = this.outline();
             this.clearPreview();
-            if (!p || pts.length < 4) {
+            if(!p || pts.length < 4) {
                 this.points = [];
                 return;
             }
@@ -1552,27 +1561,27 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             path.strokeCap = 'round';
             path.strokeJoin = 'round';
             applyStyle(path, false);
-            if (!path.fillColor) {
+            if(!path.fillColor) {
                 var cFall = currentColors();
-                if (cFall.stroke) path.fillColor = cFall.stroke;
+                if(cFall.stroke) path.fillColor = cFall.stroke;
                 else {
                     var sSt = store();
                     var pcol = (sSt && sSt.getState().scratchPaint && sSt.getState().scratchPaint.color) || {};
                     path.fillColor = colorOf(pcol.fillColor) || colorOf(pcol.strokeColor) || (p ? new p.Color('#855cd6') : null);
                 }
             }
-            if (!path.fillColor) {
+            if(!path.fillColor) {
                 path.remove();
                 this.points = [];
                 return;
             }
-            if (isBitmapFormat()) {
+            if(isBitmapFormat()) {
                 bakeIntoRaster(path);
                 this.points = [];
                 return;
             }
             var layer = paintingLayer();
-            if (!layer) {
+            if(!layer) {
                 path.remove();
                 this.points = [];
                 return;
@@ -1580,7 +1589,11 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             layer.activate();
             layer.addChild(path);
             path.selected = true;
-            dispatch({type: 'scratch-paint/select/CHANGE_SELECTED_ITEMS', selectedItems: [path], bitmapMode: false});
+            dispatch({
+                type: 'scratch-paint/select/CHANGE_SELECTED_ITEMS',
+                selectedItems: [path],
+                bitmapMode: false
+            });
             p.view.update();
             if (!commit()) path.remove();
             this.points = [];
@@ -1589,11 +1602,11 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
     function showPenPanel (anchor: PaintElement) {
         var panel = toggleFor(anchor, 'pen');
-        if (!panel) return;
+        if(!panel) return;
 
         var grid = document.createElement('div');
         grid.className = 'gwt-grid gwt-pens';
-        PENS.forEach(function (profile: typeof PENS[number]) {
+        PENS.forEach(function(profile: typeof PENS[number]) {
             var b = createIconButton(document, 'gwt-cell', tr(profile.nameKey), nibSwatch(profile));
             b.className = 'gwt-cell gwt-pen';
             b.dataset.pen = String(profile.id);
@@ -1611,7 +1624,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         off.type = 'button';
         off.className = 'gwt-cell gwt-off';
         off.textContent = tr('off');
-        listen(off, 'click', function () {
+        listen(off, 'click', function() {
             pen.deactivate();
             markPens();
         });
@@ -1639,9 +1652,9 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
         panel.appendChild(keyRow([GLYPH.undo, 'Ctrl', 'Z']));
 
-        function markPens () {
+        function markPens() {
             var buttons = grid.querySelectorAll<HTMLElement>('.gwt-pen');
-            for (var i = 0; i < buttons.length; i++) {
+            for(let i=0; i < buttons.length; i++) {
                 buttons[i].classList.toggle('gwt-on', pen.active && buttons[i].dataset.pen === settings.pen);
             }
         }
@@ -1652,14 +1665,14 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     var lastFormat = null;
     var lastColorSig = null;
     function colorSig (color: any) {
-        if (!color) return '-';
-        if (color.gradient) {
+        if(!color) return '-';
+        if(color.gradient) {
             var stops = color.gradient.stops || [];
             return 'g|' + color.gradient.type + '|' + stops.map(function (s: any) {
                 return Math.round(s.offset * 1000) + '@' + (s.color && s.color.toCSS ? s.color.toCSS(true) : s.color);
             }).join(',');
         }
-        if (color.toCSS) return color.toCSS(true);
+        if(color.toCSS) return color.toCSS(true);
         var f = color.fillColor || {};
         var s = color.strokeColor || {};
         return [f.gradientType, f.primary, f.secondary, s.gradientType, s.primary, s.secondary].join('|');
@@ -1669,32 +1682,35 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }
     function onStateChange () {
         var p = paintState();
-        if (!p) return;
+        if(!p) return;
         var sig = colorSig(p.color || {});
-        if (sig !== lastColorSig) {
+        if(sig !== lastColorSig) {
             lastColorSig = sig;
-            if (gradStrip) paintGradStrip();
+            if(gradStrip) paintGradStrip();
         }
-        if (p.mode !== lastMode) {
+        if(p.mode !== lastMode) {
             var switched = lastMode !== null;
             lastMode = p.mode;
-            if (switched) {
-                if (pen.active && p.mode !== pen.armedInMode) pen.deactivate();
-                if (shaper.shape) shaper.disarm();
-                if (openPanel && openPanel._gwtKind === 'nib' && !isBrushFamily(p.mode)) closePanel();
-                else if (openPanel && openPanel._gwtKind === 'nib') refreshNibUi();
-                if (layers.railEl) markObjects();
+            if(switched) {
+                if(pen.active && p.mode !== pen.armedInMode) pen.deactivate();
+                if(shaper.shape) shaper.disarm();
+                if(openPanel && openPanel._gwtKind === 'nib' && !isBrushFamily(p.mode)) closePanel();
+                else if(openPanel && openPanel._gwtKind === 'nib') refreshNibUi();
+                if(layers.railEl) markObjects();
             }
         }
-        if (p.format !== lastFormat) {
+        if(p.format !== lastFormat) {
             var changed = lastFormat !== null;
             lastFormat = p.format;
-            if (changed && openPanel && openPanel._gwtKind === 'nib') closePanel();
-            if (changed) syncRail();
+            if(changed && openPanel && openPanel._gwtKind === 'nib') closePanel();
+            if(changed) syncRail();
         }
     }
 
-    function findVM () { return Scratch.vm; }
+    function findVM () {
+        return Scratch.vm;
+    }
+
     function anchorTarget () {
         var vm = findVM();
         var t = vm && vm.editingTarget;
@@ -1702,8 +1718,8 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }
 
     function toolButton (key: string) {
-        for (var i = 0; i < toolButtons.length; i++) {
-            if (toolButtons[i]._gwtKey === key && toolButtons[i].isConnected) return toolButtons[i];
+        for(let i=0; i < toolButtons.length; i++) {
+            if(toolButtons[i]._gwtKey === key && toolButtons[i].isConnected) return toolButtons[i];
         }
         return null;
     }
@@ -1713,13 +1729,13 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         toolButtons = toolButtons.filter(function (b: HTMLElement) { return b.isConnected; });
         ['shapes', 'pen', 'fx', 'anchor'].forEach(function (key: string) {
             var btn = toolButton(key);
-            if (btn || !grid) return;
+            if(btn || !grid) return;
             addToolButton(grid, key, TOOL_ICON[key], function () {
                 var self = toolButton(key);
-                if (!self) return;
-                if (key === 'shapes') showShapePanel(self);
-                else if (key === 'pen') showPenPanel(self);
-                else if (key === 'anchor') showAnchorPanel(self);
+                if(!self) return;
+                if(key === 'shapes') showShapePanel(self);
+                else if(key === 'pen') showPenPanel(self);
+                else if(key === 'anchor') showAnchorPanel(self);
                 else showFxPanel(self);
             });
         });
@@ -1730,16 +1746,16 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
     function mount () {
         var grid = document.querySelector('[class*="paint-editor_mode-selector"]');
-        if (!grid || grid.dataset.gwtMounted || !paper() || !store()) return;
+        if(!grid || grid.dataset.gwtMounted || !paper() || !store()) return;
         grid.dataset.gwtMounted = String('1');
 
         syncToolButtons();
         watchColorTarget();
         syncRail();
-        if (pen.active) markArmed(pen.button, true);
+        if(pen.active) markArmed(pen.button, true);
 
         var s = store();
-        if (!s.__gwtWatch) {
+        if(!s.__gwtWatch) {
             s.__gwtWatch = true;
             lastMode = (paintState() || {}).mode;
             lastFormat = (paintState() || {}).format;
@@ -1748,7 +1764,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
         var buttons = grid.querySelectorAll('[class*="tool-select-base_mod-tool-select"]');
         Array.prototype.forEach.call(buttons, function (btn: HTMLElement) {
-            if (btn.classList.contains('gwt-tool')) return;
+            if(btn.classList.contains('gwt-tool')) return;
             listen(btn, 'click', function () {
                 later(function () {
                     pen.deactivate();
@@ -1760,7 +1776,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         });
 
         var host = document.querySelector('[class*="paint-editor_canvas-container"]');
-        if (host && !host.dataset.gwtWheel) {
+        if(host && !host.dataset.gwtWheel) {
             host.dataset.gwtWheel = String('1');
             listen(host, 'wheel', function (e: WheelEvent) {
                 if (!e.altKey) return;
@@ -1775,29 +1791,29 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }
 
     function onKeyDown (e: KeyboardEvent) {
-        if (pixels.pxEd) return;
-        if (isTextInput(e.target)) return;
-        if (!paintEditorOpen()) return;
-        if (e.key === 'Escape') {
-            if (openPanel) closePanel();
-            else if (pen.active) pen.deactivate();
-            else if (shaper.shape) shaper.disarm();
+        if(pixels.pxEd) return;
+        if(isTextInput(e.target)) return;
+        if(!paintEditorOpen()) return;
+        if(e.key === 'Escape') {
+            if(openPanel) closePanel();
+            else if(pen.active) pen.deactivate();
+            else if(shaper.shape) shaper.disarm();
             return;
         }
-        if (e.key === '[') stepNib(-1);
-        if (e.key === ']') stepNib(1);
-        if (e.altKey && !e.ctrlKey && !e.metaKey) {
-            if (e.code === 'KeyM') {
+        if(e.key === '[') stepNib(-1);
+        if(e.key === ']') stepNib(1);
+        if(e.altKey && !e.ctrlKey && !e.metaKey) {
+            if(e.code === 'KeyM') {
                 e.preventDefault();
                 if (setMask(!isMasked())) markFx();
-            } else if (e.code === 'KeyB') {
+            }else if(e.code === 'KeyB') {
                 e.preventDefault();
                 stepBlend(e.shiftKey ? -1 : 1);
                 markFx();
-            } else if (e.code === 'KeyJ') {
+            }else if(e.code === 'KeyJ') {
                 e.preventDefault();
                 if (setMiter(1.2)) markFx();
-            } else if (e.code === 'KeyD') {
+            }else if(e.code === 'KeyD') {
                 e.preventDefault();
                 var anchorBtn = toolButton('anchor');
                 if (openPanel && openPanel._gwtKind === 'anchor') {
@@ -1806,10 +1822,10 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
                 } else if (anchorBtn) {
                     showAnchorPanel(anchorBtn);
                 }
-            } else if (e.code === 'KeyP') {
+            }else if(e.code === 'KeyP') {
                 e.preventDefault();
                 openPixelEditor();
-            } else if (e.code === 'KeyX') {
+            }else if(e.code === 'KeyX') {
                 e.preventDefault();
                 exportPng(settings.pngScale || 1);
             }
@@ -1835,23 +1851,23 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             if (pixels.pxEd) {
                 var nowTarget = anchorTarget();
                 var nowCostume = nowTarget && nowTarget.getCostumes()[nowTarget.currentCostume];
-                if (!nowCostume || nowCostume.name !== pixels.pxEd.costume) closePixelEditor();
+                if(!nowCostume || nowCostume.name !== pixels.pxEd.costume) closePixelEditor();
             }
             syncGradStrip();
             syncRail();
             syncToolButtons();
             const language = tr().lang;
-            if (lastLanguage !== language) {
+            if(lastLanguage !== language) {
                 lastLanguage = language;
                 refreshToolLabels();
                 closePanel();
-            } else if (openPanel && !openAnchor.isConnected) {
+            }else if(openPanel && !openAnchor.isConnected) {
                 closePanel();
             }
             if (openPanel && openPanel._gwtKind === 'fx') markFx();
             else if (openPanel && openPanel._gwtKind === 'anchor') markAnchor();
         } catch (e) {
-            if (window.console) window.console.warn('GoWarp Toolkit:', e);
+            if(window.console) window.console.warn('GoWarp Toolkit:', e);
         }
     }
 
@@ -1865,7 +1881,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
                 document.adoptedStyleSheets = document.adoptedStyleSheets.concat([sheet]);
                 styleInjected = true;
                 return;
-            } catch (e) { /* fall through to the <style> tag */ }
+            } catch (e) {}
         }
         styleTag = document.createElement('style') as HTMLStyleElement;
         var tag = styleTag;
@@ -1887,10 +1903,14 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     const anchors = createAnchors(context, {
         anchorTarget,
         findVM,
-        get railEl() { return layers.railEl; },
+        get railEl() {
+            return layers.railEl;
+        },
         markObjects,
         keyRow,
-        get openPanel() { return openPanel; },
+        get openPanel() {
+            return openPanel;
+        },
         toggleFor,
         labelEl
     });
@@ -1913,15 +1933,14 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         pageToast,
         ensureStyle
     });
-    const {sfSync, sfTeardown} = folders;
+    const { sfSync, sfTeardown } = folders;
 
     listen(window, 'keydown', onKeyDown);
     listen(window, 'resize', function () {
-        if (openPanel) fitPanel(openPanel);
+        if(openPanel) fitPanel(openPanel);
     });
     listen(window, 'pointerdown', function (e: PointerEvent) {
-        if (openPanel && openPanel._gwtKind === 'nib' &&
-            /paper-canvas/.test(String(e.target && (e.target as Element).className))) closePanel();
+        if(openPanel && openPanel._gwtKind === 'nib' && /paper-canvas/.test(String(e.target && (e.target as Element).className))) closePanel();
         refreshPanels();
     }, true);
     listen(window, 'keyup', refreshPanels, true);
@@ -1931,11 +1950,11 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     return {
         openPixelEditor,
         dispose() {
-            if (disposed) return;
+            if(disposed) return;
             disposed = true;
             lifecycle.dispose();
             unsubscribe?.();
-            if (editor.storeRef) delete editor.storeRef.__gwtWatch;
+            if(editor.storeRef) delete editor.storeRef.__gwtWatch;
             delete document.__gwtGrad;
             closePanel(); closePixelEditor();
             pen.deactivate(); shaper.disarm(); destroyRail(); dropGradStrip(); sfTeardown();
@@ -1945,7 +1964,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
                 delete element.dataset.gwtMounted; delete element.dataset.gwtWheel;
             });
             styleTag?.remove();
-            if (sheet) document.adoptedStyleSheets = document.adoptedStyleSheets.filter((item: CSSStyleSheet) => item !== sheet);
+            if(sheet) document.adoptedStyleSheets = document.adoptedStyleSheets.filter((item: CSSStyleSheet) => item !== sheet);
         }
     };
 }
