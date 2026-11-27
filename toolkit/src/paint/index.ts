@@ -17,7 +17,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     const window = globalThis.window as EditorWindow;
     const lifecycle = createLifecycle();
     const {listen, later, repeat} = lifecycle;
-    const editor = createEditorAccess(document, window);
+    const editor = createEditorAccess(window);
     const {paintCanvas, fiberOf, paper, paintState, isBitmapFormat, isEraserMode, dispatch, store} = editor;
     const theme = createTheme(document, window);
     const {nativeClass, readTheme, applyTheme} = theme;

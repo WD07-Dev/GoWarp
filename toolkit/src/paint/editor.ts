@@ -1,6 +1,6 @@
-import type {EditorDocument, EditorWindow} from './type';
+import type { EditorWindow } from './type';
 
-export function createEditorAccess(document: EditorDocument, window: EditorWindow) {
+export function createEditorAccess(window: EditorWindow) {
     var paperRef = null;
     var storeRef = null;
 
