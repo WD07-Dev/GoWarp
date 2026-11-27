@@ -59,7 +59,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         return out;
     }
 
-    function costumeRaster(c: any) {
+    async function costumeRaster(c: any) {
         var raw = c.asset && (c.asset.data !== undefined ? c.asset.data : c.asset);
         if (c.dataFormat === 'svg' || typeof raw === 'string') {
             var txt = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
@@ -75,42 +75,40 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             });
         }
         var bytes = raw instanceof ArrayBuffer ? raw : (raw && raw.buffer ? raw.buffer : raw);
-        return createImageBitmap(new Blob([bytes], {type: 'image/' + (c.dataFormat || 'png')}))
-        .then((bmp: ImageBitmap) => {
-            var s = alphaStats(bmp, bmp.width, bmp.height, 1);
-            var res = Math.max(1, Number(c.bitmapResolution) || 1);
-            if(s.area && res > 1) {
-                var inUnits = Math.hypot(s.cx / res - c.rotationCenterX, s.cy / res - c.rotationCenterY);
-                var inPixels = Math.hypot(s.cx - c.rotationCenterX, s.cy - c.rotationCenterY);
-                if(inUnits <= inPixels) {
-                    s.cx /= res;
-                    s.cy /= res;
-                    s.w /= res;
-                    s.h /= res;
-                }
+        const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/' + (c.dataFormat || 'png') }));
+        var s = alphaStats(bmp, bmp.width, bmp.height, 1);
+        var res_1 = Math.max(1, Number(c.bitmapResolution) || 1);
+        if(s.area && res_1 > 1) {
+            var inUnits = Math.hypot(s.cx / res_1 - c.rotationCenterX, s.cy / res_1 - c.rotationCenterY);
+            var inPixels = Math.hypot(s.cx - c.rotationCenterX, s.cy - c.rotationCenterY);
+            if (inUnits <= inPixels) {
+                s.cx /= res_1;
+                s.cy /= res_1;
+                s.w /= res_1;
+                s.h /= res_1;
             }
-            return s;
-        });
+        }
+        return s;
     }
 
-    function measureOne(c: any) {
+    async function measureOne(c: any) {
         var key = (c.md5 || c.assetId || '') + '|' + c.dataFormat + '|' + c.name;
         if(anchorCache[key]) return Promise.resolve(anchorCache[key]);
-        return costumeRaster(c).then(function (s: AlphaStats) {
-            anchorCache[key] = s;
-            var keys = Object.keys(anchorCache);
-            if (keys.length > 48) delete anchorCache[keys[0]];
-            return s;
-        });
+        const s = await costumeRaster(c);
+        anchorCache[key] = s;
+        var keys = Object.keys(anchorCache);
+        if(keys.length > 48) delete anchorCache[keys[0]];
+        return s;
     }
 
-    function measureAnchor() {
+    async function measureAnchor() {
         var t = anchorTarget();
         if(!t) return Promise.resolve(null);
         var costumes = t.getCostumes();
         if(costumes.length < 2) return Promise.resolve({short: true, n: costumes.length});
         anchorState.busy = true;
-        return Promise.all(costumes.map(measureOne)).then(function (stats: AlphaStats[]) {
+        try {
+            const stats = await Promise.all(costumes.map(measureOne));
             anchorState.list = stats.map(function (s: AlphaStats, i: number) {
                 return {
                     index: i, name: costumes[i].name, area: s.area || 0, cx: s.cx || 0, cy: s.cy || 0,
@@ -122,11 +120,11 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             anchorState.n = costumes.length;
             anchorState.busy = false;
             return anchorState.list;
-        }).catch(function (e: unknown) {
+        } catch (e) {
             anchorState.busy = false;
             if (window.console) window.console.warn('GoWarp Toolkit anchor:', e);
             return null;
-        });
+        }
     }
 
     function anchorPlan(mode: string, list: AnchorMeasurement[]) {
@@ -149,7 +147,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         return out;
     }
 
-    function anchorJump (list: AnchorMeasurement[], pivots: number[][]) {
+    function anchorJump(list: AnchorMeasurement[], pivots: number[][]) {
         var pts = [];
         list.forEach(function (s: AnchorMeasurement, i: number) {
             if (s.area > 0) pts.push([s.cx - pivots[i][0], s.cy - pivots[i][1]]);
@@ -167,7 +165,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         return (Math.round(v * 10) / 10).toFixed(1);
     }
 
-    function refreshAnchorView (t: any) {
+    function refreshAnchorView(t: any) {
         try {
             var idx = t.currentCostume, n = t.getCostumes().length;
             if(n < 2) return;
@@ -180,7 +178,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         } catch (e) {}
     }
 
-    function applyAnchor (mode: string) {
+    function applyAnchor(mode: string) {
         var t = anchorTarget();
         if(!t || !anchorState.list) return null;
         var costumes = t.getCostumes();
@@ -218,7 +216,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         return anchorState.result;
     }
 
-    function undoAnchor () {
+    function undoAnchor() {
         var t = anchorTarget();
         var u = anchorState.undo;
         if(!t || !u || u.spriteId !== t.id) return false;
