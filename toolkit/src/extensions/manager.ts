@@ -11,11 +11,11 @@ export function installExtensions(Scratch: ScratchHost): () => void {
     }
     const originalLoad = sm.canLoadExtensionFromProject;
     const originalMode = sm.getSandboxMode;
-    const load = function (this: typeof sm, url: string, ...args: unknown[]) {
+    const load = function(this: typeof sm, url: string, ...args: unknown[]) {
         if(approvals.has(url)) return Promise.resolve(true);
         return originalLoad.call(this, url, ...args);
     };
-    const mode = function (this: typeof sm, url: string, ...args: unknown[]) {
+    const mode = function(this: typeof sm, url: string, ...args: unknown[]) {
         const approvedMode = approvals.get(url);
         if(approvedMode === 'unsandboxed' || approvedMode === 'iframe') return approvedMode;
         return originalMode.call(this, url, ...args);
