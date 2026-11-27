@@ -23,7 +23,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         var cv = document.createElement('canvas');
         cv.width = Math.max(1, Math.round(w * s));
         cv.height = Math.max(1, Math.round(h * s));
-        var ctx = cv.getContext('2d', {willReadFrequently: true});
+        var ctx = cv.getContext('2d', { willReadFrequently: true });
         ctx.drawImage(img, 0, 0, cv.width, cv.height);
         var d = ctx.getImageData(0, 0, cv.width, cv.height).data;
         var sum = 0, sx = 0, sy = 0, minX = 1e9, minY = 1e9, maxX = -1, maxY = -1;
@@ -61,7 +61,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
 
     async function costumeRaster(c: any) {
         var raw = c.asset && (c.asset.data !== undefined ? c.asset.data : c.asset);
-        if (c.dataFormat === 'svg' || typeof raw === 'string') {
+        if(c.dataFormat === 'svg' || typeof raw === 'string') {
             var txt = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
             var w = Number((/\swidth="([\d.]+)"/.exec(txt) || [])[1]) || 0;
             var h = Number((/\sheight="([\d.]+)"/.exec(txt) || [])[1]) || 0;
