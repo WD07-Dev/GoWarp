@@ -69,7 +69,6 @@ func (r *Runtime) createClone(source *target) {
 			break
 		}
 	}
-	// Insert behind the source; only its layer and those above it move.
 	layer := source.state.LayerOrder
 	r.drawList = append(r.drawList, clone)
 	copy(r.drawList[layer+1:], r.drawList[layer:len(r.drawList)-1])
@@ -112,10 +111,6 @@ func (r *Runtime) deleteClone(t *target) {
 		}
 	}
 	r.cloneCount--
-	/*
-		Keep sound parameters for audio handles and broadcast waiters.
-		Release other clone data after cleanup events.
-	*/
 	t.variables = nil
 	t.nativeVariables = nil
 	t.state.Lists = nil
