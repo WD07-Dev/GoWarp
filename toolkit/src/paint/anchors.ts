@@ -1,9 +1,9 @@
+import {tr} from '../translate';
 import type { AlphaStats, AnchorServices } from './type';
 import type { PaintContext } from './context';
 
 export function createAnchors(context: PaintContext, services: AnchorServices) {
     const {document, window} = context;
-    const {t} = context.locale;
     const {listen} = context.lifecycle;
     const {anchorTarget, findVM, markObjects, keyRow, toggleFor, labelEl} = services;
 
@@ -223,12 +223,12 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         panel.appendChild(jump);
         var sub = document.createElement('div');
         sub.className = 'gwt-sub';
-        sub.textContent = t('anchorSub');
+        sub.textContent = tr('anchorSub');
         panel.appendChild(sub);
 
         var seg = document.createElement('div');
         seg.className = 'gwt-seg';
-        [['body', t('anchorBody')], ['own', t('anchorOwn')], ['match', t('anchorFirst')]].forEach(function (row) {
+        [['body', tr('anchorBody')], ['own', tr('anchorOwn')], ['match', tr('anchorFirst')]].forEach(function (row) {
             var b = document.createElement('button');
             b.type = 'button';
             b.dataset.mode = String(row[0]);
@@ -250,7 +250,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         var go = document.createElement('button');
         go.type = 'button';
         go.className = 'gwt-primary';
-        go.textContent = t('anchorApply');
+        go.textContent = tr('anchorApply');
         listen(go, 'click', function () {
             var r = applyAnchor(anchorState.mode);
             if (r) {
@@ -261,7 +261,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         var back = document.createElement('button');
         back.type = 'button';
         back.className = 'gwt-ghost';
-        back.textContent = t('anchorUndo');
+        back.textContent = tr('anchorUndo');
         back.disabled = !anchorState.undo;
         listen(back, 'click', function () {
             if (undoAnchor()) markAnchor();
@@ -289,14 +289,14 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         var tgt = anchorTarget();
         if (!tgt || anchorState.busy) {
             strong.textContent = anchorState.busy ? '…' : '—';
-            if (sub) sub.textContent = tgt ? t('anchorBusy') : t('anchorNone');
+            if (sub) sub.textContent = tgt ? tr('anchorBusy') : tr('anchorNone');
             if (go) go.disabled = true;
             return;
         }
         var costumes = tgt.getCostumes();
         if (costumes.length < 2 || !anchorState.list || anchorState.n !== costumes.length) {
             strong.textContent = '—';
-            if (sub) sub.textContent = costumes.length < 2 ? t('anchorNone') : t('anchorBusy');
+            if (sub) sub.textContent = costumes.length < 2 ? tr('anchorNone') : tr('anchorBusy');
             if (list) { list.textContent = ''; list.dataset.sig = String(''); }
             if (go) go.disabled = true;
             if (back) back.disabled = true;
@@ -319,13 +319,13 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         var next = plan ? anchorJump(anchorState.list, plan) : now;
         strong.textContent = px(now.mean);
         if (sub) {
-            sub.textContent = (anchorState.result ? t('anchorDone') + ' ' + anchorState.result.written + ' · ' : '') +
+            sub.textContent = (anchorState.result ? tr('anchorDone') + ' ' + anchorState.result.written + ' · ' : '') +
                 px(now.mean) + ' → ' + px(next.mean) + ' px';
         }
         if (go) go.disabled = !plan || now.mean < .05;
         if (back) back.disabled = !anchorState.undo;
         if (!list || !plan) return;
-        var sig = context.locale.lang + ';' + anchorState.list.map(function (s, i) {
+        var sig = tr().lang + ';' + anchorState.list.map(function (s, i) {
             return [s.name, s.area <= 0 ? '-' : px(s.pivot[0]) + ',' + px(s.pivot[1]) +
                 '>' + px(plan[i][0]) + ',' + px(plan[i][1])].join('|');
         }).join(';');
@@ -344,7 +344,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             var d = document.createElement('span');
             d.className = 'gwt-adelta';
             if (s.area <= 0) {
-                d.textContent = t('anchorSkipped');
+                d.textContent = tr('anchorSkipped');
             } else {
                 var shift = Math.hypot(plan[i][0] - s.pivot[0], plan[i][1] - s.pivot[1]);
                 d.textContent = (shift < .05 ? '=' : '→ ') + px(s.pivot[0]) + ',' + px(s.pivot[1]) +
@@ -360,7 +360,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
     function showAnchorPanel (anchor) {
         var panel = toggleFor(anchor, 'anchor', 'gwt-wide');
         if (!panel) return;
-        panel.appendChild(labelEl(t('anchorTitle')));
+        panel.appendChild(labelEl(tr('anchorTitle')));
         anchorBody(panel);
     }
     return {

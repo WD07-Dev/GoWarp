@@ -12,8 +12,7 @@ export type EditorWindow = Window & typeof globalThis & {
 
 export interface Shape {
     id: string;
-    label: string;
-    en: string;
+    nameKey: string;
     points?: number[][];
     minRound?: number;
     path?: string;

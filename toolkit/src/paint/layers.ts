@@ -1,3 +1,4 @@
+import {tr} from '../translate';
 import type {PaintContext} from './context';
 
 interface LayerServices {
@@ -6,18 +7,16 @@ interface LayerServices {
     commit: () => boolean;
     eachSelected: (fn: any, live?: any) => boolean;
     icon: (paths: any) => string;
-    msg: (id: any, fallback: any) => any;
     paintEditorOpen: () => boolean;
     colorSig: (color: any) => any;
 }
 
 export function createLayers(context: PaintContext, services: LayerServices) {
-    const {t} = context.locale;
     const {paintState, paper, isBitmapFormat} = context.editor;
     const {document, window} = context;
     const {listen} = context.lifecycle;
     const {applyTheme, readTheme} = context.theme;
-    const {paintingLayer, selectedPaths, commit, eachSelected, icon, msg, paintEditorOpen, colorSig} = services;
+    const {paintingLayer, selectedPaths, commit, eachSelected, icon, paintEditorOpen, colorSig} = services;
 
     function objectList () {
         var layer = paintingLayer(), out = [];
@@ -39,11 +38,11 @@ export function createLayers(context: PaintContext, services: LayerServices) {
     }
     function kindName (item) {
         var cls = item.className;
-        if (cls === 'Group') return t('group');
-        if (cls === 'PointText' || cls === 'Text') return t('text');
-        if (cls === 'Raster') return t('raster');
-        if (cls === 'CompoundPath') return t('compound');
-        return t('path');
+        if (cls === 'Group') return tr('group');
+        if (cls === 'PointText' || cls === 'Text') return tr('text');
+        if (cls === 'Raster') return tr('raster');
+        if (cls === 'CompoundPath') return tr('compound');
+        return tr('path');
     }
     function objectName (item, index, total) {
         return item.name || (kindName(item) + ' ' + (total - index));
@@ -225,13 +224,13 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         var row = document.createElement('div');
         row.className = 'gwt-obj' + (item.selected ? ' gwt-on' : '') + (item.visible ? '' : ' gwt-dim');
         var eye = miniButton(item.visible ? OBJ_GLYPH.eye : OBJ_GLYPH.eyeOff,
-            t(item.visible ? 'hide' : 'show'));
+            tr(item.visible ? 'hide' : 'show'));
         listen(eye, 'click', function () {
             toggleObject(item, 'visible');
             markObjects();
         });
         var lock = miniButton(item.locked ? OBJ_GLYPH.lock : OBJ_GLYPH.unlock,
-            t(item.locked ? 'unlock' : 'lock'));
+            tr(item.locked ? 'unlock' : 'lock'));
         if (item.locked) lock.classList.add('gwt-strong');
         listen(lock, 'click', function () {
             toggleObject(item, 'locked');
@@ -326,8 +325,8 @@ export function createLayers(context: PaintContext, services: LayerServices) {
     function buildRail () {
         var rail = document.createElement('div');
         rail.className = 'gwt-rail';
-        rail.setAttribute('dir', context.locale.isRtl ? 'rtl' : 'ltr');
-        rail.setAttribute('aria-label', t('objects'));
+        rail.setAttribute('dir', tr().isRtl ? 'rtl' : 'ltr');
+        rail.setAttribute('aria-label', tr('objects'));
 
         var spine = document.createElement('div');
         spine.className = 'gwt-spine';
@@ -337,12 +336,12 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         var head = document.createElement('div');
         head.className = 'gwt-rhead';
         var title = document.createElement('span');
-        title.textContent = t('objects');
+        title.textContent = tr('objects');
         var count = document.createElement('span');
         count.className = 'gwt-count';
         head.appendChild(title);
         head.appendChild(count);
-        var pin = miniButton(OBJ_GLYPH.pin, t('pin'));
+        var pin = miniButton(OBJ_GLYPH.pin, tr('pin'));
         pin.setAttribute('aria-pressed', 'false');
         listen(pin, 'click', function () {
             var on = rail.classList.toggle('gwt-pin');
@@ -363,7 +362,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
             ['dup', 'duplicate', OBJ_GLYPH.dup, duplicateObjects],
             ['del', 'Delete', OBJ_GLYPH.del, deleteObjects]] as const).forEach(function (row) {
             var b = miniButton(row[2], row[0] === 'del'
-                ? msg('paint.paintEditor.delete', 'Delete') : t(row[1]));
+                ? tr('delete') : tr(row[1]));
             b.dataset.order = String(row[0]);
             listen(b, 'click', function () {
                 row[3]();
@@ -378,7 +377,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
             ['right', 'alignRight', OBJ_GLYPH.right], ['top', 'alignTop', OBJ_GLYPH.top],
             ['vcenter', 'alignCenterV', OBJ_GLYPH.vcenter], ['bottom', 'alignBottom', OBJ_GLYPH.bottom],
             ['center', 'alignCenter', OBJ_GLYPH.center]].forEach(function (row) {
-            var b = miniButton(row[2], t(row[1]));
+            var b = miniButton(row[2], tr(row[1]));
             b.dataset.align = String(row[0]);
             listen(b, 'click', function () {
                 alignObjects(row[0]);
@@ -389,8 +388,8 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         rail.appendChild(railRow(aligns));
 
         var last = [];
-        [[-90, 'rotateLeft', OBJ_GLYPH.rotL], [90, 'rotateRight', OBJ_GLYPH.rotR]].forEach(function (row) {
-            var b = miniButton(row[2], t(row[1]));
+        ([[-90, 'rotateLeft', OBJ_GLYPH.rotL], [90, 'rotateRight', OBJ_GLYPH.rotR]] as const).forEach(function (row) {
+            var b = miniButton(row[2], tr(row[1]));
             b.dataset.rotate = String(row[0]);
             listen(b, 'click', function () {
                 rotateObjects(row[0]);
@@ -401,7 +400,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         var nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.className = 'gwt-text gwt-rname';
-        nameInput.setAttribute('aria-label', t('name'));
+        nameInput.setAttribute('aria-label', tr('name'));
         listen(nameInput, 'change', function () {
             var items = selectedPaths();
             if (!items.length) return;
@@ -430,7 +429,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         opRange.min = 0;
         opRange.max = 100;
         opRange.step = 1;
-        opRange.setAttribute('aria-label', t('opacity'));
+        opRange.setAttribute('aria-label', tr('opacity'));
         var opOut = document.createElement('output');
         listen(opRange, 'input', function () {
             opOut.textContent = opRange.value + '%';

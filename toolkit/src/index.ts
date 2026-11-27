@@ -1,10 +1,11 @@
-import {installExtensions} from './extensions/manager';
-import {installPaintTools} from './paint';
-import type {ScratchHost} from './shared/scratch';
+import { tr } from './translate';
+import { installExtensions } from './extensions/manager';
+import { installPaintTools } from './paint';
+import type { ScratchHost } from './shared/scratch';
 declare const Scratch: ScratchHost;
 
-if (!Scratch.extensions.unsandboxed) {
-    throw new Error('GoWarp Toolkit must run without sandbox.');
+if(!Scratch.extensions.unsandboxed) {
+    throw new Error(tr('errors.unsandboxed'));
 }
 
 const key = Symbol.for('gowarp-toolkit.session');

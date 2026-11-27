@@ -1,9 +1,9 @@
+import {tr} from '../translate';
 import {createFolders} from '../sprites/folders';
 import {createAnchors} from './anchors';
 import {createPixelEditor} from './pixels';
 import {createLayers} from './layers';
 import {createTheme} from './theme';
-import {createLocale} from './locale';
 import {round, cornerPath, SHAPES, NIBS, PENS} from './shapes';
 import {createEditorAccess} from './editor';
 import {paintStyle as CSS} from './style';
@@ -21,9 +21,8 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     const {paintCanvas, fiberOf, paper, paintState, isBitmapFormat, isEraserMode, dispatch, store} = editor;
     const theme = createTheme(document, window);
     const {nativeClass, readTheme, applyTheme} = theme;
-    const locale = createLocale(Scratch, store);
-    const {t, nameOf, readLocale} = locale;
-    const context: PaintContext = {document, window, lifecycle, editor, theme, locale};
+    let lastLanguage = tr().lang;
+    const context: PaintContext = {document, window, lifecycle, editor, theme};
     let disposed = false;
     let unsubscribe: (() => void) | undefined;
     let sheet: CSSStyleSheet | undefined;
@@ -395,10 +394,10 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             return null;
         }
         closePanel();
-        readLocale();
+
         var panel = document.createElement('div');
         panel.className = 'gwt-panel' + (extraClass ? ' ' + extraClass : '');
-        panel.setAttribute('dir', locale.isRtl ? 'rtl' : 'ltr');
+        panel.setAttribute('dir', tr().isRtl ? 'rtl' : 'ltr');
         panel._gwtAnchor = anchor;
         panel._gwtKind = kind;
         var theme = readTheme();
@@ -407,7 +406,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var close = document.createElement('button');
         close.type = 'button';
         close.className = 'gwt-close';
-        close.setAttribute('aria-label', t('close'));
+        close.setAttribute('aria-label', tr('close'));
         close.textContent = '✕';
         listen(close, 'click', closePanel);
         panel.appendChild(close);
@@ -469,8 +468,8 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         if (!btn.getAttribute('role')) btn.setAttribute('role', 'button');
         btn._gwtKey = key;
         btn.dataset.gwtKey = String(key);
-        btn.setAttribute('title', t(key));
-        btn.setAttribute('aria-label', t(key));
+        btn.setAttribute('title', tr(key));
+        btn.setAttribute('aria-label', tr(key));
         var imgClass = nativeClass('tool-select-base_tool-select-icon') || 'gwt-icon';
         var img = document.createElement('img');
         img.alt = '';
@@ -498,7 +497,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             if (!btn.isConnected) return;
             var armed = btn === pen.button && pen.active && pen.profile;
             var stamp = btn === shaper.button && shaper.shape;
-            var text = armed ? nameOf(pen.profile) : stamp ? nameOf(shaper.shape) : t(btn._gwtKey);
+            var text = armed ? tr(pen.profile.nameKey) : stamp ? tr(shaper.shape.nameKey) : tr(btn._gwtKey);
             btn.setAttribute('title', text);
             btn.setAttribute('aria-label', text);
         });
@@ -519,7 +518,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         input.max = max;
         input.step = step;
         input.value = settings[key];
-        input.setAttribute('aria-label', t(SLIDER_TEXT[key] || key));
+        input.setAttribute('aria-label', tr(SLIDER_TEXT[key] || key));
         var out = document.createElement('output');
         out.textContent = sliderValueText(key, settings[key]);
         listen(input, 'input', function () {
@@ -763,14 +762,6 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             '"><b></b><u></u></i>';
     }
 
-    function msg (id, fallback) {
-        var s = store();
-        try {
-            return (s.getState().locales.messages || {})[id] || fallback;
-        } catch (e) {
-            return fallback;
-        }
-    }
     function selectedPaths () {
         var layer = paintingLayer();
         var out = [];
@@ -1090,7 +1081,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             var b = document.createElement('b');
             b.dataset.i = String(i);
             b.setAttribute('role', 'slider');
-            b.setAttribute('aria-label', t('stops') + ' ' + (i + 1));
+            b.setAttribute('aria-label', tr('stops') + ' ' + (i + 1));
             listen(b, 'pointerdown', thumbDown);
             bar.appendChild(b);
         }
@@ -1119,7 +1110,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
         var bar = document.createElement('div');
         bar.className = 'gwt-bar gwt-gbar';
-        bar.setAttribute('aria-label', t('gradient'));
+        bar.setAttribute('aria-label', tr('gradient'));
         wrap.appendChild(bar);
 
         var foot = document.createElement('div');
@@ -1130,15 +1121,15 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             var b = document.createElement('button');
             b.type = 'button';
             b.textContent = String(n);
-            b.setAttribute('aria-label', t('stops') + ' ' + n);
-            b.title = t('stops') + ' · ' + n;
+            b.setAttribute('aria-label', tr('stops') + ' ' + n);
+            b.title = tr('stops') + ' · ' + n;
             listen(b, 'click', function () { setStopCount(n); });
             counts.appendChild(b);
         });
         var well = document.createElement('input');
         well.type = 'color';
         well.className = 'gwt-gwell';
-        well.setAttribute('aria-label', t('stops'));
+        well.setAttribute('aria-label', tr('stops'));
         listen(well, 'input', function () {
             settings.grad.extras[gradPick - 1] = well.value;
             saveSettings();
@@ -1148,7 +1139,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var apply = document.createElement('button');
         apply.type = 'button';
         apply.className = 'gwt-gapply';
-        apply.textContent = t('apply');
+        apply.textContent = tr('apply');
         listen(apply, 'click', function () {
             if (applyGradientToSelection()) paintGradStrip();
         });
@@ -1202,10 +1193,10 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var panel = toggleFor(anchor, 'fx', 'gwt-fxbox');
         if (!panel) return;
 
-        panel.appendChild(labelEl(t('mask')));
+        panel.appendChild(labelEl(tr('mask')));
         var masks = document.createElement('div');
         masks.className = 'gwt-grid gwt-maskrow';
-        [['on', t('mask')], ['off', t('maskOff')]].forEach(function (row) {
+        [['on', tr('mask')], ['off', tr('maskOff')]].forEach(function (row) {
             var b = cell(row[1], demoMask(row[0] === 'on') + '<span>' + row[1] + '</span>');
             b.dataset.mask = String(row[0]);
             listen(b, 'click', function () {
@@ -1216,7 +1207,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         });
         panel.appendChild(masks);
 
-        panel.appendChild(labelEl(t('blend')));
+        panel.appendChild(labelEl(tr('blend')));
         var grid = document.createElement('div');
         grid.className = 'gwt-grid gwt-blends';
         BLENDS.forEach(function (mode) {
@@ -1232,7 +1223,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
         var row = document.createElement('div');
         row.className = 'gwt-row';
-        row.innerHTML = '<span class="gwt-tag">' + t('joint') + '</span>' +
+        row.innerHTML = '<span class="gwt-tag">' + tr('joint') + '</span>' +
             '<i class="gwt-demo gwt-corner"><svg viewBox="0 0 30 24" aria-hidden="true">' +
             '<path d="M3 21 15 3 27 21"/></svg></i>';
         var corner = row.querySelector('path');
@@ -1242,7 +1233,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         slider.max = 10;
         slider.step = 0.1;
         slider.value = miterOfSelection();
-        slider.setAttribute('aria-label', t('joint'));
+        slider.setAttribute('aria-label', tr('joint'));
         var out = document.createElement('output');
         out.textContent = Number(slider.value).toFixed(1);
         listen(slider, 'input', function () {
@@ -1262,7 +1253,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         div.className = 'gwt-div';
         panel.appendChild(div);
 
-        panel.appendChild(labelEl(t('png')));
+        panel.appendChild(labelEl(tr('png')));
         var pngs = document.createElement('div');
         pngs.className = 'gwt-seg';
         pngs.style.marginTop = '.3rem';
@@ -1271,7 +1262,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             b.type = 'button';
             b.textContent = scale === 1 ? '1×' : scale + '×';
             b.dataset.scale = String(scale);
-            b.title = t('png') + ' ' + scale + '×';
+            b.title = tr('png') + ' ' + scale + '×';
             listen(b, 'click', function () {
                 settings.pngScale = scale;
                 saveSettings();
@@ -1306,7 +1297,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         Array.prototype.forEach.call(openPanel.querySelectorAll('[data-scale]'), function (b) {
             b.setAttribute('aria-pressed', String(Number(b.dataset.scale) === settings.pngScale));
             b.disabled = !art;
-            b.title = art ? t('png') + ' ' + b.dataset.scale + '×' : t('empty');
+            b.title = art ? tr('png') + ' ' + b.dataset.scale + '×' : tr('empty');
         });
         var slider = openPanel.querySelector('.gwt-row input[type=range]');
         if (slider && document.activeElement !== slider) {
@@ -1317,7 +1308,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         }
         Array.prototype.forEach.call(openPanel.querySelectorAll('[data-blend], [data-mask]'), function (b) {
             var ready = some && (b.dataset.mask !== 'on' || maskable);
-            var why = !vector ? t('vectorOnly') : some ? t('maskAlone') : t('nothing');
+            var why = !vector ? tr('vectorOnly') : some ? tr('maskAlone') : tr('nothing');
             b.disabled = !ready;
             b.title = ready ? b.textContent : why;
         });
@@ -1339,7 +1330,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var grid = document.createElement('div');
         grid.className = 'gwt-grid';
         SHAPES.forEach(function (shape) {
-            var b = cell(nameOf(shape), shapeIcon(shape));
+            var b = cell(tr(shape.nameKey), shapeIcon(shape));
             b.dataset.shape = String(shape.id);
             listen(b, 'click', function () {
                 shaper.arm(shape);
@@ -1389,7 +1380,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var grid = document.createElement('div');
         grid.className = 'gwt-grid gwt-nibs';
         NIBS.forEach(function (nib) {
-            var b = cell(nameOf(nib) + ' · ' + nib.size, '');
+            var b = cell(tr(nib.nameKey) + ' · ' + nib.size, '');
             b.className = 'gwt-cell gwt-nib';
             b.dataset.size = String(nib.size);
             var dot = document.createElement('span');
@@ -1415,7 +1406,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         input.max = 100;
         input.className = 'gwt-nib-slider';
         input.value = currentNibSize();
-        input.setAttribute('aria-label', t('size'));
+        input.setAttribute('aria-label', tr('size'));
         var out = document.createElement('output');
         out.textContent = currentNibSize();
         listen(input, 'input', function () {
@@ -1611,7 +1602,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var grid = document.createElement('div');
         grid.className = 'gwt-grid gwt-pens';
         PENS.forEach(function (profile) {
-            var b = cell(nameOf(profile), nibSwatch(profile));
+            var b = cell(tr(profile.nameKey), nibSwatch(profile));
             b.className = 'gwt-cell gwt-pen';
             b.dataset.pen = String(profile.id);
             listen(b, 'click', function () {
@@ -1627,7 +1618,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var off = document.createElement('button');
         off.type = 'button';
         off.className = 'gwt-cell gwt-off';
-        off.textContent = t('off');
+        off.textContent = tr('off');
         listen(off, 'click', function () {
             pen.deactivate();
             markPens();
@@ -1642,7 +1633,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         press.className = 'gwt-row';
         var text = document.createElement('span');
         text.className = 'gwt-name';
-        text.textContent = t('pressure');
+        text.textContent = tr('pressure');
         var box = document.createElement('input');
         box.type = 'checkbox';
         box.checked = settings.penPressure;
@@ -1749,7 +1740,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var grid = document.querySelector('[class*="paint-editor_mode-selector"]');
         if (!grid || grid.dataset.gwtMounted || !paper() || !store()) return;
         grid.dataset.gwtMounted = String('1');
-        readLocale();
+
         syncToolButtons();
         watchColorTarget();
         syncRail();
@@ -1857,9 +1848,9 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             syncGradStrip();
             syncRail();
             syncToolButtons();
-            var before = locale.lang;
-            readLocale();
-            if (before !== locale.lang) {
+            const language = tr().lang;
+            if (lastLanguage !== language) {
+                lastLanguage = language;
                 refreshToolLabels();
                 closePanel();
             } else if (openPanel && !openAnchor.isConnected) {
@@ -1897,7 +1888,6 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         commit,
         eachSelected,
         icon,
-        msg,
         paintEditorOpen,
         colorSig
     });
@@ -1944,11 +1934,10 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }, true);
     listen(window, 'keyup', refreshPanels, true);
 
-    readLocale();
     tick();
     repeat(tick, 900);
     return {
-        openPixelEditor: () => { readLocale(); openPixelEditor(); },
+        openPixelEditor,
         dispose() {
             if (disposed) return;
             disposed = true;

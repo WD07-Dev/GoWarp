@@ -1,9 +1,9 @@
+import {tr} from '../translate';
 import type { PaintContext } from '../paint/context';
 import { FolderMenuItem, FolderServices } from './type';
 
 export function createFolders(context: PaintContext, services: FolderServices) {
     const {window, document} = context;
-    const {t, readLocale} = context.locale;
     const {paintedColor, parseColor, brightness, cssVar, applyTheme, rgba} = context.theme;
     const {listen} = context.lifecycle;
     const {findVM, pageToast, ensureStyle} = services;
@@ -185,7 +185,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
     function sfMakeFolder(name) {
         var data = sfLoad();
         if(!name || sfNameTaken(name)) {
-            var base = t('sfDefault');
+            var base = tr('sfDefault');
             var n = 1;
             do {
                 name = base + ' ' + n++;
@@ -253,7 +253,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         chip.setAttribute('role', 'tab');
         chip.setAttribute('aria-selected', String(active));
         if(isFolder) {
-            chip.title = t('sfHint');
+            chip.title = tr('sfHint');
             chip.innerHTML = SF_FOLDER;
         }
         var name = document.createElement('span');
@@ -290,7 +290,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             var f = sfFolderOf(s);
             counts[f] = (counts[f] || 0) + 1;
         });
-        var sig = JSON.stringify([context.locale.lang, sprites.length, counts, data.folders.map((f) => [f.id, f.name])]);
+        var sig = JSON.stringify([tr().lang, sprites.length, counts, data.folders.map((f) => [f.id, f.name])]);
         if(sig === sf.sig) {
             if(sf.shown !== sf.active) {
                 sf.shown = sf.active;
@@ -303,15 +303,15 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         sf.sig = sig;
         sf.shown = sf.active;
         sf.bar.textContent = '';
-        sf.bar.appendChild(sfChip('', t('sfAll'), sprites.length, sf.active === '', false));
+        sf.bar.appendChild(sfChip('', tr('sfAll'), sprites.length, sf.active === '', false));
         data.folders.forEach(function (f) {
             sf.bar.appendChild(sfChip(f.id, f.name, counts[f.id] || 0, sf.active === f.id, true));
         });
         var add = document.createElement('button');
         add.type = 'button';
         add.className = 'gwt-fchip gwt-fnew';
-        add.title = t('sfNew');
-        add.setAttribute('aria-label', t('sfNew'));
+        add.title = tr('sfNew');
+        add.setAttribute('aria-label', tr('sfNew'));
         add.textContent = '+';
         listen(add, 'click', function () { sfNewChip(add); });
         sf.bar.appendChild(add);
@@ -324,7 +324,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         input.type = 'text';
         input.maxLength = 24;
         input.value = initial || '';
-        input.setAttribute('aria-label', t('sfName'));
+        input.setAttribute('aria-label', tr('sfName'));
         holder.textContent = '';
         holder.appendChild(input);
         input.focus();
@@ -355,10 +355,10 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         holder.className = 'gwt-fchip gwt-fhold';
         sf.bar.insertBefore(holder, addBtn);
         sfNameInput(holder, '', function (name) {
-            if (sfNameTaken(name)) { pageToast(t('sfDup'), true); return; }
+            if (sfNameTaken(name)) { pageToast(tr('sfDup'), true); return; }
             sfMakeFolder(name);
             sf.active = '';
-            pageToast(t('sfCreated'));
+            pageToast(tr('sfCreated'));
         }, function () {
             holder.remove();
         });
@@ -367,10 +367,10 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         var folder = sfLoad().folders.filter(function (f) { return f.id === folderId; })[0];
         if(!folder) return;
         sfNameInput(chip, folder.name, function (name) {
-            if (sfNameTaken(name, folderId)) { pageToast(t('sfDup'), true); return; }
+            if (sfNameTaken(name, folderId)) { pageToast(tr('sfDup'), true); return; }
             folder.name = name;
             sfSave();
-            pageToast(t('sfRenamed'));
+            pageToast(tr('sfRenamed'));
         });
     }
     function sfDeleteFolder (folderId) {
@@ -383,7 +383,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         if (sf.active === folderId) sf.active = '';
         sfSave();
         sf.sig = '';
-        pageToast(t('sfDeleted'));
+        pageToast(tr('sfDeleted'));
         sfSync();
     }
 
@@ -441,11 +441,11 @@ export function createFolders(context: PaintContext, services: FolderServices) {
     function sfChipMenu (x, y, folderId) {
         sfMenu(x, y, [
             {head: sfFolderName(folderId)},
-            {label: t('sfRename'), icon: SF_FOLDER, run: function () {
+            {label: tr('sfRename'), icon: SF_FOLDER, run: function () {
                 var chip = sf.bar && sf.bar.querySelector('[data-folder="' + folderId + '"]');
                 if (chip) sfRenameChip(chip, folderId);
             }},
-            {label: t('sfDelete'), run: function () { sfDeleteFolder(folderId); }}
+            {label: tr('sfDelete'), run: function () { sfDeleteFolder(folderId); }}
         ]);
     }
     function sfSpriteMenu (tile, anchor) {
@@ -458,17 +458,17 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         data.folders.forEach(function (f) {
             rows.push({label: f.name, icon: SF_FOLDER, checked: f.id === current, run: function () {
                 sfAssign(sprite, f.id);
-                pageToast(t('sfMoved').replace('{s}', sprite.name).replace('{f}', f.name));
+                pageToast(tr('sfMoved').replace('{s}', sprite.name).replace('{f}', f.name));
             }});
         });
         if (data.folders.length) rows.push({sep: true});
         if (current) {
-            rows.push({label: t('sfNone'), run: function () { sfAssign(sprite, ''); }});
+            rows.push({label: tr('sfNone'), run: function () { sfAssign(sprite, ''); }});
         }
-        rows.push({label: t('sfNew'), icon: SF_FOLDER_PLUS, run: function () {
+        rows.push({label: tr('sfNew'), icon: SF_FOLDER_PLUS, run: function () {
             var folder = sfMakeFolder('');
             sfAssign(sprite, folder.id);
-            pageToast(t('sfCreated'));
+            pageToast(tr('sfCreated'));
         }});
         var r = anchor.getBoundingClientRect();
         sfMenu(r.left, r.bottom + 4, rows);
@@ -479,8 +479,8 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             var b = document.createElement('button');
             b.type = 'button';
             b.className = 'gwt-sf-tile';
-            b.title = t('sfMove');
-            b.setAttribute('aria-label', t('sfMove'));
+            b.title = tr('sfMove');
+            b.setAttribute('aria-label', tr('sfMove'));
             b.innerHTML = SF_FOLDER;
             listen(b, 'click', function (event) {
                 event.preventDefault();
@@ -528,7 +528,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         var items = scroll && scroll.querySelector('[class*="sprite-selector_items-wrapper"]');
         if (!scroll || !items) { sfTeardown(); return; }
         ensureStyle();
-        readLocale();
+
         var sprites = sfSprites();
         sfLink(sprites);
         if (sf.active && sf.count && sprites.length > sf.count) sf.active = '';
@@ -551,7 +551,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             sprites.forEach(function (s) { if (sfFolderOf(s) === sf.active) inFolder++; });
         }
         if (sf.active && !inFolder && sfFolderName(sf.active)) {
-            hint.textContent = t('sfEmpty');
+            hint.textContent = tr('sfEmpty');
             hint.style.display = '';
         } else {
             hint.style.display = 'none';

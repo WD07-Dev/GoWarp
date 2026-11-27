@@ -1,3 +1,4 @@
+import {tr} from '../translate';
 import type {PixelEditor} from './type';
 import type {PaintContext} from './context';
 
@@ -18,7 +19,6 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
     const {document, window} = context;
     const {later, listen, repeat} = context.lifecycle;
     const {isBitmapFormat, store, dispatch, paper} = context.editor;
-    const {t, readLocale} = context.locale;
     const {readTheme, applyTheme} = context.theme;
     const {anchorTarget, rasterItem, commit, paintEditorOpen, icon, clamp, paintingLayer, findLayer, refreshAnchorView, GLYPH} = services;
 
@@ -188,7 +188,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         later(function () {
             if (!isBitmapFormat()) return;
             var snap = snapBitmapPixels();
-            if (snap && snap.changed) pageToast(t('bitmapSnapped').replace('{ratio}', snap.ratio));
+            if (snap && snap.changed) pageToast(tr('bitmapSnapped').replace('{ratio}', snap.ratio));
         }, 160);
     }
 
@@ -231,9 +231,9 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         }
         hookConversion(native);
         var label = pxBtn.querySelector('span');
-        if (label) label.textContent = t('pixelOpen');
-        pxBtn.title = t('pixelArt');
-        pxBtn.setAttribute('aria-label', t('pixelArt'));
+        if (label) label.textContent = tr('pixelOpen');
+        pxBtn.title = tr('pixelArt');
+        pxBtn.setAttribute('aria-label', tr('pixelArt'));
         pxBtn.dataset.gwtPixel = String('1');
     }
 
@@ -663,7 +663,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         ed.gesture = {tool: tool, start: p, last: p, base: pxSnapshot(ed)};
         if (tool === 'move') {
             ed.gesture.box = pxBounds(ed.grid.data, ed.w, ed.h);
-            ed.note.textContent = t('pixelHelp');
+            ed.note.textContent = tr('pixelHelp');
             return;
         }
         var color = pxToolColor(ed, tool);
@@ -725,7 +725,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
             pxRender(ed);
         }
         pxUpdateButtons(ed);
-        ed.note.textContent = g.tool === 'brush' || g.tool === 'pencil' ? t('pixelHelp') : ed.note.textContent;
+        ed.note.textContent = g.tool === 'brush' || g.tool === 'pencil' ? tr('pixelHelp') : ed.note.textContent;
     }
 
     function pxUndo (ed) {
@@ -826,21 +826,21 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         if (!ed) return;
         if (ed.autoFixInput.checked) pxFixAlpha(ed.grid);
         if (!pxHasArt(ed.grid)) {
-            ed.note.textContent = t('pixelEmpty');
+            ed.note.textContent = tr('pixelEmpty');
             return;
         }
         var p = paper(), layer = paintingLayer();
         if (!p || !layer) {
-            ed.note.textContent = t('pxFail');
+            ed.note.textContent = tr('pxFail');
             return;
         }
         var vector = pxVectorPaths(ed);
         if (!vector.paths.length) {
-            ed.note.textContent = t('pixelEmpty');
+            ed.note.textContent = tr('pixelEmpty');
             return;
         }
         if (vector.count > 30000) {
-            ed.note.textContent = t('pxHeavy');
+            ed.note.textContent = tr('pxHeavy');
             return;
         }
         ed.busy = true;
@@ -873,13 +873,13 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         if (!commit()) {
             added.forEach(function (a) { a.remove(); });
             ed.busy = false;
-            ed.note.textContent = t('pxFail');
+            ed.note.textContent = tr('pxFail');
             return;
         }
         var target = ed.target;
         closePixelEditor();
         refreshAnchorView(target);
-        pageToast(t('pxApplied'));
+        pageToast(tr('pxApplied'));
     }
 
     function closePixelEditor () {
@@ -931,7 +931,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
     }
 
     function buildPixelEditor (src) {
-        readLocale();
+
         var bounds = pxBounds(src.ctx.getImageData(0, 0, src.W, src.H).data, src.W, src.H);
         var offX, offY, w, h, grid;
         if (!bounds) {
@@ -949,7 +949,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         var y0 = 360 - src.costumeH;
         var root = document.createElement('div');
         root.className = 'gwt-px';
-        root.setAttribute('dir', context.locale.isRtl ? 'rtl' : 'ltr');
+        root.setAttribute('dir', tr().isRtl ? 'rtl' : 'ltr');
         applyTheme(root, theme);
 
         var ed: PixelEditor = {
@@ -963,29 +963,29 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         var head = document.createElement('div');
         head.className = 'gwt-px-head';
         var title = document.createElement('strong');
-        title.textContent = t('pixelArt');
+        title.textContent = tr('pixelArt');
         var sub = document.createElement('span');
         sub.className = 'gwt-px-sub';
-        sub.textContent = t('pixelSub') + ' · ' + w + '×' + h;
+        sub.textContent = tr('pixelSub') + ' · ' + w + '×' + h;
         var undo = document.createElement('button');
         undo.type = 'button';
         undo.className = 'gwt-px-icon';
-        undo.title = t('undo');
-        undo.setAttribute('aria-label', t('undo'));
+        undo.title = tr('undo');
+        undo.setAttribute('aria-label', tr('undo'));
         undo.innerHTML = GLYPH.undo;
         listen(undo, 'click', function () { pxUndo(ed); });
         var redo = document.createElement('button');
         redo.type = 'button';
         redo.className = 'gwt-px-icon';
-        redo.title = t('redo');
-        redo.setAttribute('aria-label', t('redo'));
+        redo.title = tr('redo');
+        redo.setAttribute('aria-label', tr('redo'));
         redo.innerHTML = icon('<path d="M16 8.5H7.5a4 4 0 1 0 0 8H13"/><path d="M16 8.5 13 5.5M16 8.5l-3 3"/>');
         listen(redo, 'click', function () { pxRedo(ed); });
         var close = document.createElement('button');
         close.type = 'button';
         close.className = 'gwt-px-icon gwt-px-close';
-        close.setAttribute('aria-label', t('close'));
-        close.title = t('close');
+        close.setAttribute('aria-label', tr('close'));
+        close.title = tr('close');
         close.textContent = '✕';
         listen(close, 'click', closePixelEditor);
         head.append(title, sub, undo, redo, close);
@@ -1005,8 +1005,8 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
             var b = document.createElement('button');
             b.type = 'button';
             b.className = 'gwt-px-tool';
-            b.title = t(row[2]);
-            b.setAttribute('aria-label', t(row[2]));
+            b.title = tr(row[2]);
+            b.setAttribute('aria-label', tr(row[2]));
             b.dataset.tool = String(row[0]);
             b.innerHTML = PX_ICONS[row[1]];
             listen(b, 'click', function () { setTool(row[0]); });
@@ -1039,7 +1039,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         }
         var colorLabel = document.createElement('label');
         colorLabel.className = 'gwt-px-field';
-        colorLabel.textContent = t('color');
+        colorLabel.textContent = tr('color');
         var colorInput = document.createElement('input');
         colorInput.type = 'color';
         colorInput.value = ed.color;
@@ -1071,7 +1071,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         var sizeLabel = document.createElement('label');
         sizeLabel.className = 'gwt-px-field';
         var sizeText = document.createElement('span');
-        sizeText.textContent = t('size');
+        sizeText.textContent = tr('size');
         var sizeInput = document.createElement('input');
         sizeInput.type = 'range';
         sizeInput.min = 1;
@@ -1091,7 +1091,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         fillInput.type = 'checkbox';
         fillInput.checked = true;
         listen(fillInput, 'change', function () { ed.filled = fillInput.checked; });
-        fillLabel.append(fillInput, document.createTextNode(t('filled')));
+        fillLabel.append(fillInput, document.createTextNode(tr('filled')));
         side.appendChild(fillLabel);
         var gridLabel = document.createElement('label');
         gridLabel.className = 'gwt-px-check';
@@ -1102,18 +1102,18 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
             ed.gridOn = gridInput.checked;
             pxRender(ed);
         });
-        gridLabel.append(gridInput, document.createTextNode(t('gridOn')));
+        gridLabel.append(gridInput, document.createTextNode(tr('gridOn')));
         side.appendChild(gridLabel);
         var fixLabel = document.createElement('label');
         fixLabel.className = 'gwt-px-check';
         var fixInput = document.createElement('input');
         fixInput.type = 'checkbox';
         fixInput.checked = true;
-        fixLabel.append(fixInput, document.createTextNode(t('autoFix')));
+        fixLabel.append(fixInput, document.createTextNode(tr('autoFix')));
         side.appendChild(fixLabel);
         var help = document.createElement('p');
         help.className = 'gwt-px-help';
-        help.textContent = t('pixelHelp');
+        help.textContent = tr('pixelHelp');
         side.appendChild(help);
 
         var foot = document.createElement('div');
@@ -1124,7 +1124,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         zoomOut.type = 'button';
         zoomOut.className = 'gwt-px-zoom';
         zoomOut.textContent = '−';
-        zoomOut.title = t('zoom');
+        zoomOut.title = tr('zoom');
         listen(zoomOut, 'click', function () { pxZoom(ed, -1); });
         var zoomLabel = document.createElement('span');
         zoomLabel.className = 'gwt-px-zoomval';
@@ -1132,22 +1132,22 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         zoomIn.type = 'button';
         zoomIn.className = 'gwt-px-zoom';
         zoomIn.textContent = '+';
-        zoomIn.title = t('zoom');
+        zoomIn.title = tr('zoom');
         listen(zoomIn, 'click', function () { pxZoom(ed, 1); });
         var fit = document.createElement('button');
         fit.type = 'button';
         fit.className = 'gwt-px-zoom gwt-px-fit';
-        fit.textContent = t('fit');
+        fit.textContent = tr('fit');
         listen(fit, 'click', function () { pxFit(ed); });
         var cancel = document.createElement('button');
         cancel.type = 'button';
         cancel.className = 'gwt-px-cancel';
-        cancel.textContent = t('cancel');
+        cancel.textContent = tr('cancel');
         listen(cancel, 'click', closePixelEditor);
         var apply = document.createElement('button');
         apply.type = 'button';
         apply.className = 'gwt-px-apply';
-        apply.textContent = t('applyVector');
+        apply.textContent = tr('applyVector');
         listen(apply, 'click', pxApply);
         foot.append(note, zoomOut, zoomLabel, zoomIn, fit, cancel, apply);
 
@@ -1172,7 +1172,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
                 ed.autoFixInput = fixInput;
                 if (fixInput.checked) {
                     var fixed = pxFixAlpha(ed.grid);
-                    if (fixed) note.textContent = fixed + ' ' + t('autoFixed');
+                    if (fixed) note.textContent = fixed + ' ' + tr('autoFixed');
                 }
                 pxFit(ed);
             }
@@ -1187,19 +1187,19 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         if (pxEd) return;
         var target = anchorTarget();
         if (!target) {
-            pageToast(t('pixelNoTarget'));
+            pageToast(tr('pixelNoTarget'));
             return;
         }
         var wasBitmap = isBitmapFormat();
-        if (wasBitmap) pageToast(t('converting'));
+        if (wasBitmap) pageToast(tr('converting'));
         ensureVectorCostume().then(function (ok) {
             if (!ok) {
-                pageToast(t('pixelNoTarget'), true);
+                pageToast(tr('pixelNoTarget'), true);
                 return;
             }
             rasterizeCostume().then(function (src) {
                 if (!src) {
-                    pageToast(t('pixelNoTarget'), true);
+                    pageToast(tr('pixelNoTarget'), true);
                     return;
                 }
                 buildPixelEditor(src);
