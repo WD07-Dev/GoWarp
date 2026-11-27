@@ -42,22 +42,16 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         var native = document.querySelector('[class*="mode-selector"] [class*="mod-tool-select"]');
         if (native && !native.classList.contains('gwt-tool')) native.click();
     }
-    function selectObject(item: any) {
+    function selectObject(item: any, toggle: boolean = false) {
         var p = paper();
-        if(!p) return false;
-        if(item.locked) return false;
+        if(!p || item.locked) return false;
         useSelectTool();
-        objectList().forEach(function (it: any) { it.selected = false; });
-        item.selected = true;
-        p.view.update();
-        return true;
-    }
-    function toggleSelectObject(item: any) {
-        var p = paper();
-        if(!p) return false;
-        if(item.locked) return false;
-        useSelectTool();
-        item.selected = !item.selected;
+        if(toggle) {
+            item.selected = !item.selected;
+        }else {
+            objectList().forEach(function (it: any) { it.selected = false; });
+            item.selected = true;
+        }
         p.view.update();
         return true;
     }
@@ -224,11 +218,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         name.textContent = objectName(item, index, total);
         name.title = name.textContent;
         listen(name, 'click', function (e: PointerEvent) {
-            if(e.shiftKey || e.ctrlKey || e.metaKey) {
-                toggleSelectObject(item);
-            }else {
-                selectObject(item);
-            }
+            selectObject(item, e.shiftKey || e.ctrlKey || e.metaKey);
             markObjects();
         });
         listen(name, 'dblclick', (e: MouseEvent) => {

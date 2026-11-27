@@ -713,17 +713,12 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         ed.note.textContent = g.tool === 'brush' || g.tool === 'pencil' ? tr('pixelHelp') : ed.note.textContent;
     }
 
-    function pxUndo(ed: PixelEditor) {
-        if(!ed.undo.length) return;
-        ed.redo.push(pxSnapshot(ed));
-        ed.grid = ed.undo.pop();
-        pxRender(ed);
-        pxUpdateButtons(ed);
-    }
-    function pxRedo(ed: PixelEditor) {
-        if(!ed.redo.length) return;
-        ed.undo.push(pxSnapshot(ed));
-        ed.grid = ed.redo.pop();
+    function pxRestoreHistory(ed: PixelEditor, direction: 'undo' | 'redo') {
+        const source = ed[direction];
+        if(!source.length) return;
+        const destination = direction === 'undo' ? ed.redo : ed.undo;
+        destination.push(pxSnapshot(ed));
+        ed.grid = source.pop();
         pxRender(ed);
         pxUpdateButtons(ed);
     }
@@ -885,7 +880,7 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         if(e.ctrlKey || e.metaKey) {
             if(e.key.toLowerCase() === 'z') {
                 e.preventDefault();
-                if(e.shiftKey) pxRedo(ed); else pxUndo(ed);
+                pxRestoreHistory(ed, e.shiftKey ? 'redo' : 'undo');
             }
             return;
         }
@@ -968,14 +963,14 @@ export function createPixelEditor(context: PaintContext, services: PixelServices
         undo.title = tr('undo');
         undo.setAttribute('aria-label', tr('undo'));
         undo.innerHTML = GLYPH.undo;
-        listen(undo, 'click', function () { pxUndo(ed); });
+        listen(undo, 'click', function () { pxRestoreHistory(ed, 'undo'); });
         var redo = document.createElement('button');
         redo.type = 'button';
         redo.className = 'gwt-px-icon';
         redo.title = tr('redo');
         redo.setAttribute('aria-label', tr('redo'));
         redo.innerHTML = icon('<path d="M16 8.5H7.5a4 4 0 1 0 0 8H13"/><path d="M16 8.5 13 5.5M16 8.5l-3 3"/>');
-        listen(redo, 'click', function () { pxRedo(ed); });
+        listen(redo, 'click', function () { pxRestoreHistory(ed, 'redo'); });
         var close = document.createElement('button');
         close.type = 'button';
         close.className = 'gwt-px-icon gwt-px-close';

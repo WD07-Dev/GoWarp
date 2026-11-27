@@ -11,13 +11,13 @@ export function installExtensions(Scratch: ScratchHost): () => void {
     }
     const originalLoad = sm.canLoadExtensionFromProject;
     const originalMode = sm.getSandboxMode;
-    const load = (url: string, ...args: unknown[]) => {
+    const load = function (this: typeof sm, url: string, ...args: unknown[]) {
         if(approvals.has(url)) return Promise.resolve(true);
         return originalLoad.call(this, url, ...args);
     };
-    const mode = (url: string, ...args: unknown[]) => {
-        if(approvals.get(url) === 'unsandboxed') return 'unsandboxed';
-        if(approvals.get(url) === 'iframe') return 'iframe';
+    const mode = function (this: typeof sm, url: string, ...args: unknown[]) {
+        const approvedMode = approvals.get(url);
+        if(approvedMode === 'unsandboxed' || approvedMode === 'iframe') return approvedMode;
         return originalMode.call(this, url, ...args);
     };
     function install() {
@@ -33,10 +33,10 @@ export function installExtensions(Scratch: ScratchHost): () => void {
         if(sm.canLoadExtensionFromProject === load) sm.canLoadExtensionFromProject = originalLoad;
         if(sm.getSandboxMode === mode) sm.getSandboxMode = originalMode;
     }
-    function node<K extends keyof HTMLElementTagNameMap>(tag: K, text: string = '', style?: Partial<CSSStyleDeclaration>): HTMLElementTagNameMap[K] {
+    function node<K extends keyof HTMLElementTagNameMap>(tag: K, text: string = '', className: string = ''): HTMLElementTagNameMap[K] {
         const e = document.createElement(tag);
         if(text) e.textContent = text;
-        if(style) Object.assign(e.style, style);
+        if(className) e.className = className;
         return e;
     }
     let dialog: HTMLDialogElement;
@@ -97,20 +97,19 @@ export function installExtensions(Scratch: ScratchHost): () => void {
         const panel = node('dialog');
         panel.id = 'gowarp-toolkit-dialog';
         panel.setAttribute('aria-labelledby','gowarp-toolkit-title');
-        const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text: string = '', cls: string = '') => { const e = node(tag,text); if (cls) e.className=cls; return e; };
-        const header = make('div','','em-header');
-        const title = make('h2',tr('toolkitName')); title.id='gowarp-toolkit-title';
-        const session = make('span','','em-muted');
+        const header = node('div','','em-header');
+        const title = node('h2',tr('toolkitName')); title.id='gowarp-toolkit-title';
+        const session = node('span','','em-muted');
         header.append(title,session);
-        const help = make('p', review ? tr('extensions.reviewIncoming') : tr('extensions.reviewCurrent'));
-        const warning = make('p',tr('extensions.warning'),'em-warning');
-        const summary = make('div','','em-summary');
-        const projectLabel = make('strong',tr('extensions.title'));
-        const selection = make('span','','em-muted'); summary.append(projectLabel,selection);
-        const status = make('p','','em-status'); status.setAttribute('role','status');
-        const list = make('div','','em-list');
-        const controls = make('div','','em-toolbar');
-        const footer = make('div','','em-footer');
+        const help = node('p', review ? tr('extensions.reviewIncoming') : tr('extensions.reviewCurrent'));
+        const warning = node('p',tr('extensions.warning'),'em-warning');
+        const summary = node('div','','em-summary');
+        const projectLabel = node('strong',tr('extensions.title'));
+        const selection = node('span','','em-muted'); summary.append(projectLabel,selection);
+        const status = node('p','','em-status'); status.setAttribute('role','status');
+        const list = node('div','','em-list');
+        const controls = node('div','','em-toolbar');
+        const footer = node('div','','em-footer');
         const rows: ExtensionRow[]=[];
         function button(text: string,handler: (event: MouseEvent) => void) { const b=node('button',text); b.type='button'; b.addEventListener('click',handler); return b; }
         let closed=false;
@@ -145,14 +144,24 @@ export function installExtensions(Scratch: ScratchHost): () => void {
             refresh();
         });
         approve.dataset.primary='';
-        const selectAll = button(tr('extensions.selectAll'),()=>{rows.forEach((r: ExtensionRow)=>r.check.checked=true);refresh();});
-        const selectNone = button(tr('extensions.selectNone'),()=>{rows.forEach((r: ExtensionRow)=>r.check.checked=false);refresh();});
-        const sandboxed = button(tr('extensions.setSandboxed'),()=>{rows.filter((r: ExtensionRow)=>r.check.checked).forEach((r: ExtensionRow)=>r.mode.value='iframe');refresh();});
-        const unsandboxed = button(tr('extensions.setUnsandboxed'),()=>{rows.filter((r: ExtensionRow)=>r.check.checked).forEach((r: ExtensionRow)=>r.mode.value='unsandboxed');refresh();});
+        function setSelection(checked: boolean) {
+            for(const row of rows) row.check.checked = checked;
+            refresh();
+        }
+        function setSandboxMode(mode: 'iframe' | 'unsandboxed') {
+            for(const row of rows) {
+                if(row.check.checked) row.mode.value = mode;
+            }
+            refresh();
+        }
+        const selectAll = button(tr('extensions.selectAll'), () => setSelection(true));
+        const selectNone = button(tr('extensions.selectNone'), () => setSelection(false));
+        const sandboxed = button(tr('extensions.setSandboxed'), () => setSandboxMode('iframe'));
+        const unsandboxed = button(tr('extensions.setUnsandboxed'), () => setSandboxMode('unsandboxed'));
         controls.append(selectAll, selectNone, sandboxed, unsandboxed);
         if(!review) controls.append(button(tr('extensions.refresh'),()=>showCurrentProject()));
         const clearButton = button(tr('extensions.clearApprovals'),()=>{clear();rows.forEach((r: ExtensionRow)=>{r.check.checked=false;r.mode.value='default';});status.textContent=tr('extensions.policyRestored');refresh();});
-        footer.append(clearButton, make('span','','em-spacer'), button(review ? tr('cancel') : tr('close'), ()=> close(false)), approve);
+        footer.append(clearButton, node('span','','em-spacer'), button(review ? tr('cancel') : tr('close'), ()=> close(false)), approve);
         function refresh() {
             const count=rows.filter((r: ExtensionRow)=>r.check.checked).length;
             session.textContent=tr('extensions.sessionApproved', {count: approvals.size});
@@ -168,17 +177,17 @@ export function installExtensions(Scratch: ScratchHost): () => void {
             list.replaceChildren();rows.length=0;
             projectLabel.textContent=name;
             for(const [id,url] of entriesFor(project)){
-                const item=make('div','','em-item');
-                const label=make('label');
+                const item=node('div','','em-item');
+                const label=node('label');
                 const check=node('input');check.type='checkbox';check.checked=approvals.has(url);check.addEventListener('change',refresh);
                 label.append(check,node('span',id));
-                const detail=make('div',url.startsWith('data:')?tr('extensions.embedded', {count: url.length.toLocaleString()}):url,'em-detail');
+                const detail=node('div',url.startsWith('data:')?tr('extensions.embedded', {count: url.length.toLocaleString()}):url,'em-detail');
                 const select=node('select');
                 for(const [value,text] of [['default',tr('extensions.defaultPolicy')],['iframe',tr('extensions.sandboxed')],['unsandboxed',tr('extensions.unsandboxed')]]){const option=node('option',text);option.value=value;select.append(option);}
                 select.value=approvals.get(url)||'default';select.setAttribute('aria-label',tr('extensions.sandboxMode', {id}));
                 item.append(label,select,detail);list.append(item);rows.push({check,mode:select,url});
             }
-            if(!rows.length)list.append(make('div',tr('extensions.empty'),'em-empty'));
+            if(!rows.length)list.append(node('div',tr('extensions.empty'),'em-empty'));
             status.textContent=review?tr('extensions.unselectedPolicy'):tr('extensions.futureLoads');
             refresh();
         }
@@ -188,12 +197,11 @@ export function installExtensions(Scratch: ScratchHost): () => void {
             }catch(e) {
                 list.replaceChildren(); rows.length=0;
                 projectLabel.textContent=tr('extensions.currentProject');
-                list.append(make('div',tr('extensions.readFailed'),'em-empty'));
+                list.append(node('div',tr('extensions.readFailed'),'em-empty'));
                 status.textContent=String(e.message || e); refresh();
             }
         }
-        panel.append(header);
-        panel.append(help,warning,summary,controls,list,status,footer);
+        panel.append(header,help,warning,summary,controls,list,status,footer);
         document.body.append(panel);dialog=panel;
         panel.addEventListener('cancel',(e: Event)=>{e.preventDefault();close(false);});
         panel.addEventListener('close',()=>close(false));
@@ -202,7 +210,7 @@ export function installExtensions(Scratch: ScratchHost): () => void {
         panel.showModal();
         (rows[0]?.check||approve).focus();
     }
-    const extensionLoad = async (extensionIDs: Iterable<string>, extensionURLs: Map<string, string> = new Map(), ...args: unknown[]) => {
+    const extensionLoad = async function (this: typeof vm, extensionIDs: Iterable<string>, extensionURLs: Map<string, string> = new Map(), ...args: unknown[]) {
         const urls: Record<string, string> = Object.create(null);
         const manager = this.extensionManager;
         if(extensionIDs && typeof extensionIDs[Symbol.iterator] === 'function' && typeof extensionURLs?.get === 'function') {
