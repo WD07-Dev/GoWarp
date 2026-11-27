@@ -600,7 +600,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         sf.theme = '';
         Array.prototype.forEach.call(document.querySelectorAll('.gwt-sf-tile'), function (b: HTMLElement) { b.remove(); });
         var scroll = document.querySelector('[class*="sprite-selector_scroll-wrapper"]');
-        if (!scroll) return;
+        if(!scroll) return;
         Array.prototype.forEach.call(scroll.querySelectorAll('[class*="sprite-selector_sprite-wrapper"]'), function (w: HTMLElement) {
             if (w.style.display === 'none') w.style.display = '';
         });

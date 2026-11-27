@@ -57,8 +57,6 @@ export function installExtensions(Scratch: ScratchHost): () => void {
     const style = node('style');
     style.id = 'gowarp-toolkit-style';
     style.textContent = `
-        #gowarp-toolkit-button {display:flex;align-items:center;align-self:center;gap:7px;min-height:32px;margin:0 8px;padding:0 14px;border:1px solid #ff8187;border-radius:6px;background:#c52f3b;color:#fff;font:700 13px sans-serif;cursor:pointer;white-space:nowrap;box-shadow:0 2px 5px #0003;}
-        #gowarp-toolkit-button:hover {background:#e13b48;}
         #gowarp-toolkit-dialog {box-sizing:border-box;width:min(640px,92vw);max-height:88vh;overflow:auto;padding:24px;border:1px solid #666;border-radius:10px;background:#202020;color:#eee;color-scheme:dark;font:14px/1.5 sans-serif;box-shadow:0 12px 50px #0008;}
         #gowarp-toolkit-dialog::backdrop {background:#0008;}
         #gowarp-toolkit-dialog h2 {margin:0;color:#ff4b51;font-size:22px;}
@@ -72,7 +70,7 @@ export function installExtensions(Scratch: ScratchHost): () => void {
         #gowarp-toolkit-dialog button:disabled {opacity:.45;cursor:default;}
         #gowarp-toolkit-dialog button[data-primary] {background:#a32a31;border-color:#c85e63;}
         #gowarp-toolkit-dialog button[data-primary]:hover:not(:disabled) {background:#c52f3b;}
-        #gowarp-toolkit-dialog button:focus-visible,#gowarp-toolkit-dialog input:focus-visible,#gowarp-toolkit-dialog select:focus-visible,#gowarp-toolkit-button:focus-visible {outline:2px solid #ff8187;outline-offset:2px;}
+        #gowarp-toolkit-dialog button:focus-visible,#gowarp-toolkit-dialog input:focus-visible,#gowarp-toolkit-dialog select:focus-visible {outline:2px solid #ff8187;outline-offset:2px;}
         #gowarp-toolkit-dialog input[type=checkbox] {accent-color:#c52f3b;width:16px;height:16px;margin:0;flex:none;}
         #gowarp-toolkit-dialog select {box-sizing:border-box;max-width:100%;min-width:0;padding:7px 9px;border:1px solid #666;border-radius:5px;background:#111;color:#eee;font:13px sans-serif;}
         #gowarp-toolkit-dialog .em-summary {margin:18px 0 8px;justify-content:space-between;}
@@ -264,25 +262,10 @@ export function installExtensions(Scratch: ScratchHost): () => void {
         }
     }
     Scratch.extensions.register(new Toolkit());
-    function attachButton() {
-        if(document.getElementById('gowarp-toolkit-button'))return;
-        const bar=document.querySelector('[class*="menu-bar_main-menu"]')||document.querySelector('[class*="menu-bar_menu-bar_"]');
-        if(!bar)return;
-        const launcher = node('button',tr('toolkitName'));
-        launcher.id = 'gowarp-toolkit-button';
-        launcher.type = 'button';
-        launcher.title = tr('extensions.launcherHint');
-        launcher.addEventListener('click', () => open());
-        bar.appendChild(launcher);
-    }
-    const observer = new MutationObserver(attachButton);
-    observer.observe(document.body,{childList:true,subtree:true});attachButton();
     return () => {
-        observer.disconnect();
         dialogClose?.();
         clear();
         if (vm._loadExtensions === extensionLoad) vm._loadExtensions = originalExtensionLoad;
-        document.getElementById('gowarp-toolkit-button')?.remove();
         style.remove();
     };
 }
