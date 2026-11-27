@@ -1,9 +1,8 @@
 import type { ScratchHost } from '../shared/scratch';
-import type { PaintTools } from '../paint/type';
 import { Project, Review, ExtensionRow } from './type';
 import { tr } from '../translate';
 
-export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () => void {
+export function installExtensions(Scratch: ScratchHost): () => void {
     const vm = Scratch.vm;
     const sm = vm.extensionManager.securityManager;
     const approvals = new Map();
@@ -106,12 +105,12 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
         const help = make('p', review ? tr('extensions.reviewIncoming') : tr('extensions.reviewCurrent'));
         const warning = make('p',tr('extensions.warning'),'em-warning');
         const summary = make('div','','em-summary');
-        const projectLabel=make('strong',tr('extensions.title'));
-        const selection=make('span','','em-muted'); summary.append(projectLabel,selection);
-        const status=make('p','','em-status'); status.setAttribute('role','status');
-        const list=make('div','','em-list');
-        const controls=make('div','','em-toolbar');
-        const footer=make('div','','em-footer');
+        const projectLabel = make('strong',tr('extensions.title'));
+        const selection = make('span','','em-muted'); summary.append(projectLabel,selection);
+        const status = make('p','','em-status'); status.setAttribute('role','status');
+        const list = make('div','','em-list');
+        const controls = make('div','','em-toolbar');
+        const footer = make('div','','em-footer');
         const rows: ExtensionRow[]=[];
         function button(text: string,handler: (event: MouseEvent) => void) { const b=node('button',text); b.type='button'; b.addEventListener('click',handler); return b; }
         let closed=false;
@@ -121,26 +120,40 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
             if(review) { if(proceed===true)review.resolve(); else review.reject(new Error(tr('extensions.cancelled'))); }
         };
         dialogClose=()=>close(false);
-        const approve=button(review?tr('extensions.approveAndOpen'):tr('extensions.approve'),()=>{
-            const chosen=rows.filter((r: ExtensionRow)=>r.check.checked);
-            if(!chosen.length&&!review){status.textContent=tr('extensions.selectRequired');return;}
-            if(chosen.some((r: ExtensionRow)=>r.mode.value==='unsandboxed')&&!window.confirm(tr('extensions.confirmUnsandboxed')))return;
-            try{install();}catch(e){status.textContent=e.message;return;}
-            if(review){for(const r of rows)if(!r.check.checked&&!chosen.some((c: ExtensionRow)=>c.url===r.url))approvals.delete(r.url);}
-            for(const r of chosen)approvals.set(r.url,r.mode.value);
-            if(review){close(true);return;}
-            status.textContent=tr('extensions.approved', {count: chosen.length});
+        const approve = button(review ? tr('extensions.approveAndOpen') : tr('extensions.approve'), () => {
+            const chosen = rows.filter((r: ExtensionRow) => r.check.checked);
+            if(!chosen.length && !review) {
+                status.textContent = tr('extensions.selectRequired');
+                return;
+            }
+            if(chosen.some((r: ExtensionRow) => r.mode.value==='unsandboxed') && !window.confirm(tr('extensions.confirmUnsandboxed')))return;
+            try {
+                install();
+            } catch(e) {
+                status.textContent = e.message;
+                return;
+            }
+            if(review) {
+                for(const r of rows) if(!r.check.checked && !chosen.some((c: ExtensionRow)=>c.url===r.url)) approvals.delete(r.url);
+            }
+            for(const r of chosen) approvals.set(r.url,r.mode.value);
+            if(review) {
+                close(true);
+                return;
+            }
+            status.textContent = tr('extensions.approved', {count: chosen.length});
             refresh();
-        }); approve.dataset.primary='';
-        const selectAll=button(tr('extensions.selectAll'),()=>{rows.forEach((r: ExtensionRow)=>r.check.checked=true);refresh();});
-        const selectNone=button(tr('extensions.selectNone'),()=>{rows.forEach((r: ExtensionRow)=>r.check.checked=false);refresh();});
-        const sandboxed=button(tr('extensions.setSandboxed'),()=>{rows.filter((r: ExtensionRow)=>r.check.checked).forEach((r: ExtensionRow)=>r.mode.value='iframe');refresh();});
-        const unsandboxed=button(tr('extensions.setUnsandboxed'),()=>{rows.filter((r: ExtensionRow)=>r.check.checked).forEach((r: ExtensionRow)=>r.mode.value='unsandboxed');refresh();});
-        controls.append(selectAll,selectNone,sandboxed,unsandboxed);
+        });
+        approve.dataset.primary='';
+        const selectAll = button(tr('extensions.selectAll'),()=>{rows.forEach((r: ExtensionRow)=>r.check.checked=true);refresh();});
+        const selectNone = button(tr('extensions.selectNone'),()=>{rows.forEach((r: ExtensionRow)=>r.check.checked=false);refresh();});
+        const sandboxed = button(tr('extensions.setSandboxed'),()=>{rows.filter((r: ExtensionRow)=>r.check.checked).forEach((r: ExtensionRow)=>r.mode.value='iframe');refresh();});
+        const unsandboxed = button(tr('extensions.setUnsandboxed'),()=>{rows.filter((r: ExtensionRow)=>r.check.checked).forEach((r: ExtensionRow)=>r.mode.value='unsandboxed');refresh();});
+        controls.append(selectAll, selectNone, sandboxed, unsandboxed);
         if(!review) controls.append(button(tr('extensions.refresh'),()=>showCurrentProject()));
-        const clearButton=button(tr('extensions.clearApprovals'),()=>{clear();rows.forEach((r: ExtensionRow)=>{r.check.checked=false;r.mode.value='default';});status.textContent=tr('extensions.policyRestored');refresh();});
-        footer.append(clearButton,make('span','','em-spacer'),button(review?tr('cancel'):tr('close'),()=>close(false)),approve);
-        function refresh(){
+        const clearButton = button(tr('extensions.clearApprovals'),()=>{clear();rows.forEach((r: ExtensionRow)=>{r.check.checked=false;r.mode.value='default';});status.textContent=tr('extensions.policyRestored');refresh();});
+        footer.append(clearButton, make('span','','em-spacer'), button(review ? tr('cancel') : tr('close'), ()=> close(false)), approve);
+        function refresh() {
             const count=rows.filter((r: ExtensionRow)=>r.check.checked).length;
             session.textContent=tr('extensions.sessionApproved', {count: approvals.size});
             selection.textContent=tr('extensions.selected', {count, total: rows.length});
@@ -151,7 +164,7 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
             approve.disabled=!review&&!count;
             approve.textContent=review?(count?tr('extensions.approveAndOpen'):tr('extensions.openDefault')):tr('extensions.approve');
         }
-        function showProject(project: Project,name: string){
+        function showProject(project: Project,name: string) {
             list.replaceChildren();rows.length=0;
             projectLabel.textContent=name;
             for(const [id,url] of entriesFor(project)){
@@ -169,7 +182,7 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
             status.textContent=review?tr('extensions.unselectedPolicy'):tr('extensions.futureLoads');
             refresh();
         }
-        function showCurrentProject(){
+        function showCurrentProject() {
             try {
                 showProject(currentProject(),tr('extensions.currentProject'));
             }catch(e) {
@@ -179,13 +192,7 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
                 status.textContent=String(e.message || e); refresh();
             }
         }
-        if(!review) {
-            const tools = make('div', '', 'em-toolbar');
-            tools.append(
-                button(tr('extensions.pixelEditor'), () => { close(); paint.openPixelEditor(); })
-            );
-            panel.append(header, tools, make('p', tr('extensions.toolsHint')));
-        }else panel.append(header);
+        panel.append(header);
         panel.append(help,warning,summary,controls,list,status,footer);
         document.body.append(panel);dialog=panel;
         panel.addEventListener('cancel',(e: Event)=>{e.preventDefault();close(false);});
@@ -195,7 +202,7 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
         panel.showModal();
         (rows[0]?.check||approve).focus();
     }
-    const extensionLoad = async function (extensionIDs: Iterable<string>, extensionURLs: Map<string, string> = new Map(), ...args: unknown[]) {
+    const extensionLoad = async (extensionIDs: Iterable<string>, extensionURLs: Map<string, string> = new Map(), ...args: unknown[]) => {
         const urls: Record<string, string> = Object.create(null);
         const manager = this.extensionManager;
         if(extensionIDs && typeof extensionIDs[Symbol.iterator] === 'function' && typeof extensionURLs?.get === 'function') {
@@ -224,7 +231,7 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
         }
     }
     Scratch.extensions.register(new Toolkit());
-    function attachButton(){
+    function attachButton() {
         if(document.getElementById('gowarp-toolkit-button'))return;
         const bar=document.querySelector('[class*="menu-bar_main-menu"]')||document.querySelector('[class*="menu-bar_menu-bar_"]');
         if(!bar)return;
@@ -233,7 +240,7 @@ export function installExtensions(Scratch: ScratchHost, paint: PaintTools): () =
         launcher.title=tr('extensions.launcherHint');
         launcher.addEventListener('click',()=>open());bar.appendChild(launcher);
     }
-    const observer=new MutationObserver(attachButton);
+    const observer = new MutationObserver(attachButton);
     observer.observe(document.body,{childList:true,subtree:true});attachButton();
     return () => {
         observer.disconnect();

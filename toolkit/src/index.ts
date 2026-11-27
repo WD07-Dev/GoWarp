@@ -14,7 +14,7 @@ if(!vm[key]) {
     const paint = installPaintTools(Scratch);
     let removeExtensions: () => void;
     try {
-        removeExtensions = installExtensions(Scratch, paint);
+        removeExtensions = installExtensions(Scratch);
     } catch (error) {
         paint.dispose();
         throw error;

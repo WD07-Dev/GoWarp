@@ -7,7 +7,16 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
     const { anchorTarget, findVM, markObjects, keyRow, toggleFor, labelEl } = services;
 
     var anchorCache: Record<string, AlphaStats> = {};
-    var anchorState = {probing: false, busy: false, list: null as AnchorMeasurement[] | null, spriteId: '', n: 0, mode: 'match', undo: null, result: null};
+    var anchorState = {
+        probing: false,
+        busy: false,
+        list: null as AnchorMeasurement[] | null,
+        spriteId: '',
+        n: 0,
+        mode: 'match',
+        undo: null,
+        result: null
+    };
 
     function alphaStats(img: CanvasImageSource, w: number, h: number, scale: number) {
         var s = Math.min(scale, 1400 / Math.max(w, h, 1));
@@ -18,17 +27,17 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         ctx.drawImage(img, 0, 0, cv.width, cv.height);
         var d = ctx.getImageData(0, 0, cv.width, cv.height).data;
         var sum = 0, sx = 0, sy = 0, minX = 1e9, minY = 1e9, maxX = -1, maxY = -1;
-        for (var y = 0; y < cv.height; y++) {
-            for (var x = 0; x < cv.width; x++) {
+        for(let y=0; y < cv.height; y++) {
+            for(let x=0; x < cv.width; x++) {
                 var a = d[(y * cv.width + x) * 4 + 3];
-                if (!a) continue;
+                if(!a) continue;
                 sum += a;
                 sx += x * a;
                 sy += y * a;
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
+                if(x < minX) minX = x;
+                if(x > maxX) maxX = x;
+                if(y < minY) minY = y;
+                if(y > maxY) maxY = y;
             }
         }
         var out: AlphaStats = {
@@ -58,7 +67,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             var h = Number((/\sheight="([\d.]+)"/.exec(txt) || [])[1]) || 0;
             return new Promise<AlphaStats>(function (res: (value: AlphaStats | PromiseLike<AlphaStats>) => void, rej: (reason?: unknown) => void) {
                 var img = new Image();
-                img.onload = function () {
+                img.onload = () => {
                     res(alphaStats(img, w || img.naturalWidth, h || img.naturalHeight, 4));
                 };
                 img.onerror = function () { rej(new Error('svg raster')); };
@@ -70,10 +79,10 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         .then((bmp: ImageBitmap) => {
             var s = alphaStats(bmp, bmp.width, bmp.height, 1);
             var res = Math.max(1, Number(c.bitmapResolution) || 1);
-            if (s.area && res > 1) {
+            if(s.area && res > 1) {
                 var inUnits = Math.hypot(s.cx / res - c.rotationCenterX, s.cy / res - c.rotationCenterY);
                 var inPixels = Math.hypot(s.cx - c.rotationCenterX, s.cy - c.rotationCenterY);
-                if (inUnits <= inPixels) {
+                if(inUnits <= inPixels) {
                     s.cx /= res;
                     s.cy /= res;
                     s.w /= res;
@@ -86,7 +95,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
 
     function measureOne(c: any) {
         var key = (c.md5 || c.assetId || '') + '|' + c.dataFormat + '|' + c.name;
-        if (anchorCache[key]) return Promise.resolve(anchorCache[key]);
+        if(anchorCache[key]) return Promise.resolve(anchorCache[key]);
         return costumeRaster(c).then(function (s: AlphaStats) {
             anchorCache[key] = s;
             var keys = Object.keys(anchorCache);
@@ -103,9 +112,11 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         anchorState.busy = true;
         return Promise.all(costumes.map(measureOne)).then(function (stats: AlphaStats[]) {
             anchorState.list = stats.map(function (s: AlphaStats, i: number) {
-                return {index: i, name: costumes[i].name, area: s.area || 0, cx: s.cx || 0, cy: s.cy || 0,
+                return {
+                    index: i, name: costumes[i].name, area: s.area || 0, cx: s.cx || 0, cy: s.cy || 0,
                     w: s.w || 0, h: s.h || 0, thumb: s.thumb || '',
-                    pivot: [costumes[i].rotationCenterX, costumes[i].rotationCenterY]};
+                    pivot: [costumes[i].rotationCenterX, costumes[i].rotationCenterY]
+                };
             });
             anchorState.spriteId = t.id;
             anchorState.n = costumes.length;
@@ -122,7 +133,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         var live = list.filter(function (s: AnchorMeasurement) { return s.area > 0; });
         if(!live.length) return null;
         var out = list.map(function (s: AnchorMeasurement) { return [s.pivot[0], s.pivot[1]]; });
-        if (mode === 'own') {
+        if(mode === 'own') {
             list.forEach(function (s: AnchorMeasurement, i: number) { if (s.area > 0) out[i] = [s.cx, s.cy]; });
             return out;
         }
@@ -152,28 +163,28 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         return {mean: pts.length > 1 ? tot / (pts.length - 1) : 0, max: max, steps: pts.length - 1};
     }
 
-    function px (v: number) {
+    function px(v: number) {
         return (Math.round(v * 10) / 10).toFixed(1);
     }
 
     function refreshAnchorView (t: any) {
         try {
             var idx = t.currentCostume, n = t.getCostumes().length;
-            if (n < 2) return;
+            if(n < 2) return;
             t.setCostume((idx + 1) % n);
             t.setCostume(idx);
             t.updateAllDrawableProperties();
             var vm = findVM();
-            if (vm && typeof vm.emitTargetsUpdate === 'function') vm.emitTargetsUpdate();
-            if (vm && typeof vm.emitProjectChanged === 'function') vm.emitProjectChanged();
+            if(vm && typeof vm.emitTargetsUpdate === 'function') vm.emitTargetsUpdate();
+            if(vm && typeof vm.emitProjectChanged === 'function') vm.emitProjectChanged();
         } catch (e) {}
     }
 
     function applyAnchor (mode: string) {
         var t = anchorTarget();
-        if (!t || !anchorState.list) return null;
+        if(!t || !anchorState.list) return null;
         var costumes = t.getCostumes();
-        if (costumes.length !== anchorState.n) {
+        if(costumes.length !== anchorState.n) {
             anchorState.list = null;
             return null;
         }
@@ -181,7 +192,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             s.pivot = [costumes[i].rotationCenterX, costumes[i].rotationCenterY];
         });
         var plan = anchorPlan(mode, anchorState.list);
-        if (!plan) return null;
+        if(!plan) return null;
         var before = anchorJump(anchorState.list, anchorState.list.map(function (s: AnchorMeasurement) { return s.pivot; }));
         var snapshot = costumes.map(function (c: any) { return [c.rotationCenterX, c.rotationCenterY]; });
         var written = 0;
@@ -240,12 +251,12 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
 
         var seg = document.createElement('div');
         seg.className = 'gwt-seg';
-        [['body', tr('anchorBody')], ['own', tr('anchorOwn')], ['match', tr('anchorFirst')]].forEach(function (row: string[]) {
+        [['body', tr('anchorBody')], ['own', tr('anchorOwn')], ['match', tr('anchorFirst')]].forEach((row: string[]) => {
             var b = document.createElement('button');
             b.type = 'button';
             b.dataset.mode = String(row[0]);
             b.textContent = row[1];
-            listen(b, 'click', function () {
+            listen(b, 'click', () => {
                 anchorState.mode = row[0];
                 markAnchor();
             });
@@ -263,9 +274,9 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         go.type = 'button';
         go.className = 'gwt-primary';
         go.textContent = tr('anchorApply');
-        listen(go, 'click', function () {
+        listen(go, 'click', () => {
             var r = applyAnchor(anchorState.mode);
-            if (r) {
+            if(r) {
                 markAnchor();
                 if (services.railEl) markObjects();
             }
@@ -275,8 +286,8 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         back.className = 'gwt-ghost';
         back.textContent = tr('anchorUndo');
         back.disabled = !anchorState.undo;
-        listen(back, 'click', function () {
-            if (undoAnchor()) markAnchor();
+        listen(back, 'click', () => {
+            if(undoAnchor()) markAnchor();
         });
         act.appendChild(go);
         act.appendChild(back);
@@ -286,7 +297,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
     }
 
     function markAnchor() {
-        if (!services.openPanel || services.openPanel._gwtKind !== 'anchor') return;
+        if(!services.openPanel || services.openPanel._gwtKind !== 'anchor') return;
         var panel = services.openPanel;
         var strong = panel.querySelector('.gwt-jump strong');
         var sub = panel.querySelector('.gwt-sub');
@@ -301,8 +312,8 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         var tgt = anchorTarget();
         if(!tgt || anchorState.busy) {
             strong.textContent = anchorState.busy ? '…' : '—';
-            if (sub) sub.textContent = tgt ? tr('anchorBusy') : tr('anchorNone');
-            if (go) go.disabled = true;
+            if(sub) sub.textContent = tgt ? tr('anchorBusy') : tr('anchorNone');
+            if(go) go.disabled = true;
             return;
         }
         var costumes = tgt.getCostumes();
@@ -314,10 +325,10 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             if(back) back.disabled = true;
             if(costumes.length > 1 && !anchorState.probing) {
                 anchorState.probing = true;
-                measureAnchor().then(function () {
+                measureAnchor().then(() => {
                     anchorState.probing = false;
                     markAnchor();
-                }, function () {
+                }, () => {
                     anchorState.probing = false;
                 });
             }
@@ -366,9 +377,9 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         });
     }
 
-    function showAnchorPanel (anchor: PaintElement) {
+    function showAnchorPanel(anchor: PaintElement) {
         var panel = toggleFor(anchor, 'anchor', 'gwt-wide');
-        if (!panel) return;
+        if(!panel) return;
         panel.appendChild(labelEl(tr('anchorTitle')));
         anchorBody(panel);
     }

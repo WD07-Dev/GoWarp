@@ -47,7 +47,7 @@ export function createEditorAccess(document: EditorDocument, window: EditorWindo
     function findStoreInTree () {
         var canvas = paintCanvas();
         var fiber = canvas ? fiberOf(canvas) : null;
-        for (var i = 0; i < 60 && fiber; i++) {
+        for(let i=0; i < 60 && fiber; i++) {
             var props = fiber.memoizedProps;
             if (props && props.value && props.value.store && typeof props.value.store.getState === 'function') {
                 return props.value.store;
