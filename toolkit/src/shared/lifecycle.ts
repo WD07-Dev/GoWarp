@@ -20,7 +20,7 @@ export function createLifecycle() {
     function later(callback: () => void, delay: number): number {
         const id = browser.setTimeout(() => {
             timers.delete(id);
-            if (!disposed) callback();
+            if(!disposed) callback();
         }, delay);
         timers.add(id);
         return id;
@@ -28,7 +28,7 @@ export function createLifecycle() {
 
     function repeat(callback: () => void, delay: number): number {
         const id = browser.setInterval(() => {
-            if (!disposed) callback();
+            if(!disposed) callback();
         }, delay);
         intervals.add(id);
         return id;
