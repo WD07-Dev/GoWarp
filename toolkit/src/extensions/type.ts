@@ -1,3 +1,5 @@
+export const toolkitExtensionId = 'gowarpToolkit';
+
 export interface Project {
     extensions?: string[];
     extensionURLs?: Record<string, string>;
