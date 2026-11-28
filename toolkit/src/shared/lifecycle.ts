@@ -39,7 +39,7 @@ export function createLifecycle() {
         later,
         repeat,
         dispose() {
-            if (disposed) return;
+            if(disposed) return;
             disposed = true;
             listeners.abort();
             timers.forEach((id: number) => browser.clearTimeout(id));

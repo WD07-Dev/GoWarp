@@ -13,8 +13,8 @@ export function createFolders(context: PaintContext, services: FolderServices) {
     var pageToastTimer = 0;
 
     function pageToast(text: string, bad?: boolean) {
-        if (!text) return;
-        if (!pageToastEl) {
+        if(!text) return;
+        if(!pageToastEl) {
             pageToastEl = document.createElement('div');
             pageToastEl.className = 'gwt-toast';
             document.body.appendChild(pageToastEl);
@@ -66,19 +66,19 @@ export function createFolders(context: PaintContext, services: FolderServices) {
         sf.data = {folders: Array.from(names, (name: string) => ({id: name, name}))};
         return sf.data;
     }
-    function sfPane () {
+    function sfPane() {
         return document.querySelector('[class*="sprite-selector_sprite-selector"]');
     }
-    function sfTiles (): HTMLElement[] {
+    function sfTiles(): HTMLElement[] {
         var scroll = document.querySelector('[class*="sprite-selector_scroll-wrapper"]');
         if(!scroll) return [];
         return Array.prototype.slice.call(scroll.querySelectorAll('[class*="sprite-selector-item_sprite-selector-item"]'));
     }
-    function sfTileName (tile: Element) {
+    function sfTileName(tile: Element) {
         var n = tile && tile.querySelector('[class*="sprite-selector-item_sprite-name"]');
         return n ? (n.textContent || '') : '';
     }
-    function sfSprites (): SpriteInfo[] {
+    function sfSprites(): SpriteInfo[] {
         var out = [];
         var vm = findVM();
         if(vm && vm.runtime && vm.runtime.targets) {
@@ -170,7 +170,7 @@ export function createFolders(context: PaintContext, services: FolderServices) {
             let n = 1;
             do {
                 name = base + ' ' + n++;
-            } while (sfNameTaken(name));
+            } while(sfNameTaken(name));
         }
         if(!sfValidName(name)) return null;
         if(sfNameTaken(name)) {

@@ -290,7 +290,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
             settings.grad.extras.push(usable(c) ? c : '#8899aa');
         }
     })();
-    
+
     function saveSettings() {
         save(settings);
     }
@@ -674,7 +674,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
         button: null,
         shape: null as Shape | null,
         start: null,
-        cursor: function (on: boolean) {
+        cursor: function(on: boolean) {
             var canvas = document.querySelector('canvas[class*="paper-canvas"]');
             if(canvas) canvas.style.cursor = on ? 'crosshair' : '';
         },
@@ -732,7 +732,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
             }
             previewShape(shaper.shape, shaper.boxOf(shaper.start, point) || shaper.start);
         },
-        onUp: function (e: PointerEvent) {
+        onUp: function(e: PointerEvent) {
             document.removeEventListener('pointermove', shaper.onMove, true);
             document.removeEventListener('pointerup', shaper.onUp, true);
             document.removeEventListener('pointercancel', shaper.onUp, true);
@@ -770,9 +770,9 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
         var layer = paintingLayer();
         var top = null;
         if(layer) {
-            (function find (node: any) {
-                if (node.locked) return;
-                if (items.indexOf(node) >= 0) {
+            (function find(node: any) {
+                if(node.locked) return;
+                if(items.indexOf(node) >= 0) {
                     top = node;
                     return;
                 }
@@ -857,7 +857,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
         if(!p || !items.length || (on && !canMask())) return false;
         var top = topOf(items);
         artItems().forEach(function (item: any) {
-            if (item.clipMask && items.indexOf(item) < 0) item.clipMask = false;
+            if(item.clipMask && items.indexOf(item) < 0) item.clipMask = false;
         });
         items.forEach(function (item: any) {
             item.clipMask = on && item === top;
@@ -907,7 +907,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
     }
     function artSvg() {
         var p = paper();
-        if (!p) return null;
+        if(!p) return null;
         var svg = null;
         try {
             var box = artBox(p);
@@ -967,13 +967,13 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
 
     function pickerBody() {
         var body = document.querySelector('[class*="Popover-body"]');
-        if (!body || !body.querySelector('[class*="color-picker_gradient-picker-row"]')) return null;
+        if(!body || !body.querySelector('[class*="color-picker_gradient-picker-row"]')) return null;
         return body;
     }
     function gradBarCss() {
         var p = paper();
         var stops = gradStops(gradTarget);
-        if (!p || !stops) return '';
+        if(!p || !stops) return '';
         return gradientCss(p, stops, gradType(gradTarget) || 'VERTICAL');
     }
     function hex6(css: string) {
@@ -1428,7 +1428,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
         points: [],
         preview: null,
 
-        activate: function (profile: typeof PENS[number]) {
+        activate: function(profile: typeof PENS[number]) {
             this.deactivate();
             shaper.disarm();
             if(!paper()) return;
@@ -1439,7 +1439,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
             markArmed(this.button, true);
             refreshToolLabels();
         },
-        deactivate: function () {
+        deactivate: function() {
             document.removeEventListener('pointerdown', this.onDown, true);
             markArmed(this.button, false);
             if(!this.active) return;
@@ -1449,13 +1449,13 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
             this.points = [];
             refreshToolLabels();
         },
-        clearPreview: function () {
+        clearPreview: function() {
             if(this.preview) {
                 this.preview.remove();
                 this.preview = null;
             }
         },
-        widthAt: function (t: number, pressure: number, angle: number) {
+        widthAt: function(t: number, pressure: number, angle: number) {
             var prof = this.profile;
             var base = settings.penSize;
             var pr = settings.penPressure ? clamp(pressure, 0.05, 1) : 0.6;
@@ -1467,14 +1467,14 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
             var taper = prof.taper * Math.sin(Math.PI * clamp(t, 0, 1));
             return Math.max(0.6, width * (1 - taper * 0.6));
         },
-        toProject: function (e: MouseEvent) {
+        toProject: function(e: MouseEvent) {
             var p = paper();
             var canvas = document.querySelector('canvas[class*="paper-canvas"]');
             if(!p || !canvas) return null;
             var rect = canvas.getBoundingClientRect();
             return p.project.view.viewToProject(new p.Point(e.clientX - rect.left, e.clientY - rect.top));
         },
-        onDown: function (e: PointerEvent) {
+        onDown: function(e: PointerEvent) {
             if(!pen.active) return;
             var canvas = e.target && (e.target as Element).closest ? (e.target as Element).closest('canvas[class*="paper-canvas"]') : null;
             if(!canvas) return;
@@ -1488,7 +1488,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
             listen(document, 'pointerup', pen.onUp, true);
             listen(document, 'pointercancel', pen.onUp, true);
         },
-        onMove: function (e: PointerEvent) {
+        onMove: function(e: PointerEvent) {
             if(!pen.active || !pen.points.length) return;
             e.stopPropagation();
             var raw = pen.toProject(e);
@@ -1501,14 +1501,14 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
             pen.points.push({x: x, y: y, p: e.pressure || last.p});
             pen.drawPreview();
         },
-        onUp: function (e: PointerEvent) {
+        onUp: function(e: PointerEvent) {
             if(e) e.stopPropagation();
             document.removeEventListener('pointermove', pen.onMove, true);
             document.removeEventListener('pointerup', pen.onUp, true);
             document.removeEventListener('pointercancel', pen.onUp, true);
             pen.endStroke();
         },
-        outline: function () {
+        outline: function() {
             var pts = this.points;
             if(pts.length < 2) return [];
             var left = [];
@@ -1804,7 +1804,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
                 if (!e.altKey) return;
                 e.preventDefault();
                 stepNib(e.deltaY < 0 ? 1 : -1);
-            }, {passive: false});
+            }, { passive: false });
         }
     }
 

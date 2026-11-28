@@ -18,12 +18,12 @@ if(!vm[key]) {
         throw error;
     }
     const dispose = () => {
-        if (!vm[key]) return;
+        if(!vm[key]) return;
         removeExtensions();
         paint.dispose();
         window.removeEventListener('pagehide', dispose);
         delete vm[key];
     };
-    vm[key] = {dispose};
+    vm[key] = { dispose };
     window.addEventListener('pagehide', dispose, {once: true});
 }

@@ -31,7 +31,7 @@ export function createCostumeTools(context: PaintContext, services: CostumeServi
             }
             img.onload = () => done();
             img.onerror = () => done(new Error('Image unavailable'));
-            signal.addEventListener('abort', abort, {once: true});
+            signal.addEventListener('abort', abort, { once: true });
             if(signal.aborted) abort();
             else img.src = url;
         });
@@ -60,7 +60,6 @@ export function createCostumeTools(context: PaintContext, services: CostumeServi
             if(['x', 'y', 'width', 'height', 'viewBox', 'preserveAspectRatio', 'xmlns'].includes(attr.name)) continue;
             content.setAttributeNS(attr.namespaceURI, attr.name, attr.value);
         }
-        // Scratch flattens group transforms without accounting for nested SVG viewports.
         content.setAttribute('transform', `translate(${x} ${y}) ${node.getAttribute('transform') || ''} scale(${width / viewBox.width} ${height / viewBox.height}) translate(${-viewBox.x} ${-viewBox.y})`);
         content.append(...Array.from(node.childNodes));
         group.append(clip, content);
@@ -193,9 +192,10 @@ export function createCostumeTools(context: PaintContext, services: CostumeServi
             try {
                 valid();
                 if(reverting) {
-                    if(undo?.target !== target || undo.changes.some(({costume, after}) =>
-                        !target.getCostumes().includes(costume) || costume.asset !== after.asset || costume.skinId !== after.skinId ||
-                        costume.rotationCenterX !== after.rotationCenterX || costume.rotationCenterY !== after.rotationCenterY)) {
+                    if(undo?.target !== target || undo.changes.some(({costume, after}) => {
+                        return !target.getCostumes().includes(costume) || costume.asset !== after.asset || costume.skinId !== after.skinId ||
+                        costume.rotationCenterX !== after.rotationCenterX || costume.rotationCenterY !== after.rotationCenterY
+                    })) {
                         throw new Error(tr('costumesChanged'));
                     }
                     for(const {costume, before, after} of undo.changes) {
@@ -209,8 +209,7 @@ export function createCostumeTools(context: PaintContext, services: CostumeServi
                 }
                 const picked = checks.filter(({input}) => input.checked).map(({costume}) => ({
                     costume,
-                    before: Object.fromEntries(['asset', 'assetId', 'md5', 'dataFormat', 'bitmapResolution',
-                        'skinId', 'rotationCenterX', 'rotationCenterY', 'size', 'broken'].map((key: string) => [key, costume[key]]))
+                    before: Object.fromEntries(['asset', 'assetId', 'md5', 'dataFormat', 'bitmapResolution', 'skinId', 'rotationCenterX', 'rotationCenterY', 'size', 'broken'].map((key: string) => [key, costume[key]]))
                 }));
                 if(!picked.length) return;
                 for(const {costume, before} of picked) {
@@ -271,8 +270,7 @@ export function createCostumeTools(context: PaintContext, services: CostumeServi
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(original, -left, -top);
                             ctx.drawImage(overlay, 0, 0, width, height);
-                            const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value: Blob | null) =>
-                                value ? resolve(value) : reject(new Error('PNG encoding failed')), 'image/png'));
+                            const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value: Blob | null) => value ? resolve(value) : reject(new Error('PNG encoding failed')), 'image/png'));
                             asset = storage.createAsset(storage.AssetType.ImageBitmap, storage.DataFormat.PNG, new Uint8Array(await blob.arrayBuffer()), null, true);
                             valid();
                             skinId = renderer.createBitmapSkin(canvas, resolution, [(cx - left) / resolution, (cy - top) / resolution]);
@@ -284,7 +282,7 @@ export function createCostumeTools(context: PaintContext, services: CostumeServi
                             rotationCenterX: cx - left, rotationCenterY: cy - top, size: [width, height]
                         };
                         delete after.broken;
-                        changes.push({costume, before, after});
+                        changes.push({ costume, before, after });
                     } finally {
                         original.src = '';
                         if(overlay) overlay.src = '';
@@ -299,8 +297,11 @@ export function createCostumeTools(context: PaintContext, services: CostumeServi
                     throw new Error(tr('costumesChanged'));
                 }
                 releaseUndo();
-                for(const {costume, after} of changes) { delete costume.broken; Object.assign(costume, after); }
-                undo = {target, renderer, changes: changes.splice(0)};
+                for(const {costume, after} of changes) {
+                    delete costume.broken;
+                    Object.assign(costume, after);
+                }
+                undo = { target, renderer, changes: changes.splice(0) };
                 refresh(target, vm);
                 status.textContent = tr('costumesDone', {count: undo.changes.length});
             } catch(error) {

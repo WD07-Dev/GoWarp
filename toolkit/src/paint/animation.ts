@@ -157,7 +157,7 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
         try {
             const size = services.stageSize();
             const region = crop?.bounds() || {x: 0, y: 0, width: Math.round(size.width), height: Math.round(size.height)};
-            const {width, height} = region;
+            const { width, height } = region;
             const gif = createAnimationGIF(width, height, fps);
             canvas.width = width; canvas.height = height;
             const ctx = canvas.getContext('2d', {willReadFrequently: true});

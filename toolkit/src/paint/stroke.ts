@@ -15,7 +15,10 @@ export function preparePenStroke(path: any): {path: any; previous: any} {
     clean.data.gwtPenStroke = true;
     const previous = path.previousSibling;
     if(!previous?.data.gwtPenStroke || !hasOpaqueFill(clean, clean.fillColor) || !hasOpaqueFill(previous, clean.fillColor) || !clean.bounds.intersects(previous.bounds)) {
-        return {path: clean, previous: null};
+        return {
+            path: clean,
+            previous: null
+        };
     }
 
     const merged = clean.unite(previous, {insert: false});
