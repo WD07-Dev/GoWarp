@@ -50,6 +50,7 @@ function editor(t, language = "en") {
         }, comments: {}}], extensions: []
     };
     const runtime = new EventEmitter();
+    runtime.audioEngine = {inputNode: {gain: {value: 1}}};
     const monitors = new Map();
     runtime.getMonitorState = () => monitors;
     runtime.requestUpdateMonitor = delta => {
@@ -230,6 +231,34 @@ function editor(t, language = "en") {
     };
 }
     
+test("preview follows editor volume and stops watching after disconnect", async t => {
+    const e = editor(t);
+    const gain = e.runtime.audioEngine.inputNode.gain;
+    gain.value = 0.4;
+    await e.connect();
+    await e.run();
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const volumes = () => e.commands.filter(c => c.action === "volume").map(c => c.volume);
+    assert.equal(e.runSettings().volume, 0.4);
+    assert.deepEqual(volumes(), [0.4]);
+    gain.value = 0;
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.deepEqual(volumes(), [0.4, 0]);
+    gain.value = 0.7;
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.deepEqual(volumes(), [0.4, 0, 0.7]);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.equal(volumes().length, 3, "unchanged volume was retransmitted");
+    await e.disconnect();
+    gain.value = 0.2;
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.equal(volumes().length, 3);
+    await e.connect();
+    await e.run();
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.deepEqual(volumes(), [0.4, 0, 0.7, 0.2]);
+});
+
 test("saving a project keeps the button-only editor extension", async t => {
     const e = editor(t);
     e.project.extensions = ["pen"];

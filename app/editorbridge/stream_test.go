@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -150,6 +151,8 @@ func TestPreviewStreamsFramesAndCommandsWithoutRebuilding(t *testing.T) {
 		{Action: "monitor", Monitor: &project.Monitor{ID: "score", Opcode: "data_variable", Visible: true}},
 		{Action: "answer", QuestionID: 17, Text: "한글"},
 		{Action: "state"},
+		{Action: "volume", Volume: .25},
+		{Action: "volume", Volume: 0},
 	} {
 		if err := websocket.JSON.Send(ws, sent); err != nil {
 			t.Fatal(err)
@@ -249,6 +252,41 @@ func TestPreviewStreamsFramesAndCommandsWithoutRebuilding(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("browser disconnect left held input")
+	}
+}
+
+func TestPreviewQueuesInitialVolumeBeforeBrowserConnects(t *testing.T) {
+	checked := make(chan struct{})
+	s, err := Start(context.Background(), func(ctx context.Context, _ string, options Options) (<-chan error, error) {
+		defer close(checked)
+		peer, err := ConnectRuntime(ctx, options.RuntimeURL, false)
+		if err != nil {
+			return nil, err
+		}
+		defer peer.Close()
+		select {
+		case command := <-peer.Commands:
+			if command.Action != "volume" || command.Volume != 0 {
+				t.Errorf("initial volume command = %+v", command)
+			}
+		case <-time.After(time.Second):
+			t.Error("initial mute was not sent before the browser connected")
+		}
+		done := make(chan error, 1)
+		done <- nil
+		return done, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	req := httptest.NewRequest("POST", "/run", strings.NewReader("snapshot"))
+	req.Header.Set("X-GoWarp-Options", `{"name":"Preview","fps":30,"width":480,"height":360,"volume":0}`)
+	s.receive(httptest.NewRecorder(), req)
+	select {
+	case <-checked:
+	case <-time.After(3 * time.Second):
+		t.Fatal("preview did not start")
 	}
 }
 

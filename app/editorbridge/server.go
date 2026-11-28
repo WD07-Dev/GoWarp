@@ -28,6 +28,7 @@ import (
 const maxProjectSize = 512 << 20
 
 type Options struct {
+	Volume           *float64         `json:"volume,omitempty"`
 	Snapshot         string           `json:"snapshot,omitempty"`
 	ClickStart       bool             `json:"clickStart"`
 	Display          string           `json:"display"`
@@ -305,6 +306,10 @@ func (s *Server) receive(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithCancel(s.ctx)
 	j := &job{ctx: ctx, cancel: cancel, done: make(chan struct{}), token: hex.EncodeToString(secret[:]), stream: newRelay(), display: options.Display}
+	if options.Volume != nil {
+		command, _ := json.Marshal(Command{Action: "volume", Volume: *options.Volume})
+		j.stream.commands <- command
+	}
 	options.RuntimeURL = "ws://" + s.address + "/runtime#" + j.token
 	s.active = j
 	s.status = Status{Phase: "receiving"}

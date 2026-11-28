@@ -31,6 +31,8 @@ func (g *game) editorInput(in *Input) {
 		case command := <-peer.Commands:
 			reply := editorbridge.Reply{ID: command.ID}
 			switch command.Action {
+			case "volume":
+				g.audio.setVolume(command.Volume)
 			case "state":
 				g.editor.questionSynced = false
 			case "monitor":

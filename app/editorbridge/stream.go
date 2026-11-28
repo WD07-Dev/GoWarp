@@ -26,6 +26,7 @@ const maxCommandSize = 4 << 20
 
 // Command messages are applied by the player on its VM thread.
 type Command struct {
+	Volume     float64          `json:"volume,omitempty"`
 	Monitor    *project.Monitor `json:"monitor,omitempty"`
 	QuestionID uint64           `json:"questionId,omitempty"`
 	Frames     int              `json:"frames,omitempty"`
@@ -278,7 +279,7 @@ func (s *relay) serve(ws *websocket.Conn, player bool) {
 				return
 			}
 			switch command.Action {
-			case "toggle", "flag", "stop", "frame", "key", "mouse", "text", "release-input", "edit", "monitor", "answer", "state":
+			case "toggle", "flag", "stop", "frame", "key", "mouse", "text", "release-input", "edit", "monitor", "answer", "state", "volume":
 			default:
 				return
 			}

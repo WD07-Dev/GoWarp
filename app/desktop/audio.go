@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -42,6 +43,7 @@ type urlSoundLoad struct {
 type audioOutput struct {
 	assets      *media.Library
 	mute        bool
+	volume      float64
 	context     *audio.Context
 	players     map[int]playing
 	urls        map[string]*media.Sound
@@ -54,9 +56,20 @@ func newAudioOutput(lib *media.Library, mute bool) *audioOutput {
 	return &audioOutput{
 		assets:      lib,
 		mute:        mute,
+		volume:      1,
 		players:     map[int]playing{},
 		urls:        map[string]*media.Sound{},
 		pendingURLs: map[int]pendingURLSound{},
+	}
+}
+
+func (a *audioOutput) setVolume(volume float64) {
+	if math.IsNaN(volume) || math.IsInf(volume, 0) {
+		return
+	}
+	a.volume = max(0, min(1, volume))
+	for _, p := range a.players {
+		p.player.SetVolume(a.volume)
 	}
 }
 
@@ -170,6 +183,7 @@ func (a *audioOutput) play(r *vm.Runtime, cmd vm.AudioCommand, sound *media.Soun
 		return fmt.Errorf("audio player: %w", err)
 	}
 	player.SetBufferSize(50 * time.Millisecond)
+	player.SetVolume(a.volume)
 	pending := paused || !stream.Ready()
 	a.players[cmd.ID] = playing{player: player, stream: stream, pending: pending, paused: paused}
 	if !pending {

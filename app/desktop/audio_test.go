@@ -2,14 +2,60 @@ package desktop
 
 import (
 	"bytes"
+	"math"
 	"testing"
 
 	"github.com/hajimehoshi/ebiten/v2/audio"
 
+	"gowarp/app/editorbridge"
 	"gowarp/core/media"
 	"gowarp/core/project"
 	"gowarp/core/vm"
 )
+
+func TestEditorVolumeAppliesToCurrentAndFutureSounds(t *testing.T) {
+	output := newAudioOutput(&media.Library{}, false)
+	defer output.close()
+	r := vm.New(&project.Project{})
+	sound := &media.Sound{Rate: sampleRate, Samples: []float32{.5, .5}}
+	if err := output.play(r, vm.AudioCommand{ID: 1, Volume: 50}, sound, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := output.players[1].player.Volume(); got != 1 {
+		t.Fatalf("default master volume = %v", got)
+	}
+	peer := &editorbridge.Peer{Commands: make(chan editorbridge.Command, 1)}
+	g := &game{options: Options{Editor: peer}, audio: output}
+	for _, embedded := range []bool{false, true} {
+		peer.Embedded = embedded
+		for _, volume := range []float64{.4, 0, 1} {
+			peer.Commands <- editorbridge.Command{Action: "volume", Volume: volume}
+			g.editorInput(&Input{})
+			if got := output.players[1].player.Volume(); got != volume {
+				t.Fatalf("embedded=%v volume=%v, want %v", embedded, got, volume)
+			}
+			if !output.players[1].paused || output.mute {
+				t.Fatal("volume changed playback state")
+			}
+		}
+	}
+	output.setVolume(.3)
+	if err := output.play(r, vm.AudioCommand{ID: 2, Volume: 80}, sound, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := output.apply(r, []vm.AudioCommand{{Kind: "update", ID: 2, Volume: 20}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := output.players[2].player.Volume(); got != .3 {
+		t.Fatalf("sound volume overwrote master volume: %v", got)
+	}
+	for _, invalid := range []float64{math.NaN(), math.Inf(1)} {
+		output.setVolume(invalid)
+	}
+	if output.players[2].player.Volume() != .3 {
+		t.Fatal("invalid volume was applied")
+	}
+}
 
 func TestMutedAudioValidatesAssetsWithoutOpeningDevice(t *testing.T) {
 	output := newAudioOutput(&media.Library{Sounds: [][]*media.Sound{{{Rate: 8000, Samples: []float32{.5, .5}}}}}, true)

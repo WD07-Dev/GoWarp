@@ -40,6 +40,8 @@
     let phase = "ready";
     let disposed = false;
     let polling = null;
+    let volumeTimer = null;
+    let sentVolume = null;
     let upload = null;
     let socket = null;
     let revision = 0;
@@ -483,6 +485,7 @@
             phase = "receiving";
             status.textContent = messages[phase];
             refresh();
+            options.volume = editorVolume();
             const receipt = await request(target, "/run", "POST", project, options, upload);
             if (disposed || upload.signal.aborted || connection !== target) return;
             previewSettingsRevision = receipt.settingsRevision || "";
@@ -574,6 +577,9 @@
     }
     
     function restoreEditor() {
+        clearTimeout(volumeTimer);
+        volumeTimer = null;
+        sentVolume = null;
         if (questionID) runtime.emit("QUESTION", null);
         questionID = 0;
         pendingMonitors.clear();
@@ -625,6 +631,20 @@
         return true;
     }
     
+    function editorVolume() {
+        const gain = runtime.audioEngine?.inputNode?.gain?.value ?? 1;
+        return Number.isFinite(gain) ? Math.max(0, Math.min(1, gain)) : 1;
+    }
+
+    function syncVolume() {
+        clearTimeout(volumeTimer);
+        volumeTimer = null;
+        if (disposed || phase !== "running" || socket?.readyState !== WebSocket.OPEN) return;
+        const volume = editorVolume();
+        if (volume !== sentVolume && send({action: "volume", volume})) sentVolume = volume;
+        volumeTimer = setTimeout(syncVolume, 100);
+    }
+
     function openStream() {
         if (socket || !connection || disposed) return;
         const ws = new WebSocket(connection.base.replace(/^http:/, "ws:") + "/preview", "gowarp-preview");
@@ -634,6 +654,8 @@
         ws.onopen = () => {
             if(socket !== ws) return;
             ws.send(JSON.stringify({token: connection.token}));
+            sentVolume = null;
+            syncVolume();
             flushMonitors();
             send({action: "state"});
             if(activeDisplay === "embedded") {
