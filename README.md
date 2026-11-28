@@ -103,6 +103,19 @@ Files are saved as `<app-id>.log`, `<app-id>.cpu.pprof`, and `<app-id>.allocs.pp
 
 Slow VM entries also report graphics query waits, queue waits, and display-thread dispatch time when the parallel graphics path is used. These are elapsed times, include scheduling delays, and overlap with VM timing; they are not GPU execution times and must not be added together. Use `go tool pprof -sample_index=alloc_space <app-id>.allocs.pprof` to inspect cumulative allocation bytes rather than live memory.
 
+`frame_timing` summaries cover all measured samples, including short delays omitted from the slow-event log. They are emitted every five seconds, on loading/focus/minimize/logic-FPS transitions, and on normal exit. Each metric includes its sample count, mean, approximate P95/P99, maximum, and counts exceeding 1/60 s, 1/30 s, and 50 ms. Percentiles use 1 ms upper-bound buckets; samples above one second share an overflow bucket reported as the observed maximum. Means, maxima, and threshold counts use the original durations.
+
+| Metric | Measurement |
+| --- | --- |
+| `update_interval`, `draw_interval` | Intervals between Update measurement points and Draw callback starts; not physical screen presentation times |
+| `update_work`, `draw_work` | Elapsed callback work (Update starts measuring after native window event polling) |
+| `vm_batch` | Time advancing the VM, potentially including multiple ticks; `vm_ticks` reports the total tick count |
+| `audio`, `draw_prepare` | Audio command processing and scene drawing, nested within callback work |
+| `host_gap` | Time from the end of measured Update work to the next Update measurement point |
+| `host_other` | Host gap minus measured Draw work; includes presentation waits, native events, scheduling, and other unmeasured work, **not GPU time** |
+
+These durations overlap and must not be summed. Threshold counts are reference budgets, not counts of dropped frames; a deliberate 30 FPS limit naturally exceeds the 60 Hz budget. Draw callbacks may reuse a previous frame when presentation is limited or the window is unfocused. Loading and window-state transitions reset interval baselines so background gaps do not distort foreground percentiles. Histogram storage is allocated only in diagnostic mode; recording a sample does not allocate or write to disk.
+
 ## Extension support
 
 GoWarp does not run ordinary JavaScript extensions or automatically translate them into Go. A custom extension must include a GoWarp-compatible implementation inside an `@gowarp-go { ... }` block in a JavaScript comment. External module requirements belong in a separate `@gowarp-config { ... }` block.

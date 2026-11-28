@@ -53,6 +53,7 @@ type game struct {
 	lastSlowAudio               time.Time
 	lastSlowDraw                time.Time
 	stepDiagnostics             vm.StepDiagnostics
+	frameTiming                 *frameTiming
 	options                     Options
 	path                        string
 	project                     *project.Project
@@ -207,12 +208,24 @@ func (g *game) Update() error {
 		return err
 	}
 	if g.options.Diagnostic != nil {
+		now := time.Now()
+		if g.frameTiming == nil {
+			g.frameTiming = &frameTiming{}
+		}
+		state := frameTimingState{focused: g.sampleWindowFocus(), minimized: g.windowMinimized, loading: g.controller == nil}
+		if g.controller != nil {
+			state.logicFPS = g.controller.vm.FPS()
+		}
+		g.frameTiming.beginUpdate(now, state, g.options.Diagnostic)
 		if !g.lastHostUpdateEnd.IsZero() {
 			// Measure the gap between callbacks, excluding the previous Update's work.
 			g.reportSlowPhase("host_gap", time.Since(g.lastHostUpdateEnd), 1)
 		}
 		g.hostDrawTime, g.hostDrawCalls = 0, 0
-		defer func() { g.lastHostUpdateEnd = time.Now() }()
+		defer func() {
+			g.lastHostUpdateEnd = time.Now()
+			g.frameTiming.endUpdate(g.lastHostUpdateEnd)
+		}()
 	}
 	if !g.started {
 		g.started = true
@@ -563,6 +576,17 @@ func (g *game) reportSlowPhase(phase string, elapsed time.Duration, ticks int) {
 	if g.options.Diagnostic == nil || g.controller == nil {
 		return
 	}
+	if f := g.frameTiming; f != nil {
+		switch phase {
+		case "vm":
+			f.stats[timingVMBatch].add(elapsed)
+			f.ticks += ticks
+		case "audio":
+			f.stats[timingAudio].add(elapsed)
+		case "draw_cpu":
+			f.stats[timingDrawPrepare].add(elapsed)
+		}
+	}
 	c := g.controller
 	// Compare a catch-up batch with its total tick allowance.
 	threshold := max(time.Second/30, time.Duration(2*float64(time.Second)*float64(max(1, ticks))/c.vm.FPS()))
@@ -654,9 +678,16 @@ func (g *game) updateFocus(focused bool) {
 func (g *game) Draw(screen *ebiten.Image) {
 	if g.options.Diagnostic != nil {
 		start := time.Now()
+		if g.frameTiming != nil {
+			g.frameTiming.beginDraw(start)
+		}
 		defer func() {
-			g.hostDrawTime += time.Since(start)
+			end := time.Now()
+			g.hostDrawTime += end.Sub(start)
 			g.hostDrawCalls++
+			if g.frameTiming != nil {
+				g.frameTiming.endDraw(end)
+			}
 		}()
 	}
 	g.draw(screen, g.sampleWindowFocus())

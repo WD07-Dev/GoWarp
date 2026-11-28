@@ -283,6 +283,9 @@ func (g *game) restoreGameWindowSize() error {
 }
 
 func (g *game) close() {
+	if g.frameTiming != nil && g.options.Diagnostic != nil {
+		g.frameTiming.flush(time.Now(), "exit", g.options.Diagnostic)
+	}
 	if g.controller != nil && g.controller.graphics != nil {
 		g.controller.graphics.close()
 	}
