@@ -11,7 +11,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
 
     function objectList() {
         var layer = paintingLayer(), out = [];
-        if (!layer) return out;
+        if(!layer) return out;
         (function walk(node: any) {
             if(node.guide) return;
             if(node.className === 'CompoundPath') {
@@ -39,9 +39,9 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         return item.name || (kindName(item) + ' ' + (total - index));
     }
     function useSelectTool() {
-        if (/^SELECT/.test((paintState() || {}).mode || '')) return;
+        if(/^SELECT/.test((paintState() || {}).mode || '')) return;
         var native = document.querySelector('[class*="mode-selector"] [class*="mod-tool-select"]');
-        if (native && !native.classList.contains('gwt-tool')) native.click();
+        if(native && !native.classList.contains('gwt-tool')) native.click();
     }
     function selectObject(item: any, toggle: boolean = false) {
         var p = paper();
@@ -236,7 +236,9 @@ export function createLayers(context: PaintContext, services: LayerServices) {
                 css = 'linear-gradient(135deg, ' + color.gradient.stops.map(function (s: any) {
                     return s.color && s.color.toCSS ? s.color.toCSS() : '#855cd6';
                 }).join(', ') + ')';
-            } catch (e) { css = ''; }
+            } catch (e) {
+                css = '';
+            }
         }
         if(!css) {
             try {
@@ -412,7 +414,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
     }
 
     function destroyRail () {
-        if (!railEl) return;
+        if(!railEl) return;
         railEl.remove();
         railEl = null;
     }
@@ -432,7 +434,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
     }
 
     function markObjects () {
-        if (!railEl || !railEl.isConnected) return;
+        if(!railEl || !railEl.isConnected) return;
         var items = objectList();
         var total = items.length;
         var list = railEl.querySelector('.gwt-objs');
@@ -445,7 +447,7 @@ export function createLayers(context: PaintContext, services: LayerServices) {
                 '|' + Math.round(b.x) + ' ' + Math.round(b.y) + ' ' +
                 Math.round(b.width) + ' ' + Math.round(b.height);
             }).join('/');
-            if (list._gwtSig !== sig) {
+            if(list._gwtSig !== sig) {
                 var prevScroll = list.scrollTop;
                 list._gwtSig = sig;
                 list.textContent = '';
@@ -491,6 +493,8 @@ export function createLayers(context: PaintContext, services: LayerServices) {
         markObjects,
         syncRail,
         destroyRail,
-        get railEl() { return railEl; },
+        get railEl() {
+            return railEl;
+        },
     };
 }

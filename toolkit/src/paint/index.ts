@@ -308,15 +308,15 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }
     function currentNibSize() {
         var ps = paintState();
-        if (!ps) return settings.nib;
-        if (isBitmapFormat()) return isEraserMode() ? ps.bitEraserSize : ps.bitBrushSize;
+        if(!ps) return settings.nib;
+        if(isBitmapFormat()) return isEraserMode() ? ps.bitEraserSize : ps.bitBrushSize;
         return isEraserMode() ? (ps.eraserMode || {}).brushSize : (ps.brushMode || {}).brushSize;
     }
     function applyNib(size: number) {
         size = clamp(Math.round(size), 1, 100);
-        if (isBitmapFormat()) {
-            if (isEraserMode()) settings.bitEraser = size; else settings.bitNib = size;
-        } else if (isEraserMode()) settings.eraser = size; else settings.nib = size;
+        if(isBitmapFormat()) {
+            if(isEraserMode()) settings.bitEraser = size; else settings.bitNib = size;
+        }else if(isEraserMode()) settings.eraser = size; else settings.nib = size;
         dispatch(nibAction(size));
         saveSettings();
         refreshNibUi();
@@ -331,10 +331,10 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     var toolButtons = [];
 
     function markTool(btn: HTMLElement, on: boolean, fragment: string) {
-        if (!btn || !btn.classList.contains('gwt-tool')) return;
+        if(!btn || !btn.classList.contains('gwt-tool')) return;
         var cls = nativeClass(fragment);
-        if (!cls) return;
-        if (on) btn.classList.add(cls); else btn.classList.remove(cls);
+        if(!cls) return;
+        if(on) btn.classList.add(cls); else btn.classList.remove(cls);
     }
 
     function closePanel() {
@@ -349,9 +349,9 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
 
     function artRect() {
         var c = document.querySelector('canvas[class*="paper-canvas"]');
-        if (!c) return null;
+        if(!c) return null;
         var r = c.getBoundingClientRect();
-        if (r.width < 8) return null;
+        if(r.width < 8) return null;
         return r;
     }
     function overlapArea(a: Pick<DOMRect, 'left' | 'top' | 'right' | 'bottom'>, b: Pick<DOMRect, 'left' | 'top' | 'right' | 'bottom'>) {
@@ -369,15 +369,14 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         var box = panel.getBoundingClientRect();
         var art = artRect();
         var vw = window.innerWidth, vh = window.innerHeight;
-        var fits = function (x: number, y: number) {
+        var fits = function(x: number, y: number) {
             return x >= 8 && y >= 8 && x + box.width <= vw - 8 && y + box.height <= vh - 8;
         };
-        var tops = [clamp(rect.top, 8, Math.max(8, vh - box.height - 8)),
-            art ? art.bottom + 8 : 0, art ? art.top - box.height - 8 : 0];
+        var tops = [clamp(rect.top, 8, Math.max(8, vh - box.height - 8)), art ? art.bottom + 8 : 0, art ? art.top - box.height - 8 : 0];
         var xs = [rect.right + 10, rect.left - box.width - 10, vw - box.width - 8, 8];
         var cands = [];
         xs.forEach(function (x: number) {
-            if (Math.abs(x - rect.left) > box.width + rect.width + 60) return;
+            if(Math.abs(x - rect.left) > box.width + rect.width + 60) return;
             tops.forEach(function (y: number) {
                 if (!fits(x, y)) return;
                 cands.push({x: x, y: y, d: Math.abs(x - rect.left), hit: overlapArea(boxOf(x, y, box.width, box.height), art)});
@@ -407,7 +406,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         panel._gwtKind = kind;
         var theme = readTheme();
         applyTheme(panel, theme);
-        if (anchor.parentElement) anchor.parentElement.style.setProperty('--gwt-hl', theme.accent);
+        if(anchor.parentElement) anchor.parentElement.style.setProperty('--gwt-hl', theme.accent);
         var close = document.createElement('button');
         close.type = 'button';
         close.className = 'gwt-close';
@@ -616,7 +615,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         path.selected = true;
         dispatch({type: 'scratch-paint/select/CHANGE_SELECTED_ITEMS', selectedItems: [path], bitmapMode: false});
         p.view.update();
-        if (!commit()) {
+        if(!commit()) {
             path.remove();
             return false;
         }
@@ -660,7 +659,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         path._gwtGhost = true;
         layer.addChild(path);
         var art = paintingLayer();
-        if (art) art.activate();
+        if(art) art.activate();
         p.view.update();
         shapePreview = path;
         previewed = shape;
@@ -676,13 +675,13 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
         start: null,
         cursor: function (on: boolean) {
             var canvas = document.querySelector('canvas[class*="paper-canvas"]');
-            if (canvas) canvas.style.cursor = on ? 'crosshair' : '';
+            if(canvas) canvas.style.cursor = on ? 'crosshair' : '';
         },
         boxOf: function (from: {x: number; y: number}, to: {x: number; y: number}) {
             var p = paper();
             var w = Math.abs(to.x - from.x);
             var h = Math.abs(to.y - from.y);
-            if (!p || w < 3 || h < 3) return null;
+            if(!p || w < 3 || h < 3) return null;
             return new p.Rectangle(Math.min(from.x, to.x), Math.min(from.y, to.y), w, h);
         },
         arm: function (shape: Shape) {
@@ -703,18 +702,18 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             document.removeEventListener('pointercancel', this.onUp, true);
             markArmed(this.button, false);
             this.cursor(false);
-            if (!this.shape) return;
+            if(!this.shape) return;
             this.shape = null;
             this.start = null;
             clearShapePreview();
             refreshToolLabels();
         },
         onDown: function (e: PointerEvent) {
-            if (!shaper.shape || e.button !== 0) return;
+            if(!shaper.shape || e.button !== 0) return;
             var canvas = e.target && (e.target as Element).closest ? (e.target as Element).closest('canvas[class*="paper-canvas"]') : null;
-            if (!canvas) return;
+            if(!canvas) return;
             var point = pen.toProject(e);
-            if (!point) return;
+            if(!point) return;
             e.stopPropagation();
             e.preventDefault();
             shaper.start = point;
@@ -736,12 +735,12 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             document.removeEventListener('pointermove', shaper.onMove, true);
             document.removeEventListener('pointerup', shaper.onUp, true);
             document.removeEventListener('pointercancel', shaper.onUp, true);
-            if (!shaper.shape || !shaper.start) return;
+            if(!shaper.shape || !shaper.start) return;
             var point = pen.toProject(e) || shaper.start;
             var where = shaper.boxOf(shaper.start, point) || point;
             shaper.start = null;
             var placed = insertShape(shaper.shape, where);
-            if (placed) shaper.disarm();
+            if(placed) shaper.disarm();
         }
     };
 
@@ -1176,7 +1175,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
     }
 
     function watchColorTarget() {
-        if (document.__gwtGrad) return;
+        if(document.__gwtGrad) return;
         document.__gwtGrad = true;
         listen(document, 'pointerdown', function(e: PointerEvent) {
             var t = e.target as Element;
@@ -1502,7 +1501,7 @@ export function installPaintTools(Scratch: ScratchHost): PaintTools {
             pen.drawPreview();
         },
         onUp: function (e: PointerEvent) {
-            if (e) e.stopPropagation();
+            if(e) e.stopPropagation();
             document.removeEventListener('pointermove', pen.onMove, true);
             document.removeEventListener('pointerup', pen.onUp, true);
             document.removeEventListener('pointercancel', pen.onUp, true);

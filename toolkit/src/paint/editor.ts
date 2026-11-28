@@ -90,7 +90,9 @@ export function createEditorAccess(window: EditorWindow) {
         isEraserMode,
         dispatch,
         store,
-        get storeRef() { return storeRef; },
+        get storeRef() {
+            return storeRef;
+        },
     };
 }
 
