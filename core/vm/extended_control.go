@@ -75,7 +75,7 @@ func (r *Runtime) forEach(th *thread, id string, b *project.Block, input func(st
 		current = len(th.stack) - 1
 	}
 	th.stack[current].index = index + 1
-	v.Value = index + 1
+	v.set(index + 1)
 	th.pc = body
 	return nil
 }

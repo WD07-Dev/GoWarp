@@ -365,7 +365,7 @@ finished:
 	// A later error or quota boundary must expose every completed write.
 	for i := range p.variables {
 		if f.variables[i].dirty {
-			f.variables[i].value.Value = f.values[i].boxed()
+			f.variables[i].value.set(f.values[i].boxed())
 			f.flushVariable(&f.variables[i])
 		}
 	}

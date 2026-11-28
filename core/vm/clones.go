@@ -58,6 +58,7 @@ func (r *Runtime) createClone(source *target) {
 		procedures:    source.procedures,
 	}
 	r.targets = append(r.targets, clone)
+	r.invalidateTargetQueries()
 	if r.native {
 		r.bindNativeVariables(clone)
 	}
@@ -88,6 +89,7 @@ func (r *Runtime) deleteClone(t *target) {
 		return
 	}
 	t.dead = true
+	r.invalidateTargetQueries()
 	t.requestRedraw()
 	r.extensionEvent("clone-deleted", t)
 	for _, th := range t.hatThreads {
@@ -112,6 +114,7 @@ func (r *Runtime) deleteClone(t *target) {
 		}
 	}
 	r.cloneCount--
+	r.invalidateTargetQueries()
 	t.variables = nil
 	t.nativeVariables = nil
 	t.state.Lists = nil

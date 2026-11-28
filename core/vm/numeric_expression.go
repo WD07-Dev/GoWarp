@@ -128,7 +128,6 @@ func (w *variableWrite) run(ctx context.Context, r *Runtime, th *thread) error {
 	if err != nil {
 		return err
 	}
-	// Resolve the current owner after evaluating VALUE, matching the interpreter.
 	variable := r.boundVariable(th.target, w.binding)
 	if variable == nil {
 		_, variable, err = r.variable(th.target, w.id)
@@ -139,14 +138,10 @@ func (w *variableWrite) run(ctx context.Context, r *Runtime, th *thread) error {
 	if w.add {
 		value = numberValue(number(variable.Value) + delta)
 	}
-	variable.Value = value
+	variable.set(value)
 	return nil
 }
 
-/*
-Cache pure control-input plans, never their results. Yielding reporters keep the continuation
-path.
-*/
 func (r *Runtime) controlInput(ctx context.Context, th *thread, instruction *executionBlock, name string, input func(string) (any, error)) (any, error) {
 	if instruction.ready&controlPlanReady == 0 {
 		b := instruction.source
@@ -181,7 +176,6 @@ func (r *Runtime) numericExpression(t *target, b *project.Block, depth int) *num
 	if r.numericExpressions == nil {
 		r.numericExpressions = make(map[*project.Block]*numericExpression)
 	}
-	// A nil entry also breaks cycles in malformed reporter graphs.
 	r.numericExpressions[b] = nil
 	op, supported := expressionOpcodes[b.Opcode]
 	if !supported {
@@ -241,10 +235,6 @@ func (r *Runtime) numericExpression(t *target, b *project.Block, depth int) *num
 		n.height = max(n.height, 1+n.right.height)
 		n.conditional = n.conditional || n.right.conditional
 	}
-	/*
-		Conditional children keep their own instruction counts. Other operators
-		continue through the interpreter, which can still prepare these inputs.
-	*/
 	if n.conditional && op != exprAnd && op != exprOr && op != exprNot {
 		return nil
 	}
@@ -258,10 +248,6 @@ func (r *Runtime) numericExpression(t *target, b *project.Block, depth int) *num
 			}
 		}
 	}
-	/*
-		Literal arithmetic is immutable. Keep its original block count and
-		height so preparation does not change instruction or recursion limits.
-	*/
 	if op >= exprAdd && op <= exprMath && n.left.op == exprLiteral && (n.right == nil || n.right.op == exprLiteral) {
 		value, err := n.evaluate(context.Background(), r, nil)
 		if err == nil {
@@ -366,10 +352,6 @@ func (n *numericExpression) readTyped(ctx context.Context, r *Runtime, th *threa
 	return calculationValue{value: value}, err
 }
 
-/*
-The caller reserves enough budget for either branch, but only visited blocks
-consume it. Pure branches use the existing evaluator without continuations.
-*/
 func (n *numericExpression) readConditional(ctx context.Context, r *Runtime, th *thread, budget *int) (any, error) {
 	if !n.conditional {
 		*budget -= n.blocks

@@ -52,7 +52,8 @@ func (r *Runtime) readObservedVariables() {
 				t.variables[id] = cell
 				changed = true
 			}
-			*cell = value
+			cell.Name = value.Name
+			cell.set(value.Value)
 			observation.before[id] = value
 		}
 	}

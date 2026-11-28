@@ -15,8 +15,9 @@ import (
 const stepsPerFrame = 10000
 
 type Variable struct {
-	Name  string `json:"name"`
-	Value any    `json:"value"`
+	Name          string `json:"name"`
+	Value         any    `json:"value"`
+	queryRevision *uint64
 }
 
 type TargetState struct {
@@ -131,6 +132,7 @@ type thread struct {
 }
 
 type Runtime struct {
+	targetQueries                     *targetQueryCache
 	freeParams                        [8]procedureParameters
 	nativeArguments                   []calculationValue
 	executionCodes                    map[*project.Target]*executionCode
@@ -779,7 +781,7 @@ func (r *Runtime) stepBody(ctx context.Context, th *thread) error {
 			if b.Opcode == "data_changevariableby" {
 				value = numberValue(number(v.Value) + number(value))
 			}
-			v.Value = value
+			v.set(value)
 		case "data_addtolist", "data_deleteoflist", "data_deletealloflist", "data_insertatlist", "data_replaceitemoflist":
 			if err := r.listStatement(th.target, b, input); err != nil {
 				return err

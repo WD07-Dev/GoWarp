@@ -171,26 +171,7 @@ func (c *extensionContext) logicCall(operation string, args []any) (any, error) 
 			}
 			source = t.sourceIndex
 		}
-		var ids []string
-		for _, t := range r.targets {
-			if t.dead || (source >= 0 && t.sourceIndex != source) || (q.ClonesOnly && t.state.CloneID == 0) {
-				continue
-			}
-			if q.Variable != "" {
-				v, found := t.variables[q.Variable]
-				if !found && r.stage != nil {
-					v, found = r.stage.variables[q.Variable]
-				}
-				if !found || extension.Compare(v.Value, q.Value) != 0 {
-					continue
-				}
-			}
-			ids = append(ids, logicTargetID(t))
-			if q.First {
-				break
-			}
-		}
-		return ids, nil
+		return r.queryTargets(source, q), nil
 	case "target.touchingTargets":
 		ids, ok := a.get(0).([]string)
 		if !ok || len(args) > 2 {
@@ -436,9 +417,9 @@ func (c *extensionContext) logicCall(operation string, args []any) (any, error) 
 		case "variable.get":
 			return v.Value, nil
 		case "variable.set":
-			v.Value = a.get(1)
+			v.set(a.get(1))
 		case "variable.change":
-			v.Value = extension.Number(v.Value) + extension.Number(a.get(1))
+			v.set(extension.Number(v.Value) + extension.Number(a.get(1)))
 		case "variable.delete":
 			delete(owner.variables, id)
 			r.refreshNativeVariables()

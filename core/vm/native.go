@@ -89,6 +89,7 @@ func (r *Runtime) bindNativeVariables(t *target) {
 }
 
 func (r *Runtime) refreshNativeVariables() {
+	r.invalidateTargetQueries()
 	if r.native {
 		for _, t := range r.targets {
 			r.bindNativeVariables(t)
@@ -365,7 +366,8 @@ func (f *nativeFrame) readNumber(slot *nativeVariable, id string) float64 {
 func (f *nativeFrame) set(slot *nativeVariable, id string, value any) {
 	f.bindVariable(slot, id)
 	if f.err == nil {
-		slot.value.Value, slot.dirty = value, true
+		slot.value.set(value)
+		slot.dirty = true
 		if n, ok := value.(float64); ok {
 			slot.number, slot.numeric, slot.converted = n, true, true
 		} else {
@@ -415,7 +417,7 @@ func (f *nativeFrame) flushVariable(slot *nativeVariable) {
 		if slot.numeric {
 			previous, numeric := slot.value.Value.(float64)
 			if !numeric || math.Float64bits(previous) != math.Float64bits(slot.number) {
-				slot.value.Value = numberValue(slot.number)
+				slot.value.set(numberValue(slot.number))
 			}
 		}
 		slot.dirty = false

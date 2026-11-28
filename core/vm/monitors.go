@@ -58,7 +58,7 @@ func (r *Runtime) SetMonitorValue(index int, value string) bool {
 	if v == nil {
 		return false
 	}
-	v.Value = value
+	v.set(value)
 	r.writeObservedVariables()
 	return true
 }
@@ -88,7 +88,7 @@ func (r *Runtime) SetMonitorSlider(index int, value float64) bool {
 	if v == nil {
 		return false
 	}
-	v.Value = numberValue(value)
+	v.set(numberValue(value))
 	r.writeObservedVariables()
 	return true
 }

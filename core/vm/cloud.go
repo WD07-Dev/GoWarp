@@ -31,6 +31,6 @@ func (r *Runtime) ApplyCloud(id, value string) {
 		r.stage.variables[id] = v
 		r.refreshNativeVariables()
 	}
-	v.Value = value
+	v.set(value)
 	r.writeObservedVariables()
 }
