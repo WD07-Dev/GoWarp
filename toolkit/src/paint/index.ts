@@ -2,7 +2,6 @@ import type { PaintTools, EditorDocument, EditorWindow, PaintContext, PaintEleme
 import { round, cornerPath, SHAPES, NIBS, PENS } from './shapes';
 import { createIconButton, isTextInput } from '../shared/dom';
 import { createLifecycle } from '../shared/lifecycle';
-import type { ScratchHost } from '../shared/scratch';
 import { createAnimationTools } from './animation';
 import { createFolders } from '../sprites/folders';
 import { createEditorAccess } from './editor';
@@ -13,7 +12,7 @@ import { createLayers } from './layers';
 import { createTheme } from './theme';
 import { tr } from '../translate';
 
-export function installPaintTools(Scratch: ScratchHost): PaintTools {
+export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTools {
     const document = globalThis.document as EditorDocument;
     const window = globalThis.window as EditorWindow;
     const lifecycle = createLifecycle();

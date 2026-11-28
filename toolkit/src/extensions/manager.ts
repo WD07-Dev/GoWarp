@@ -1,8 +1,7 @@
 import { Project, Review, ExtensionRow } from './type';
-import type { ScratchHost } from '../shared/scratch';
 import { tr } from '../translate';
 
-export function installExtensions(Scratch: ScratchHost): () => void {
+export function installExtensions(Scratch: typeof globalThis.Scratch): () => void {
     const vm = Scratch.vm;
     const sm = vm.extensionManager.securityManager;
     const approvals = new Map();
@@ -252,7 +251,7 @@ export function installExtensions(Scratch: ScratchHost): () => void {
     };
     vm._loadExtensions = extensionLoad;
     class Toolkit {
-        getInfo() {
+        getInfo(): Omit<Scratch.Info, 'blocks'> & {blocks: Scratch.ExtensionButton[]} {
             return {id:extensionId,name:tr('toolkitName'),color1:'#b52e35',blocks:[
                 {blockType:Scratch.BlockType.BUTTON,text:tr('toolkitName'),func:'open'},
             ]};

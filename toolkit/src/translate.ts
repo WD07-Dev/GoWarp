@@ -1,5 +1,3 @@
-import type { ScratchHost } from './shared/scratch';
-
 const strings = {
     "en": {
         "animation": "Animation",
@@ -383,7 +381,6 @@ const strings = {
     }
 };
 
-declare const Scratch: ScratchHost;
 export function tr<Key extends string | undefined = undefined>(key?: Key, parameters?: TranslationValues): TranslationResult<Key> {
     const store = (globalThis as typeof globalThis & {ReduxStore?: EditorStore}).ReduxStore;
     const locale = store?.getState().locales || {};

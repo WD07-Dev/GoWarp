@@ -1,8 +1,6 @@
-import { tr } from './translate';
 import { installExtensions } from './extensions/manager';
 import { installPaintTools } from './paint';
-import type { ScratchHost } from './shared/scratch';
-declare const Scratch: ScratchHost;
+import { tr } from './translate';
 
 if(!Scratch.extensions.unsandboxed) {
     throw new Error(tr('errors.unsandboxed'));
