@@ -115,7 +115,9 @@ func Start(parent context.Context, launch func(context.Context, string, Options)
 	return s, nil
 }
 
-func (s *Server) URL() string { return "http://" + s.address + "/#" + s.token }
+func (s *Server) URL() string {
+	return "http://" + s.address + "/#" + s.token
+}
 
 func (s *Server) TurboWarpURL() (string, error) {
 	s.mu.Lock()

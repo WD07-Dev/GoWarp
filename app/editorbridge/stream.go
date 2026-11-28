@@ -24,7 +24,6 @@ const maxFrameEdge = 1920
 const maxFrameSize = 9 + maxFrameEdge*maxFrameEdge*4
 const maxCommandSize = 4 << 20
 
-// Command messages are applied by the player on its VM thread.
 type Command struct {
 	Volume     float64          `json:"volume,omitempty"`
 	Monitor    *project.Monitor `json:"monitor,omitempty"`

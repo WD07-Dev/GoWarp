@@ -21,7 +21,6 @@ func (s *Server) SetProjectHandler(handler func(context.Context, *project.Projec
 	s.projectHandler = handler
 }
 
-// Configure publishes a snapshot for the next run without changing a running player.
 func (s *Server) Configure(settings config.Settings, err error) {
 	var data []byte
 	if err == nil {
