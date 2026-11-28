@@ -441,6 +441,7 @@ func nativeRegionStatement(opcode string) bool {
 		"data_addtolist", "data_deletealloflist", "data_deleteoflist", "data_replaceitemoflist",
 		"control_if", "control_if_else", "procedures_call",
 		"motion_gotoxy", "pen_penUp", "pen_penDown",
+		"motion_setx", "motion_sety", "motion_changexby", "motion_changeyby",
 		"pen_setPenColorParamTo", "pen_changePenColorParamBy",
 		"pen_setPenSizeTo", "pen_changePenSizeBy", "pen_setPenColorToColor", "pen_stamp",
 		"motion_movesteps", "motion_turnleft", "motion_turnright", "motion_pointindirection",
@@ -604,6 +605,12 @@ func (e *nativeEmitter) input(b *project.Block, name string, depth int) (nativeE
 		return nativeBoolean("r.keyPressed(normalizeKey(text(" + key.raw() + ")))"), ok
 	case "sensing_timer":
 		return nativeNumeric("(r.elapsed-r.timerSeconds)"), true
+	case "motion_xposition":
+		return nativeNumeric("limitPrecision(t.state.X)"), true
+	case "motion_yposition":
+		return nativeNumeric("limitPrecision(t.state.Y)"), true
+	case "motion_direction":
+		return nativeNumeric("t.state.Direction"), true
 	case "data_variable":
 		id := field(b, "VARIABLE", 1)
 		return e.variable(id), true
@@ -757,6 +764,7 @@ func (e *nativeEmitter) statements(id string, depth int) (string, bool) {
 				"Param": param.raw(), "Value": value.num(), "Change": b.Opcode == "pen_changePenColorParamBy",
 			})
 		case "motion_gotoxy", "pen_penUp", "pen_penDown",
+			"motion_setx", "motion_sety", "motion_changexby", "motion_changeyby",
 			"pen_setPenColorToColor", "pen_stamp",
 			"motion_movesteps", "motion_turnleft", "motion_turnright", "motion_pointindirection",
 			"looks_setsizeto", "looks_switchcostumeto", "looks_seteffectto", "looks_cleargraphiceffects":
@@ -765,6 +773,14 @@ func (e *nativeEmitter) statements(id string, depth int) (string, bool) {
 			switch b.Opcode {
 			case "motion_gotoxy":
 				names = []string{"X", "Y"}
+			case "motion_setx":
+				names = []string{"X"}
+			case "motion_sety":
+				names = []string{"Y"}
+			case "motion_changexby":
+				names = []string{"DX"}
+			case "motion_changeyby":
+				names = []string{"DY"}
 			case "pen_setPenColorToColor":
 				names = []string{"COLOR"}
 			case "motion_movesteps":
@@ -799,6 +815,8 @@ func (e *nativeEmitter) statements(id string, depth int) (string, bool) {
 				}
 			}
 			observe := b.Opcode == "motion_gotoxy" || b.Opcode == "motion_movesteps" ||
+				b.Opcode == "motion_setx" || b.Opcode == "motion_sety" ||
+				b.Opcode == "motion_changexby" || b.Opcode == "motion_changeyby" ||
 				b.Opcode == "looks_setsizeto" || b.Opcode == "looks_switchcostumeto" ||
 				b.Opcode == "pen_penDown" || b.Opcode == "pen_stamp"
 			// Graphics callbacks can invalidate numeric slots before input evaluation.

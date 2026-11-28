@@ -31,6 +31,6 @@ module.exports = {
         new webpack.BannerPlugin({
             raw: true,
             banner: fs.readFileSync(path.join(__dirname, 'banner.txt'), 'utf8')
-        })
+        }),
     ]
 };

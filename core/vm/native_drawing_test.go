@@ -17,6 +17,19 @@ func addNativeDrawingBlocks(t testing.TB, blocks project.Blocks) {
 	t.Helper()
 	var drawing project.Blocks
 	err := json.Unmarshal([]byte(`{
+        "axisLoop":{"opcode":"control_repeat","inputs":{"TIMES":[1,[12,"x","x"]],"SUBSTACK":[2,"axisSetX"]}},
+        "axisX":{"opcode":"motion_xposition"},
+        "axisY":{"opcode":"motion_yposition"},
+        "axisDirection":{"opcode":"motion_direction"},
+        "axisNextX":{"opcode":"operator_add","inputs":{"NUM1":[2,"axisX"],"NUM2":[1,[4,"0.125"]]}},
+        "axisNextY":{"opcode":"operator_subtract","inputs":{"NUM1":[2,"axisY"],"NUM2":[1,[4,"0.125"]]}},
+        "axisSetX":{"opcode":"motion_setx","next":"axisChangeY","inputs":{"X":[2,"axisNextX"]}},
+        "axisChangeY":{"opcode":"motion_changeyby","next":"axisSetY","inputs":{"DY":[1,[4,"-0.125"]]}},
+        "axisSetY":{"opcode":"motion_sety","next":"axisChangeX","inputs":{"Y":[2,"axisNextY"]}},
+        "axisChangeX":{"opcode":"motion_changexby","inputs":{"DX":[1,[4,"0.125"]]}},
+        "axisReadDirection":{"opcode":"data_setvariableto","fields":{"VARIABLE":["score","score"]},"inputs":{"VALUE":[2,"axisDirection"]}},
+        "axisError":{"opcode":"motion_changexby","inputs":{"DX":[1,[12,"missing","missing"]]}},
+        "axisScript":{"opcode":"event_whenbroadcastreceived","topLevel":true,"next":"axisLoop"},
         "directGhost":{"opcode":"looks_seteffectto","next":"directBrightness","fields":{"EFFECT":["GHOST",null]},"inputs":{"VALUE":[1,[12,"x","x"]]}},
         "directBrightness":{"opcode":"looks_seteffectto","next":"directColor","fields":{"EFFECT":["brightness",null]},"inputs":{"VALUE":[1,[12,"x","x"]]}},
         "directColor":{"opcode":"looks_seteffectto","next":"directUnknown","fields":{"EFFECT":["color",null]},"inputs":{"VALUE":[1,[12,"x","x"]]}},
@@ -237,6 +250,95 @@ func (p *nativeDrawingRecorder) CostumeSize(DisplayTarget) (float64, float64) {
 func (p *nativeDrawingRecorder) Pen(command PenCommand) {
 	p.surfaceRecorder.Pen(command)
 	p.scores = append(p.scores, command.Target.State.Variables["score"].Value)
+}
+
+func TestNativeCompilesAxisMotion(t *testing.T) {
+	p := nativeCodegenFixture(t)
+	target := &target{source: p.Targets[1], sourceIndex: 1}
+	if err := prepareProcedures(target); err != nil {
+		t.Fatal(err)
+	}
+	g := &nativeGenerator{known: make(map[*procedure]*nativeFunction), active: make(map[*procedure]bool)}
+	for _, name := range []string{"axisReporters", "axisError"} {
+		if g.compile(target, name) == nil {
+			t.Errorf("%s still requires interpreted blocks", name)
+		}
+	}
+	g.compileRegions(target, "axisMotion")
+	for _, function := range g.functions {
+		if function.code == "axisMotion" && function.region == "axisSetX" {
+			return
+		}
+	}
+	t.Fatal("axis loop body still requires interpreted blocks")
+}
+
+func testNativeAxisMotion(t *testing.T) {
+	for _, hat := range []string{"axisMotionHat", "axisScript", "axisReportersHat", "axisErrorHat"} {
+		for _, stage := range []bool{false, true} {
+			for _, fencing := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/stage=%v/fencing=%v", hat, stage, fencing), func(t *testing.T) {
+					fast, slow := New(nativeCodegenFixture(t)), New(nativeCodegenFixture(t))
+					slow.native = false
+					recorders := [2]*nativeDrawingRecorder{{}, {}}
+					for i, r := range []*Runtime{fast, slow} {
+						target := r.targets[1]
+						target.state.IsStage = stage
+						target.state.X, target.state.Y = 300-1e-10, -200+1e-10
+						target.state.Direction, target.state.Size = -37.5, 10.6
+						target.state.Pen.Down = true
+						r.options.Fencing = fencing
+						r.SetGraphics(recorders[i])
+						r.startHat(target, hat, false)
+					}
+					for tick := range 8 {
+						fastErr := fast.Run(context.Background(), 1, 60, false)
+						slowErr := slow.Run(context.Background(), 1, 60, false)
+						if fmt.Sprint(fastErr) != fmt.Sprint(slowErr) ||
+							!reflect.DeepEqual(fast.Snapshot(), slow.Snapshot()) ||
+							!reflect.DeepEqual(recorders[0], recorders[1]) ||
+							fast.Done() != slow.Done() {
+							t.Fatalf("tick %d: compiled motion differs: errors %v / %v", tick, fastErr, slowErr)
+						}
+						if hat == "axisErrorHat" {
+							if fastErr == nil {
+								t.Fatal("invalid input did not fail")
+							}
+							break
+						}
+					}
+					if hat == "axisReportersHat" && fast.targets[1].variables["score"].Value != float64(-37.5) {
+						t.Fatal("direction changed")
+					}
+				})
+			}
+		}
+	}
+}
+
+func BenchmarkNativeAxisMotion(b *testing.B) {
+	if os.Getenv("GOWARP_NATIVE_PARITY_CHILD") != "1" {
+		b.Skip("requires generated source overlay")
+	}
+	for _, compiled := range []bool{false, true} {
+		b.Run(fmt.Sprintf("compiled=%v", compiled), func(b *testing.B) {
+			r := New(nativeCodegenFixture(b))
+			r.native, r.options.Fencing = compiled, false
+			target := r.targets[1]
+			target.variables["x"].Value = float64(1000)
+			b.ReportAllocs()
+			for b.Loop() {
+				target.state.X, target.state.Y = 0, 0
+				th := r.startHat(target, "axisMotionHat", false)
+				if err := r.Run(context.Background(), 1, 60, false); err != nil {
+					b.Fatal(err)
+				}
+				if !th.done || target.state.X != 250 || target.state.Y != -250 {
+					b.Fatal("axis loop did not finish at the expected position")
+				}
+			}
+		})
+	}
 }
 
 func testNativeDrawing(t *testing.T) {

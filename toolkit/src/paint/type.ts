@@ -133,3 +133,11 @@ export interface LoadedFrame {
     state: 'loading' | 'ready' | 'error';
     id: number;
 }
+
+export interface CostumeServices {
+    target: () => any;
+    vm: () => any;
+    paintingLayer: () => any;
+    selectedPaths: () => any[];
+    toggleFor: (anchor: PaintElement, kind: string, extraClass?: string) => PaintElement;
+}

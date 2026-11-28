@@ -243,6 +243,7 @@ func TestNativeGeneratedParityChild(t *testing.T) {
 	t.Run("pen parameter loop", testNativePenParameterLoop)
 	t.Run("pen parameter error", testNativePenParameterError)
 	t.Run("drawing", testNativeDrawing)
+	t.Run("axis motion", testNativeAxisMotion)
 	t.Run("drawing dispatch", testNativeDrawingDispatch)
 	t.Run("drawing inputs", testNativeDrawingInputs)
 	t.Run("drawing debug calls", testNativeDrawingDebug)
@@ -447,6 +448,7 @@ func TestNativeGeneratedParityChild(t *testing.T) {
 			{"dynamicBatch", "batchIncrement"},
 			{"callBatch", "callBatchStep"}, {"drawingLoop", "drawingSet"}, {"stampLoop", "stampCall"},
 			{"directDrawing", "directMove"},
+			{"axisMotion", "axisSetX"},
 		} {
 			t.Run(fixture.procedure, func(t *testing.T) {
 				fast, slow := New(nativeCodegenFixture(t)), New(nativeCodegenFixture(t))
@@ -915,6 +917,7 @@ func nativeCodegenFixture(t testing.TB) *project.Project {
 		{"sharedLoop", "sharedLoopBody", false}, {"sharedHelper", "sharedHelper0", false},
 		{"sharedOnly", "sharedOnlyBody", false},
 		{"directDrawing", "directDrawingLoop", false}, {"directEffects", "directGhost", false},
+		{"axisMotion", "axisLoop", false}, {"axisReporters", "axisReadDirection", false}, {"axisError", "axisError", false},
 		{"moveInvalid", "moveInvalid", false}, {"leftInvalid", "leftInvalid", false},
 		{"rightInvalid", "rightInvalid", false}, {"directionInvalid", "directionInvalid", false},
 		{"sizeInvalid", "sizeInvalid", false}, {"costumeInvalid", "costumeInvalid", false},

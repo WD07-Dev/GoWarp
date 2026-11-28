@@ -276,6 +276,14 @@ f.err = r.stamp(t)
 t.state.Pen.setColor(value)
 {{else if eq .Opcode "motion_movesteps"}}
 t.moveSteps(value)
+{{else if eq .Opcode "motion_setx"}}
+t.setXY(value, t.state.Y)
+{{else if eq .Opcode "motion_sety"}}
+t.setXY(t.state.X, value)
+{{else if eq .Opcode "motion_changexby"}}
+t.setXY(t.state.X + value, t.state.Y)
+{{else if eq .Opcode "motion_changeyby"}}
+t.setXY(t.state.X, t.state.Y + value)
 {{else if eq .Opcode "motion_turnleft"}}
 t.setDirection(t.state.Direction - value)
 {{else if eq .Opcode "motion_turnright"}}

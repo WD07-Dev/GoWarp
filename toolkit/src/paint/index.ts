@@ -4,6 +4,7 @@ import { createIconButton, isTextInput } from '../shared/dom';
 import { createLifecycle } from '../shared/lifecycle';
 import { createAnimationTools } from './animation';
 import { createFolders } from '../sprites/folders';
+import { createCostumeTools } from './costumes';
 import { createEditorAccess } from './editor';
 import { preparePenStroke } from './stroke';
 import { paintStyle as CSS } from './style';
@@ -439,7 +440,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
     var FX_TOOL_ICON = lineIcon('<circle cx="7.8" cy="10" r="4.9"/><circle cx="12.2" cy="10" r="4.9"/>');
     var ANCHOR_TOOL_ICON = lineIcon('<circle cx="10" cy="10" r="3.5"/>' + '<path d="M10 1.9v2.8M10 15.3v2.8M1.9 10h2.8M15.3 10h2.8"/>' + '<circle cx="10" cy="10" r=".95" fill="' + ICON_FILL + '" stroke="none"/>');
     var ANIMATION_TOOL_ICON = lineIcon('<rect x="2" y="3" width="16" height="14" rx="2"/><path d="m8 7 6 3-6 3z"/>');
-    var TOOL_ICON = {shapes: SHAPE_TOOL_ICON, pen: PEN_TOOL_ICON, fx: FX_TOOL_ICON, anchor: ANCHOR_TOOL_ICON, animation: ANIMATION_TOOL_ICON};
+    var TOOL_ICON = {shapes: SHAPE_TOOL_ICON, pen: PEN_TOOL_ICON, fx: FX_TOOL_ICON, anchor: ANCHOR_TOOL_ICON, animation: ANIMATION_TOOL_ICON, costumes: lineIcon('<rect x="2" y="2" width="11" height="11" rx="1"/><path d="M7 16h10V7M5 7h5M7.5 4.5v5"/>')};
 
     function icon (paths: string) {
         return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" ' +
@@ -1745,7 +1746,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
     function syncToolButtons() {
         var grid = document.querySelector('[class*="paint-editor_mode-selector"]');
         toolButtons = toolButtons.filter(function (b: HTMLElement) { return b.isConnected; });
-        ['shapes', 'pen', 'fx', 'anchor', 'animation'].forEach(function (key: string) {
+        ['shapes', 'pen', 'fx', 'anchor', 'animation', 'costumes'].forEach(function (key: string) {
             var btn = toolButton(key);
             if(btn || !grid) return;
             addToolButton(grid, key, TOOL_ICON[key], function () {
@@ -1755,6 +1756,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
                 else if(key === 'pen') showPenPanel(self);
                 else if(key === 'anchor') showAnchorPanel(self);
                 else if(key === 'animation') animation.showPanel(self);
+                else if(key === 'costumes') costumes.showPanel(self);
                 else showFxPanel(self);
             });
         });
@@ -1852,6 +1854,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
             ensureStyle();
             sfSync();
             animation.sync();
+            costumes.sync();
             if (!paintEditorOpen()) {
                 closePanel();
                 pen.deactivate();
@@ -1923,6 +1926,9 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
         labelEl
     });
     const { showAnchorPanel, applyAnchor, markAnchor, anchorState } = anchors;
+    const costumes = createCostumeTools(context, {
+        target: anchorTarget, vm: findVM, paintingLayer, selectedPaths, toggleFor
+    });
     const animation = createAnimationTools(context, {
         target: anchorTarget,
         stageSize: () => ({width: Scratch.vm.runtime.stageWidth || 480, height: Scratch.vm.runtime.stageHeight || 360}),
@@ -1952,6 +1958,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
             disposed = true;
             lifecycle.dispose();
             animation.dispose();
+            costumes.dispose();
             unsubscribe?.();
             if(editor.storeRef) delete editor.storeRef.__gwtWatch;
             delete document.__gwtGrad;

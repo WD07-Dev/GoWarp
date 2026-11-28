@@ -1,5 +1,6 @@
 import type { AnimationServices, CostumeFrame, LoadedFrame, PaintContext, PaintElement } from './type';
 import { createLifecycle } from '../shared/lifecycle';
+import { createAnimationGIF } from './gif';
 import { tr } from '../translate';
 
 export function frameBounds(costume: CostumeFrame, width: number, height: number) {
@@ -34,6 +35,7 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
     let playing = false, startedAt = 0;
     let raf = 0, disposed = false, imageId = 0;
     let overlayKey = '', previewKey = '';
+    let exporting: AbortController | null = null;
     const cache = new Map<NonNullable<CostumeFrame['asset']>, LoadedFrame>();
 
     function clearCache() {
@@ -92,12 +94,110 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
         }
     }
     function closePanel() {
+        exporting?.abort();
+        exporting = null;
         stop();
         panelLife.dispose();
         panel = null;
         preview = null;
         status = play = startInput = endInput = null;
         previewKey = '';
+    }
+    function exportImage(costume: CostumeFrame, signal: AbortSignal): Promise<HTMLImageElement> {
+        return new Promise((resolve: (image: HTMLImageElement) => void, reject: (reason: unknown) => void) => {
+            const image = new window.Image();
+            function cleanup(): void {
+                image.onload = image.onerror = null;
+                signal.removeEventListener('abort', abort);
+            }
+            function abort(): void {
+                cleanup();
+                image.src = '';
+                reject(signal.reason);
+            }
+            if(signal.aborted) {
+                abort();
+                return;
+            }
+            signal.addEventListener('abort', abort, {once: true});
+            image.onload = () => {
+                cleanup();
+                resolve(image);
+            };
+            image.onerror = () => {
+                cleanup();
+                reject(new Error(tr('animationImageError')));
+            };
+            try {
+                if(!costume.asset) throw new Error(tr('animationImageError'));
+                image.src = costume.asset.encodeDataURI();
+            } catch(error: unknown) {
+                cleanup();
+                reject(error);
+            }
+        });
+    }
+    async function exportGIF(button: HTMLButtonElement, message: HTMLElement): Promise<void> {
+        if(exporting || disposed) return;
+        const current = services.target();
+        const costumes: CostumeFrame[] = (current?.getCostumes() || []).slice(start, end + 1).map((costume: CostumeFrame) => ({...costume}));
+        if(!costumes.length) {
+            message.textContent = tr('animationImageError');
+            return;
+        }
+        stop();
+        const job = new AbortController();
+        exporting = job;
+        button.disabled = true;
+        message.textContent = tr('animationExportProgress', {current: 0, total: costumes.length});
+        const canvas = document.createElement('canvas') as unknown as HTMLCanvasElement;
+        try {
+            const size = services.stageSize();
+            const width = Math.round(size.width), height = Math.round(size.height);
+            const gif = createAnimationGIF(width, height, fps);
+            canvas.width = width; canvas.height = height;
+            const ctx = canvas.getContext('2d', {willReadFrequently: true});
+            if(!ctx) throw new Error(tr('animationImageError'));
+            for(let i=0; i < costumes.length; i++) {
+                await new Promise<void>((resolve: () => void) => window.setTimeout(resolve, 0));
+                job.signal.throwIfAborted();
+                const image = await exportImage(costumes[i], job.signal);
+                try {
+                    job.signal.throwIfAborted();
+                    const bounds = frameBounds(costumes[i], image.naturalWidth, image.naturalHeight);
+                    ctx.clearRect(0, 0, width, height);
+                    ctx.drawImage(image, width / 2 + bounds.x, height / 2 + bounds.y, bounds.width, bounds.height);
+                    gif.write(ctx.getImageData(0, 0, width, height).data);
+                } finally {
+                    image.src = '';
+                }
+                message.textContent = tr('animationExportProgress', {current: i + 1, total: costumes.length});
+            }
+            job.signal.throwIfAborted();
+            const blob = new window.Blob([gif.finish()], {type: 'image/gif'});
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a') as unknown as HTMLAnchorElement;
+            link.href = url;
+            link.download = String(current.getName?.() || 'animation').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_') + '.gif';
+            try {
+                document.body.appendChild(link);
+                link.click();
+            } finally {
+                link.remove();
+                window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+            }
+            message.textContent = '';
+        } catch(error: unknown) {
+            if(!job.signal.aborted) {
+                message.textContent = tr('animationExportError');
+                window.console.warn('GoWarp Toolkit GIF:', error);
+            }
+        } finally {
+            canvas.width = canvas.height = 0;
+            button.disabled = false;
+            if(job.signal.aborted) message.textContent = '';
+            if(exporting === job) exporting = null;
+        }
     }
     function selectedCostume(canvas: HTMLCanvasElement, current: number): number {
         let fiber = editor.fiberOf(canvas);
@@ -203,6 +303,7 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
         }
         const costumes: CostumeFrame[] = current.getCostumes();
         if(target !== current) {
+            exporting?.abort();
             target = current;
             stop(); clearCache();
             costumeCount = 0; start = end = frame = 0;
@@ -311,6 +412,19 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
         });
         numberField('animationFPS', fps, 60, (value: number) => { fps = value; });
         panel.appendChild(range);
+        const exportControls = document.createElement('div');
+        exportControls.className = 'gwt-animation-controls';
+        const exportButton = document.createElement('button') as unknown as HTMLButtonElement;
+        exportButton.type = 'button';
+        exportButton.textContent = tr('animationExportGIF');
+        const exportStatus = document.createElement('div');
+        exportStatus.className = 'gwt-animation-hint';
+        exportStatus.setAttribute('role', 'status');
+        listen(exportButton, 'click', () => {
+            exportGIF(exportButton, exportStatus);
+        });
+        exportControls.appendChild(exportButton);
+        panel.append(exportControls, exportStatus);
         const onion = document.createElement('fieldset');
         const legend = document.createElement('legend'); legend.textContent = tr('animationOnion'); onion.appendChild(legend);
         function check(key: string, checked: boolean, change: (value: boolean) => void) {
