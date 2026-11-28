@@ -24,36 +24,52 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-var svgFonts = [10]struct {
+const (
+	bundledMono      = 4
+	bundledSansSerif = 8
+	bundledMarker    = 9
+)
+
+var svgFonts = [...]struct {
+	data []byte
 	once sync.Once
 	font *sfnt.Font
-}{}
+}{
+	{data: goregular.TTF},
+	{data: gobold.TTF},
+	{data: goitalic.TTF},
+	{data: gobolditalic.TTF},
+	bundledMono: {data: gomono.TTF},
+	{data: gomonobold.TTF},
+	{data: gomonoitalic.TTF},
+	{data: gomonobolditalic.TTF},
+	bundledSansSerif: {data: assets.NotoSansMedium},
+	bundledMarker:    {data: assets.Knewave},
+}
 
 func bundledFont(variant int) *sfnt.Font {
-	c := &svgFonts[variant]
-	c.once.Do(func() {
-		data := [10][]byte{goregular.TTF, gobold.TTF, goitalic.TTF, gobolditalic.TTF, gomono.TTF, gomonobold.TTF, gomonoitalic.TTF, gomonobolditalic.TTF, assets.NotoSansMedium, assets.Knewave}
-		c.font, _ = sfnt.Parse(data[variant])
+	cached := &svgFonts[variant]
+	cached.once.Do(func() {
+		cached.font, _ = sfnt.Parse(cached.data)
 	})
-	return c.font
+	return cached.font
 }
 
 func defaultTextFont(family, weight, style string) *sfnt.Font {
-	// Scratch font names refer to bundled fonts, not CSS generic families.
 	name, _, _ := strings.Cut(family, ",")
 	switch strings.ToLower(strings.Trim(strings.TrimSpace(name), "\"'")) {
 	case "sans serif":
-		return bundledFont(8)
+		return bundledFont(bundledSansSerif)
 	case "marker":
-		return bundledFont(9)
+		return bundledFont(bundledMarker)
 	}
 
 	if f := browserFont(family, weight, style); f != nil {
 		return f.face
 	}
 	v := fontVariant(weight, style)
-	if fontFamily(family) == 2 {
-		v |= 4
+	if fontFamily(family) == fontMono {
+		v |= bundledMono
 	}
 	return bundledFont(v)
 }
@@ -106,7 +122,7 @@ func findGlyph(primary *sfnt.Font, r rune, ppem fixed.Int26_6, b *sfnt.Buffer) (
 	if g, ok := readGlyph(primary, r, ppem, b); ok {
 		return g, true
 	}
-	for _, family := range []int{3, 4, 5, 0} {
+	for _, family := range []int{fontEmoji, fontCJK, fontSymbols, fontSans} {
 		f := loadSystemFont(family, 0)
 		if f == nil || f.face == primary {
 			continue
@@ -157,7 +173,6 @@ func svgGlyphNodes(text string, size float64, family, weight, style string, reso
 		}
 		g, found := findGlyph(primary, r, ppem, &b)
 		if !found {
-			// Missing characters must not prevent the project from loading.
 			x, y, w, h, s := advance+size*.1, -size*.75, size*.5, size*.75, size*.06
 			p := fmt.Sprintf("M%g %g h%g v%g h%g Z M%g %g v%g h%g v%g Z ", x, y, w, h, -w, x+s, y+s, h-2*s, w-2*s, -h+2*s)
 			paths.WriteString(p)

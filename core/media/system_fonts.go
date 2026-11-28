@@ -24,11 +24,24 @@ type cachedSystemFont struct {
 	font *systemFont
 }
 
-var systemFonts [7][4]cachedSystemFont
+const (
+	fontSans = iota
+	fontSerif
+	fontMono
+	fontEmoji
+	fontCJK
+	fontSymbols
+	fontYaHei
+)
+
+var systemFontFamilies = [...]string{
+	fontSans: "sans", fontSerif: "serif", fontMono: "mono",
+	fontEmoji: "emoji", fontCJK: "cjk", fontSymbols: "symbols", fontYaHei: "yahei",
+}
+
+var systemFonts [len(systemFontFamilies)][4]cachedSystemFont
 var systemFontFiles sync.Map
 var systemFontFaces sync.Map
-
-var systemFontFamilies = [...]string{"sans", "serif", "mono", "emoji", "cjk", "symbols", "yahei"}
 
 func fontVariant(weight, style string) int {
 	variant := 0
@@ -49,27 +62,27 @@ func fontFamily(family string) int {
 	for _, name := range strings.Split(family, ",") {
 		switch strings.Trim(strings.TrimSpace(name), "\"'") {
 		case "microsoft yahei", "微软雅黑":
-			return 6
+			return fontYaHei
 		}
 	}
 	if strings.Contains(family, "mono") || strings.Contains(family, "courier") || strings.Contains(family, "consolas") {
-		return 2
+		return fontMono
 	}
 	if strings.Contains(family, "emoji") {
-		return 3
+		return fontEmoji
 	}
 	if family == "serif" || strings.Contains(family, "times") || strings.Contains(family, "georgia") {
-		return 1
+		return fontSerif
 	}
-	return 0
+	return fontSans
 }
 
 func browserFont(family, weight, style string) *systemFont {
 	variant := fontVariant(weight, style)
 	kind := fontFamily(family)
 	face := loadSystemFont(kind, variant)
-	if face == nil && kind == 6 {
-		return loadSystemFont(0, variant)
+	if face == nil && kind == fontYaHei {
+		return loadSystemFont(fontSans, variant)
 	}
 	return face
 }
@@ -78,13 +91,10 @@ func loadSystemFont(family, variant int) *systemFont {
 	cached := &systemFonts[family][variant]
 	cached.once.Do(func() {
 		bold, italic := variant&1 != 0, variant&2 != 0
+		var candidates []string
 		switch runtime.GOOS {
 		case "windows":
-			for _, path := range windowsfonts.Candidates(systemFontFamilies[family], bold, italic) {
-				if cached.font = readSystemFont(path, 0); cached.font != nil {
-					return
-				}
-			}
+			candidates = windowsfonts.Candidates(systemFontFamilies[family], bold, italic)
 		case "linux":
 			path, index := linuxfonts.Match(systemFontFamilies[family], bold, italic)
 			if path != "" {
@@ -93,10 +103,11 @@ func loadSystemFont(family, variant int) *systemFont {
 					return
 				}
 			}
-			for _, path := range linuxfonts.Candidates(systemFontFamilies[family]) {
-				if cached.font = readSystemFont(path, 0); cached.font != nil {
-					return
-				}
+			candidates = linuxfonts.Candidates(systemFontFamilies[family])
+		}
+		for _, path := range candidates {
+			if cached.font = readSystemFont(path, 0); cached.font != nil {
+				return
 			}
 		}
 	})

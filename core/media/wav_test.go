@@ -43,10 +43,6 @@ func wavFixture(format, channels, align, bits uint16, extra, payload []byte, fac
 }
 
 func TestWAVIMAMonoKnownNibbleVector(t *testing.T) {
-	/*
-		Reference IMA deltas for codes 0..7: 0,1,3,4,7,12,20,41 at predictor/index zero. Mono and stereo
-		vectors were also checked against SoX 14.4.2.
-	*/
 	data := wavFixture(0x11, 1, 8, 4, []byte{9, 0}, []byte{0, 0, 0, 0, 0x10, 0x32, 0x54, 0x76}, nil)
 	sound, err := DecodeSound("wav", data)
 	if err != nil {
@@ -66,10 +62,6 @@ func TestWAVIMAMonoKnownNibbleVector(t *testing.T) {
 }
 
 func TestWAVIMAStereoGroupsAndBlockReset(t *testing.T) {
-	/*
-		Each channel owns four successive bytes (eight codes), then the other
-		channel follows. The next block resets both predictors and step indices.
-	*/
 	block := []byte{0xe8, 3, 0, 0, 0x18, 0xfc, 0, 0, 0x10, 0x32, 0x54, 0x76, 0x98, 0xba, 0xdc, 0xfe}
 	payload := append(append([]byte{}, block...), []byte{123, 0, 0, 0, 0x85, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}...)
 	sound, err := DecodeSound("wav", wavFixture(0x11, 2, 16, 4, []byte{9, 0}, payload, nil))
@@ -112,7 +104,6 @@ func TestWAVIMAStereoGroupsAndBlockReset(t *testing.T) {
 }
 
 func TestWAVIMAClippingPartialBlockAndFact(t *testing.T) {
-	// Header predictor 32760, maximal step. Codes 7,15,15,15 saturate both ends.
 	data := []byte{0xf8, 0x7f, 88, 0, 0xf7, 0xff}
 	sound, err := DecodeSound("wav", wavFixture(0x11, 1, 8, 4, []byte{9, 0}, data, nil))
 	if err != nil {
@@ -263,10 +254,6 @@ func TestWAVRejectsTruncationAtEveryByte(t *testing.T) {
 }
 
 func TestWAVAcceptsFinalZeroPadExcludedFromRIFFLength(t *testing.T) {
-	/*
-		Famished_Fish's 24-bit mono WAVs have complete data frames and a final
-		zero alignment byte, but their RIFF size omits that one padding byte.
-	*/
 	data := wavFixture(1, 1, 3, 24, nil, []byte{0, 0, 64}, nil)
 	binary.LittleEndian.PutUint32(data[4:], uint32(len(data)-9))
 	sound, err := DecodeSound("wav", data)

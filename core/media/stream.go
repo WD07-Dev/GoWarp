@@ -30,10 +30,6 @@ func (d *soundDecode) stream(meta *Sound, rate int) (*Stream, error) {
 	}
 }
 
-/*
-Stream resamples stereo PCM with live volume, pitch and pan controls.
-Only the audio reader advances the cursor; host parameter changes are locked.
-*/
 type Stream struct {
 	mu                              sync.Mutex
 	parametersMu                    sync.Mutex
@@ -71,7 +67,6 @@ func (s *Stream) Set(volume, pitch, pan float64) {
 	s.right = gain * math.Min(1, 1+pan)
 }
 
-// Playback sets a source offset, optional ending time, and looping. Times are seconds.
 func (s *Stream) Playback(start, end float64, loop bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -111,10 +106,6 @@ func (s *Stream) Read(p []byte) (int, error) {
 			s.position = math.Min(s.position, s.end)
 		}
 	}
-	/*
-		Controls apply to the next buffer without making the game thread wait
-		for compressed audio decoding or seeking under the playback lock.
-	*/
 	s.parametersMu.Lock()
 	step, left, right, loop := s.step, s.left, s.right, s.loop
 	s.parametersMu.Unlock()
@@ -124,10 +115,6 @@ func (s *Stream) Read(p []byte) (int, error) {
 		s.gainFrames, s.gainReady = 0, true
 	} else if left != s.gainTargetLeft || right != s.gainTargetRight {
 		s.gainTargetLeft, s.gainTargetRight = left, right
-		/*
-			Smooth live gain changes over 5 ms to avoid a waveform discontinuity.
-			Initial playback retains its requested gain without delaying the attack.
-		*/
 		s.gainFrames = max(1, s.outputRate/200)
 	}
 	n := 0
@@ -159,7 +146,6 @@ func (s *Stream) Read(p []byte) (int, error) {
 			var err error
 			samples, err = s.pcm.pair(at, frames)
 			if err != nil && s.playbackClosed() {
-				// Cancellation must not enter the source EOF/loop retry path.
 				return n, io.EOF
 			}
 			if s.pcm.eof {
@@ -193,10 +179,6 @@ func (s *Stream) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-/*
-Each music player owns a decoder and a small PCM window, avoiding whole-track decoding on game
-updates.
-*/
 type streamPCM struct {
 	reader        io.ReadSeeker
 	data          []byte
@@ -216,7 +198,6 @@ func (p *streamPCM) pair(at, frames int) ([4]float32, error) {
 	if at < p.offset || min(at+2, frames) > end {
 		carry := 0
 		if at == end-1 && p.valid >= 8 {
-			// Keep the interpolation sample at a chunk boundary.
 			copy(p.data, p.data[p.valid-8:p.valid])
 			carry = 8
 		} else if at != end {
@@ -228,7 +209,6 @@ func (p *streamPCM) pair(at, frames int) ([4]float32, error) {
 		want := min(len(p.data), (frames-at)*8)
 		n, err := io.ReadFull(p.reader, p.data[carry:want])
 		p.valid = carry + n
-		// Decoder Length is an estimate; accept complete samples at EOF even when shorter.
 		if (err == io.EOF || err == io.ErrUnexpectedEOF) && p.valid%8 == 0 {
 			p.end, p.eof = at+p.valid/8, true
 			if p.valid == 0 {

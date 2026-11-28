@@ -20,10 +20,6 @@ type pcmReadResult struct {
 	generation uint64
 }
 
-/*
-Only Read/Seek access the cursor. Close can run concurrently. Three recycled
-windows bound the extra decoded memory to 96 KiB per compressed music voice.
-*/
 type pcmPrefetch struct {
 	requests         chan pcmReadRequest
 	results          chan pcmReadResult
@@ -116,7 +112,6 @@ func (p *pcmPrefetch) run(source io.ReadSeeker) {
 }
 
 func (p *pcmPrefetch) Read(dst []byte) (int, error) {
-	// Stopping is a normal end of audio, not a mixer-wide device error.
 	select {
 	case <-p.stop:
 		return 0, io.EOF
@@ -189,10 +184,6 @@ func (p *pcmPrefetch) Close() error {
 	return nil
 }
 
-/*
-StartReadAhead begins bounded decoding after Playback and before the first Read. Mixing controls
-stay in Read; Close releases the worker.
-*/
 func (s *Stream) StartReadAhead() {
 	if s.pcm == nil {
 		return
@@ -203,7 +194,6 @@ func (s *Stream) StartReadAhead() {
 	s.pcm.reader = newPCMPrefetch(s.pcm.reader, int64(s.position)*8, int64(s.frames)*8)
 }
 
-// Ready reports initial samples or a decoding error, keeping initialization out of the mixer loop.
 func (s *Stream) Ready() bool {
 	if s.decode != nil {
 		select {

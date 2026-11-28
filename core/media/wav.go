@@ -7,17 +7,12 @@ import (
 	"math"
 )
 
-// WAV frames become two float32 samples, matching the existing 64 MiB limit.
 const maxWAVFrames = (64 << 20) / 8
 
 type wavFormat struct {
 	kind, channels, rate, align, bits, samplesPerBlock int
 }
 
-/*
-Long 16-bit PCM tracks can be sampled directly from their WAV payload.
-This avoids expanding a whole track to stereo float32 before playback starts.
-*/
 type wavPCM struct {
 	data     []byte
 	channels int
@@ -56,10 +51,6 @@ func readWAV(data []byte) (wavFormat, []byte, *uint32, error) {
 		size := uint64(binary.LittleEndian.Uint32(data[offset+4 : offset+8]))
 		offset += 8
 		padded := size + size%2
-		/*
-			Accept one trailing zero alignment byte omitted from RIFF length. Payload frames must still be
-			complete.
-		*/
 		if name == "data" && size%2 == 1 && size == uint64(end-offset) && len(data) == end+1 && data[end] == 0 {
 			padded = size
 		}
@@ -217,11 +208,6 @@ func parseWAVFormat(data []byte) (wavFormat, error) {
 	return f, nil
 }
 
-/*
-IMA's standard tables and shift/add rounding are also used by Scratch's
-ADPCMSoundDecoder and dr_wav. Low nibble comes first; stereo uses four-byte
-packets per channel, rather than alternating individual compressed bytes.
-*/
 var imaSteps = [...]int{
 	7,
 	8,

@@ -2,10 +2,6 @@ package media
 
 import "fmt"
 
-/*
-streamMP3 defers frame indexing until the audio reader needs the decoder.
-Like the decoder itself, it is owned by one stream's reader goroutine.
-*/
 type streamMP3 struct {
 	data    []byte
 	rate    int
@@ -26,7 +22,6 @@ func (s *streamMP3) prepare() error {
 		s.decoder, s.err = openMP3Stream(s.data)
 		s.data = nil
 		if s.err != nil {
-			// Initialization EOF is invalid input, not successful playback EOF.
 			s.err = fmt.Errorf("decode MP3 stream: %w", s.err)
 		} else if s.decoder.SampleRate() != s.rate || s.decoder.Length() != s.length {
 			s.err = fmt.Errorf("MP3 stream metadata changed since loading")

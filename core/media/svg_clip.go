@@ -10,10 +10,6 @@ import (
 	"github.com/srwiley/rasterx"
 )
 
-/*
-Embedded bitmaps need the same clipping silhouette as their vector siblings.
-Paint the element once, then intersect it with a user-space geometry mask.
-*/
 func (r *svgCompositor) clipped(dst *image.RGBA, n *svgNode, parents []*svgNode, matrix rasterx.Matrix2D) error {
 	reference := strings.TrimSpace(n.property("clip-path"))
 	if !strings.HasPrefix(reference, "url(") || !strings.HasSuffix(reference, ")") {
@@ -84,7 +80,6 @@ func (r *svgCompositor) clipped(dst *image.RGBA, n *svgNode, parents []*svgNode,
 	if _, err := vectorSVGWithAntialias(data, mask, false, r.noAntialias); err != nil {
 		return err
 	}
-	// paint applies the element's transform itself.
 	if err := r.paint(layer, n.without("clip-path"), parents, matrix); err != nil {
 		return err
 	}
@@ -115,10 +110,7 @@ func svgClipGeometry(n *svgNode) (*svgNode, error) {
 			return nil, fmt.Errorf("unsupported SVG %s inside clipPath", key)
 		}
 	}
-	clean := n
-	for _, key := range []string{"fill", "stroke", "opacity", "fill-opacity", "fill-rule"} {
-		clean = clean.without(key)
-	}
+	clean := n.without("fill", "stroke", "opacity", "fill-opacity", "fill-rule")
 	if clean.start.Name.Local == "clipPath" {
 		clean.start.Name.Local = "g"
 	}

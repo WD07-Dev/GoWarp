@@ -11,6 +11,7 @@ import (
 	"io"
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -50,18 +51,18 @@ func (n *svgNode) property(key string) string {
 	return v
 }
 
-func (n *svgNode) without(key string) *svgNode {
+func (n *svgNode) without(keys ...string) *svgNode {
 	c := *n
 	c.start.Attr = nil
 	for _, a := range n.start.Attr {
-		if a.Name.Local == key {
+		if slices.Contains(keys, a.Name.Local) {
 			continue
 		}
 		if a.Name.Local == "style" {
 			var parts []string
 			for _, p := range strings.Split(a.Value, ";") {
 				name, _, ok := strings.Cut(p, ":")
-				if ok && strings.TrimSpace(name) != key {
+				if ok && !slices.Contains(keys, strings.TrimSpace(name)) {
 					parts = append(parts, p)
 				}
 			}
@@ -392,13 +393,11 @@ func (r *svgCompositor) paint(dst *image.RGBA, n *svgNode, parents []*svgNode, m
 			r.bytes -= len(target.Pix)
 		}()
 	}
-	clean := n.without("opacity")
-	/*
-		oksvg's one-argument scale uses zero for Y. Canonical matrices keep
-		mixed group's vector and bitmap children under the same transform.
-	*/
-	if n.attr("transform") != "" {
-		clean = clean.without("transform")
+	var clean *svgNode
+	if n.attr("transform") == "" {
+		clean = n.without("opacity")
+	} else {
+		clean = n.without("opacity", "transform")
 		clean.start.Attr = append(clean.start.Attr, xml.Attr{
 			Name:  xml.Name{Local: "transform"},
 			Value: fmt.Sprintf("matrix(%g %g %g %g %g %g)", tr.A, tr.B, tr.C, tr.D, tr.E, tr.F),
@@ -592,10 +591,6 @@ func (r *svgCompositor) image(dst *image.RGBA, n *svgNode, m rasterx.Matrix2D, p
 	if alpha != 255 {
 		opts = &xdraw.Options{SrcMask: image.NewUniform(color.Alpha{A: alpha})}
 	}
-	/*
-		Even an all-opaque mask forces x/image into its generic per-pixel path.
-		Leaving it unset preserves source alpha and enables the typed fast path.
-	*/
 	transform := f64.Aff3{m.A, m.C, m.E, m.B, m.D, m.F}
 	right, bottom := m.E+m.A*float64(config.Width), m.F+m.D*float64(config.Height)
 	scaledWidth, scaledHeight := right-m.E, bottom-m.F
@@ -603,7 +598,6 @@ func (r *svgCompositor) image(dst *image.RGBA, n *svgNode, m rasterx.Matrix2D, p
 		m.E == math.Trunc(m.E) && m.F == math.Trunc(m.F) &&
 		right == math.Trunc(right) && bottom == math.Trunc(bottom) &&
 		validSize(scaledWidth, scaledHeight) {
-		// Bilinear enlargement cannot add detail to a uniform source.
 		if uniform := svgUniformImage(src); uniform != nil {
 			var mask image.Image
 			if opts != nil {

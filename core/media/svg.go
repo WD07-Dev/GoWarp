@@ -13,10 +13,6 @@ import (
 
 var svgUniformScale = regexp.MustCompile(`\bscale\s*\(\s*([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?)\s*\)`)
 
-/*
-oksvg does not resolve percentage shape lengths and can discard geometry
-parse errors. Normalize these lengths and validate them before rasterizing.
-*/
 func normalizeSVG(data []byte) ([]byte, error) {
 	decoder := xml.NewDecoder(bytes.NewReader(data))
 	var out bytes.Buffer
@@ -105,14 +101,9 @@ func normalizeSVG(data []byte) ([]byte, error) {
 					}
 				}
 			}
-			/*
-				Scratch's Paper.js exports sometimes contain the invalid value
-				stroke-width="none". Browsers ignore that declaration.
-			*/
 			attrs := start.Attr[:0]
 			for _, attr := range start.Attr {
 				if attr.Name.Local == "transform" {
-					// oksvg incorrectly treats omitted scale-Y as zero.
 					attr.Value = svgUniformScale.ReplaceAllString(attr.Value, "scale($1,$1)")
 				}
 				if attr.Name.Local == "stroke-width" && attr.Value == "none" {

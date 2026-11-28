@@ -20,10 +20,6 @@ func TestSVGGlyphMetricsAndBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	/*
-		Independent bundled Go Regular hmtx metrics: A=1366, space=569,
-		unitsPerEm=2048. At 32px these are exact 26.6 coordinates.
-	*/
 	if advance != 21.34375 || path == "" {
 		t.Fatalf("path=%q advance=%v", path, advance)
 	}

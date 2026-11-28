@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 	"gowarp/core/project"
 	"io"
 	"math"
@@ -16,6 +15,8 @@ import (
 	"testing"
 	"testing/iotest"
 	"time"
+
+	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 )
 
 func mediaFixturePath(t *testing.T, name string) string {
@@ -304,10 +305,6 @@ func TestCompressedMusicMatchesDecodedPCM(t *testing.T) {
 }
 
 func TestLongMP3StreamsBeyondPCMBufferLimit(t *testing.T) {
-	/*
-		Silent MPEG-1 Layer III frames, 128 kbps at 44.1 kHz. The compressed
-		fixture is small, but its decoded stereo float32 PCM exceeds 128 MiB.
-	*/
 	frame := make([]byte, 417)
 	copy(frame, []byte{0xff, 0xfb, 0x90, 0x00})
 	data := bytes.Repeat(frame, maxSoundBytes/(1152*8)+1)

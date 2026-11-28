@@ -20,7 +20,6 @@ import (
 	"gowarp/core/project"
 )
 
-// LoadProgress counts inspected assets and loading preparation stages.
 type LoadProgress struct {
 	Done, Total int
 	Label       string
@@ -28,7 +27,6 @@ type LoadProgress struct {
 
 type costumeSource struct {
 	name string
-	// Reuse the pixel identity for both CPU and GPU cache lookups.
 	key  string
 	meta project.Costume
 }
@@ -37,16 +35,7 @@ type soundSource struct {
 	name, format string
 }
 
-/*
-Reserve space for the MP3 frame index and decoder state, in addition to
-source bytes. The decoded-length limit bounds the index size.
-*/
 const preparedMP3Bytes = 1 << 20
-
-/*
-Streaming retains only a small PCM window, independently of track length.
-Still bound the decoder frame index and seek offsets for compressed tracks.
-*/
 const maxStreamSoundBytes = 1 << 30
 
 type cachedAsset struct {
@@ -61,10 +50,6 @@ type cachedAsset struct {
 	prepared    *mp3PCM
 }
 
-/*
-Runtime assets are accessed by the host thread. Audio streams retain their
-decoded Sound, so eviction cannot invalidate samples being played.
-*/
 type runtimeCache struct {
 	reader       *project.AssetReader
 	ctx          context.Context
@@ -80,10 +65,6 @@ type runtimeCache struct {
 	playbackFile *os.File
 }
 
-/*
-LoadRuntime reads geometry and audio durations first. Pixel and PCM buffers
-are shared by asset and kept in a bounded LRU instead of retained per costume.
-*/
 func LoadRuntime(ctx context.Context, path string, p *project.Project, progress func(LoadProgress)) (*Library, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -100,7 +81,6 @@ func LoadRuntime(ctx context.Context, path string, p *project.Project, progress 
 			lib.Close()
 		}
 	}()
-	// Reserve progress for optional preparation so loading never returns from 100%.
 	total := len(p.Targets) + 2
 	for _, target := range p.Targets {
 		total += len(target.Costumes) + len(target.Sounds)
@@ -127,7 +107,6 @@ func LoadRuntime(ctx context.Context, path string, p *project.Project, progress 
 			name := project.AssetName(meta.MD5Ext, meta.AssetID, meta.DataFormat)
 			var c *Costume
 			if name != "" {
-				// Shared pixels do not imply shared resolution or rotation center.
 				key := fmt.Sprintf("%s/%s/%g/%g/%g", name, meta.DataFormat, meta.BitmapResolution, meta.RotationCenterX, meta.RotationCenterY)
 				if known := geometry[key]; known != nil {
 					copy := *known
@@ -223,10 +202,6 @@ func LoadRuntime(ctx context.Context, path string, p *project.Project, progress 
 	return lib, nil
 }
 
-/*
-Prepare named costumes and dynamic stamps without evicting the first frame
-or prepared audio. Bound decode work independently of retained pixel bytes.
-*/
 func (lib *Library) prepareReferencedCostumes(p *project.Project, progress func(LoadProgress)) error {
 	cache := lib.cache
 	budget := min(16<<20, cache.limit-cache.bytes)
@@ -346,7 +321,6 @@ func (lib *Library) prepareReferencedCostumes(p *project.Project, progress func(
 					}
 				}
 			}
-			// A broken optional image still fails only when actually requested.
 		}
 		if progress != nil {
 			progress(LoadProgress{Done: i + 1, Total: len(candidates), Label: "Preparing the first frame"})
@@ -467,10 +441,6 @@ func inspectSoundWithMP3(format string, data []byte) (*Sound, *mp3PCM, error) {
 	}
 }
 
-/*
-Keep repeated pixels compact in the LRU and reuse caller-owned originals through a weak reference.
-Host-thread access only.
-*/
 func newCostumeAsset(key string, pixels *image.NRGBA, bitmap bool) *cachedAsset {
 	asset := &cachedAsset{key: key, image: pixels, bytes: len(pixels.Pix)}
 	if bitmap {
@@ -532,10 +502,6 @@ func (c *runtimeCache) put(asset *cachedAsset) {
 	c.bytes += asset.bytes
 }
 
-/*
-Speculation uses free cache space and remains first in line for eviction.
-It must not force demand reads to decode their working set again.
-*/
 func (c *runtimeCache) putPrefetched(asset *cachedAsset) {
 	if c.bytes+asset.bytes > c.limit {
 		return
@@ -571,10 +537,6 @@ func (c *runtimeCache) soundSource(name string) (*cachedAsset, error) {
 	return entry, nil
 }
 
-/*
-CostumeImage returns a buffer pinned by the caller's reference, not by the
-costume metadata. It remains valid when later requests evict its cache entry.
-*/
 func (lib *Library) CostumeImage(costume *Costume) *image.NRGBA {
 	cache := lib.cache
 	if cache == nil {

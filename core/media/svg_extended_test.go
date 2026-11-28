@@ -72,10 +72,6 @@ func TestSVGEmbeddedImageTransformAllocationsAndPixels(t *testing.T) {
 					t.Fatal(err)
 				}
 			})
-			/*
-				An opaque mask must not force a boxed color allocation per sample.
-				Source PNG alpha still participates in ordinary image composition.
-			*/
 			if opacity == "1" && allocs > 1000 {
 				t.Errorf("opaque embedded image allocated %.0f objects", allocs)
 			}
