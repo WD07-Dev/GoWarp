@@ -1,6 +1,7 @@
 import type { AnimationServices, CostumeFrame, LoadedFrame, PaintContext, PaintElement } from './type';
 import { createLifecycle } from '../shared/lifecycle';
 import { createAnimationGIF } from './gif';
+import { createGIFCrop } from './crop';
 import { tr } from '../translate';
 
 export function frameBounds(costume: CostumeFrame, width: number, height: number) {
@@ -36,6 +37,7 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
     let raf = 0, disposed = false, imageId = 0;
     let overlayKey = '', previewKey = '';
     let exporting: AbortController | null = null;
+    let crop: ReturnType<typeof createGIFCrop> | null = null;
     const cache = new Map<NonNullable<CostumeFrame['asset']>, LoadedFrame>();
 
     function clearCache() {
@@ -100,6 +102,7 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
         panelLife.dispose();
         panel = null;
         preview = null;
+        crop = null;
         status = play = startInput = endInput = null;
         previewKey = '';
     }
@@ -153,7 +156,8 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
         const canvas = document.createElement('canvas') as unknown as HTMLCanvasElement;
         try {
             const size = services.stageSize();
-            const width = Math.round(size.width), height = Math.round(size.height);
+            const region = crop?.bounds() || {x: 0, y: 0, width: Math.round(size.width), height: Math.round(size.height)};
+            const {width, height} = region;
             const gif = createAnimationGIF(width, height, fps);
             canvas.width = width; canvas.height = height;
             const ctx = canvas.getContext('2d', {willReadFrequently: true});
@@ -166,7 +170,7 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
                     job.signal.throwIfAborted();
                     const bounds = frameBounds(costumes[i], image.naturalWidth, image.naturalHeight);
                     ctx.clearRect(0, 0, width, height);
-                    ctx.drawImage(image, width / 2 + bounds.x, height / 2 + bounds.y, bounds.width, bounds.height);
+                    ctx.drawImage(image, size.width / 2 + bounds.x - region.x, size.height / 2 + bounds.y - region.y, bounds.width, bounds.height);
                     gif.write(ctx.getImageData(0, 0, width, height).data);
                 } finally {
                     image.src = '';
@@ -225,7 +229,7 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
         const entry = load(costume);
         const size = services.stageSize();
         const dpr = window.devicePixelRatio || 1;
-        const key = JSON.stringify([frame, entry?.id, entry?.state, costume?.name, costume?.rotationCenterX, costume?.rotationCenterY, costume?.bitmapResolution, size, dpr]);
+        const key = JSON.stringify([frame, entry?.id, entry?.state, costume?.name, costume?.rotationCenterX, costume?.rotationCenterY, costume?.bitmapResolution, size, dpr, crop?.bounds()]);
         if(key === previewKey) return;
         previewKey = key;
         const width = 320, height = 200;
@@ -239,6 +243,7 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
             const scale = Math.min(width / size.width, height / size.height);
             ctx.drawImage(image, width / 2 + bounds.x * scale, height / 2 + bounds.y * scale, bounds.width * scale, bounds.height * scale);
         }
+        crop?.draw(ctx, width, height);
         const detail = !entry || entry.state === 'error' ? tr('animationImageError') : entry.state === 'loading' ? tr('animationLoading') : costume.name || '';
         status.textContent = `${frame + 1} / ${costumes.length} · ${detail}`;
     }
@@ -412,6 +417,12 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
         });
         numberField('animationFPS', fps, 60, (value: number) => { fps = value; });
         panel.appendChild(range);
+        crop = createGIFCrop(context, preview, services.stageSize, panelLife, () => {
+            stop();
+            previewKey = '';
+            wake();
+        });
+        panel.appendChild(crop.element);
         const exportControls = document.createElement('div');
         exportControls.className = 'gwt-animation-controls';
         const exportButton = document.createElement('button') as unknown as HTMLButtonElement;
@@ -476,7 +487,7 @@ export function createAnimationTools(context: PaintContext, services: AnimationS
             stop();
             hideOverlay();
         }else wake();
-    }, {signal: visibility.signal});
+    }, { signal: visibility.signal });
     return {
         showPanel,
         sync: wake,

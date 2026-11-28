@@ -63,32 +63,28 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         var raw = c.asset && (c.asset.data !== undefined ? c.asset.data : c.asset);
         if(c.dataFormat === 'svg' || typeof raw === 'string') {
             var txt = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
-            var w = Number((/\swidth="([\d.]+)"/.exec(txt) || [])[1]) || 0;
-            var h = Number((/\sheight="([\d.]+)"/.exec(txt) || [])[1]) || 0;
-            return new Promise<AlphaStats>(function (res: (value: AlphaStats | PromiseLike<AlphaStats>) => void, rej: (reason?: unknown) => void) {
-                var img = new Image();
+            const root = new window.DOMParser().parseFromString(txt, 'image/svg+xml').documentElement as unknown as SVGSVGElement;
+            const viewBox = root.hasAttribute('viewBox') ? root.viewBox.baseVal : null;
+            return new Promise<AlphaStats>((resolve, reject) => {
+                const img = new window.Image();
                 img.onload = () => {
-                    res(alphaStats(img, w || img.naturalWidth, h || img.naturalHeight, 4));
+                    const stats = alphaStats(img, viewBox?.width || img.naturalWidth, viewBox?.height || img.naturalHeight, 4);
+                    if(stats.area && viewBox) {
+                        stats.cx += viewBox.x;
+                        stats.cy += viewBox.y;
+                    }
+                    resolve(stats);
                 };
-                img.onerror = function () { rej(new Error('svg raster')); };
+                img.onerror = () => reject(new Error('SVG image unavailable'));
                 img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(txt);
             });
         }
-        var bytes = raw instanceof ArrayBuffer ? raw : (raw && raw.buffer ? raw.buffer : raw);
-        const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/' + (c.dataFormat || 'png') }));
-        var s = alphaStats(bmp, bmp.width, bmp.height, 1);
-        var res_1 = Math.max(1, Number(c.bitmapResolution) || 1);
-        if(s.area && res_1 > 1) {
-            var inUnits = Math.hypot(s.cx / res_1 - c.rotationCenterX, s.cy / res_1 - c.rotationCenterY);
-            var inPixels = Math.hypot(s.cx - c.rotationCenterX, s.cy - c.rotationCenterY);
-            if (inUnits <= inPixels) {
-                s.cx /= res_1;
-                s.cy /= res_1;
-                s.w /= res_1;
-                s.h /= res_1;
-            }
+        const bmp = await createImageBitmap(new Blob([raw], { type: 'image/' + (c.dataFormat || 'png') }));
+        try {
+            return alphaStats(bmp, bmp.width, bmp.height, 1);
+        } finally {
+            bmp.close();
         }
-        return s;
     }
 
     async function measureOne(c: any) {
@@ -165,24 +161,54 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         return (Math.round(v * 10) / 10).toFixed(1);
     }
 
-    function refreshAnchorView(t: any) {
+    async function refreshAnchorView(t: any, pivots: number[][]) {
+        const vm = findVM();
+        const renderer = vm.runtime.renderer;
+        const costumes = t.getCostumes();
+        const changes: {costume: any; asset: any; before: number; after: number; pivot: number[]}[] = [];
         try {
-            var idx = t.currentCostume, n = t.getCostumes().length;
-            if(n < 2) return;
-            t.setCostume((idx + 1) % n);
-            t.setCostume(idx);
-            t.updateAllDrawableProperties();
-            var vm = findVM();
-            if(vm && typeof vm.emitTargetsUpdate === 'function') vm.emitTargetsUpdate();
-            if(vm && typeof vm.emitProjectChanged === 'function') vm.emitProjectChanged();
-        } catch (e) {}
+            for(let i = 0; i < costumes.length; i++) {
+                const costume = costumes[i];
+                const pivot = pivots[i];
+                if(costume.rotationCenterX === pivot[0] && costume.rotationCenterY === pivot[1]) continue;
+                const asset = costume.asset;
+                const before = costume.skinId;
+                let after: number;
+                if(costume.dataFormat === 'svg') {
+                    after = renderer.createSVGSkin(new TextDecoder().decode(asset.data), pivot);
+                } else {
+                    const img = new window.Image();
+                    img.src = asset.encodeDataURI();
+                    await img.decode();
+                    const resolution = costume.bitmapResolution || 1;
+                    after = renderer.createBitmapSkin(img, resolution, [pivot[0] / resolution, pivot[1] / resolution]);
+                }
+                changes.push({costume, asset, before, after, pivot});
+            }
+            if(anchorTarget() !== t || changes.some(({costume, asset, before}) =>
+                !t.getCostumes().includes(costume) || costume.asset !== asset || costume.skinId !== before)) {
+                throw new Error(tr('costumesChanged'));
+            }
+        } catch(error) {
+            for(const change of changes) renderer.destroySkin(change.after);
+            throw error;
+        }
+        for(const {costume, after, pivot} of changes) {
+            costume.rotationCenterX = pivot[0];
+            costume.rotationCenterY = pivot[1];
+            costume.skinId = after;
+        }
+        for(const clone of t.sprite.clones) clone.updateAllDrawableProperties();
+        vm.emitTargetsUpdate();
+        vm.emitProjectChanged();
+        for(const change of changes) renderer.destroySkin(change.before);
     }
 
-    function applyAnchor(mode: string) {
+    async function applyAnchor(mode: string) {
         var t = anchorTarget();
-        if(!t || !anchorState.list) return null;
+        if(!t || !anchorState.list || anchorState.busy) return null;
         var costumes = t.getCostumes();
-        if(costumes.length !== anchorState.n) {
+        if(t.id !== anchorState.spriteId || costumes.length !== anchorState.n) {
             anchorState.list = null;
             return null;
         }
@@ -193,13 +219,22 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         if(!plan) return null;
         var before = anchorJump(anchorState.list, anchorState.list.map(function (s: AnchorMeasurement) { return s.pivot; }));
         var snapshot = costumes.map(function (c: any) { return [c.rotationCenterX, c.rotationCenterY]; });
+        anchorState.busy = true;
+        markAnchor();
+        try {
+            await refreshAnchorView(t, plan.map((pivot: number[]) => pivot.map((value: number) => Math.round(value * 1000) / 1000)));
+        } catch(error) {
+            window.console.warn('GoWarp Toolkit anchor:', error);
+            window.alert(tr('costumesError') + ' ' + error.message);
+            return null;
+        } finally {
+            anchorState.busy = false;
+            markAnchor();
+        }
         var written = 0;
         anchorState.list.forEach(function (s: AnchorMeasurement, i: number) {
-            if (s.area <= 0) return;
-            costumes[i].rotationCenterX = Math.round(plan[i][0] * 1000) / 1000;
-            costumes[i].rotationCenterY = Math.round(plan[i][1] * 1000) / 1000;
             s.pivot = [costumes[i].rotationCenterX, costumes[i].rotationCenterY];
-            written++;
+            if(s.area > 0) written++;
         });
         anchorState.undo = {
             spriteId: t.id,
@@ -212,20 +247,28 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             after: anchorJump(anchorState.list, anchorState.list.map((s: AnchorMeasurement) => { return s.pivot; })).mean,
             written: written
         };
-        refreshAnchorView(t);
+        markAnchor();
         return anchorState.result;
     }
 
-    function undoAnchor() {
+    async function undoAnchor() {
         var t = anchorTarget();
         var u = anchorState.undo;
-        if(!t || !u || u.spriteId !== t.id) return false;
+        if(!t || !u || anchorState.busy || u.spriteId !== t.id) return false;
         var costumes = t.getCostumes();
         if(costumes.length !== u.n) return false;
-        costumes.forEach(function (c: any, i: number) {
-            c.rotationCenterX = u.list[i][0];
-            c.rotationCenterY = u.list[i][1];
-        });
+        anchorState.busy = true;
+        markAnchor();
+        try {
+            await refreshAnchorView(t, u.list);
+        } catch(error) {
+            window.console.warn('GoWarp Toolkit anchor:', error);
+            window.alert(tr('costumesError') + ' ' + error.message);
+            return false;
+        } finally {
+            anchorState.busy = false;
+            markAnchor();
+        }
         anchorState.undo = null;
         anchorState.result = null;
         if(anchorState.list) {
@@ -233,7 +276,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
                 s.pivot = [costumes[i].rotationCenterX, costumes[i].rotationCenterY];
             });
         }
-        refreshAnchorView(t);
+        markAnchor();
         return true;
     }
 
@@ -272,8 +315,8 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         go.type = 'button';
         go.className = 'gwt-primary';
         go.textContent = tr('anchorApply');
-        listen(go, 'click', () => {
-            var r = applyAnchor(anchorState.mode);
+        listen(go, 'click', async () => {
+            var r = await applyAnchor(anchorState.mode);
             if(r) {
                 markAnchor();
                 if (services.railEl) markObjects();
@@ -284,8 +327,8 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
         back.className = 'gwt-ghost';
         back.textContent = tr('anchorUndo');
         back.disabled = !anchorState.undo;
-        listen(back, 'click', () => {
-            if(undoAnchor()) markAnchor();
+        listen(back, 'click', async () => {
+            if(await undoAnchor()) markAnchor();
         });
         act.appendChild(go);
         act.appendChild(back);
@@ -315,7 +358,7 @@ export function createAnchors(context: PaintContext, services: AnchorServices) {
             return;
         }
         var costumes = tgt.getCostumes();
-        if(costumes.length < 2 || !anchorState.list || anchorState.n !== costumes.length) {
+        if(costumes.length < 2 || !anchorState.list || anchorState.spriteId !== tgt.id || anchorState.n !== costumes.length) {
             strong.textContent = '—';
             if(sub) sub.textContent = costumes.length < 2 ? tr('anchorNone') : tr('anchorBusy');
             if(list) { list.textContent = ''; list.dataset.sig = String(''); }

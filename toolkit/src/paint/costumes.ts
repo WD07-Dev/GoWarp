@@ -45,10 +45,25 @@ export function createCostumeTools(context: PaintContext, services: CostumeServi
 
     function positionedSVG(node: SVGSVGElement, x: number, y: number): SVGGElement {
         const group = node.ownerDocument.createElementNS(svgNS, 'g');
-        group.setAttribute('transform', `translate(${x} ${y})`);
-        node.removeAttribute('x');
-        node.removeAttribute('y');
-        group.appendChild(node);
+        const content = node.ownerDocument.createElementNS(svgNS, 'g');
+        const viewBox = node.viewBox.baseVal;
+        const width = Number(node.getAttribute('width'));
+        const height = Number(node.getAttribute('height'));
+        const clip = node.ownerDocument.createElementNS(svgNS, 'clipPath');
+        clip.id = 'gwt-clip-' + window.crypto.getRandomValues(new Uint32Array(4)).join('-');
+        clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+        const rect = node.ownerDocument.createElementNS(svgNS, 'rect');
+        for(const [key, value] of Object.entries({x, y, width, height})) rect.setAttribute(key, String(value));
+        clip.appendChild(rect);
+        group.setAttribute('clip-path', `url(#${clip.id})`);
+        for(const attr of Array.from(node.attributes)) {
+            if(['x', 'y', 'width', 'height', 'viewBox', 'preserveAspectRatio', 'xmlns'].includes(attr.name)) continue;
+            content.setAttributeNS(attr.namespaceURI, attr.name, attr.value);
+        }
+        // Scratch flattens group transforms without accounting for nested SVG viewports.
+        content.setAttribute('transform', `translate(${x} ${y}) ${node.getAttribute('transform') || ''} scale(${width / viewBox.width} ${height / viewBox.height}) translate(${-viewBox.x} ${-viewBox.y})`);
+        content.append(...Array.from(node.childNodes));
+        group.append(clip, content);
         return group;
     }
 
@@ -241,6 +256,7 @@ export function createCostumeTools(context: PaintContext, services: CostumeServi
                         if(before.dataFormat === 'svg') {
                             base.setAttribute('width', String(originalWidth));
                             base.setAttribute('height', String(originalHeight));
+                            if(!viewBox) base.setAttribute('viewBox', `0 0 ${originalWidth} ${originalHeight}`);
                             root.append(positionedSVG(base, -left, -top), placedArt);
                             const text = new window.XMLSerializer().serializeToString(root);
                             asset = storage.createAsset(storage.AssetType.ImageVector, storage.DataFormat.SVG, new TextEncoder().encode(text), null, true);

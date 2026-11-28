@@ -1,5 +1,13 @@
 const strings = {
     "en": {
+        "animationCrop": "Crop GIF",
+        "animationCropLeft": "Left",
+        "animationCropTop": "Top",
+        "animationCropWidth": "Width",
+        "animationCropHeight": "Height",
+        "animationCropReset": "Use full stage",
+        "animationCropHint": "Drag on the preview or enter a rectangle measured from the stage’s top-left corner. The same area is used for every frame.",
+
         "costumes": "Apply selection to costumes",
         "costumesSelectFirst": "Select artwork in the costume editor first.",
         "costumesHint": "Apply at the same position relative to the rotation center. The current costume is excluded.",
@@ -29,7 +37,7 @@ const strings = {
         "animationExportGIF": "Export GIF",
         "animationExportProgress": "Exporting GIF… {current}/{total}",
         "animationExportError": "Could not export GIF. Check the selected costumes and stage size.",
-        "animationHint": "GIF uses the stage size, frame range and FPS. GIF timing has 10 ms precision and transparency has no partial opacity.",
+        "animationHint": "GIF uses the stage or crop area, frame range and FPS. GIF timing has 10 ms precision and transparency has no partial opacity.",
         "shapes": "Shapes",
         "pen": "GoWarp pen",
         "gradient": "Gradient",
@@ -206,6 +214,14 @@ const strings = {
         "delete": "Delete"
     },
     "ko": {
+        "animationCrop": "GIF 자르기",
+        "animationCropLeft": "왼쪽",
+        "animationCropTop": "위쪽",
+        "animationCropWidth": "너비",
+        "animationCropHeight": "높이",
+        "animationCropReset": "전체 무대로 초기화",
+        "animationCropHint": "미리보기에서 드래그하거나 무대 왼쪽 위를 기준으로 영역을 입력하세요. 모든 프레임에 같은 영역이 적용됩니다.",
+
         "costumes": "선택한 그림을 여러 모양에 적용",
         "costumesSelectFirst": "먼저 모양 편집기에서 그림을 선택하세요.",
         "costumesHint": "회전 중심을 기준으로 같은 위치에 적용합니다. 현재 모양은 제외됩니다.",
@@ -235,7 +251,7 @@ const strings = {
         "animationExportGIF": "GIF 내보내기",
         "animationExportProgress": "GIF 내보내는 중… {current}/{total}",
         "animationExportError": "GIF를 내보내지 못했습니다. 선택한 모양과 무대 크기를 확인해 주세요.",
-        "animationHint": "무대 크기·모양 범위·FPS로 GIF를 저장합니다. GIF 시간 정밀도는 10ms이며 반투명은 지원되지 않습니다.",
+        "animationHint": "무대 또는 자르기 영역·모양 범위·FPS로 GIF를 저장합니다. GIF 시간 정밀도는 10ms이며 반투명은 지원되지 않습니다.",
         "shapes": "도형",
         "pen": "GoWarp 펜",
         "gradient": "그라데이션",
