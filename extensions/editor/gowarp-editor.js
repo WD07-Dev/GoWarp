@@ -75,16 +75,16 @@
     const originalToJSON = vm.toJSON;
     function toJSON(targetId, options) {
         const json = originalToJSON.call(this, targetId, options);
-        if (targetId) return json;
+        if(targetId) return json;
         const url = runtime.extensionManager.getExtensionURLs().gowarpEditor;
-        if (typeof url !== "string") return json;
+        if(typeof url !== "string") return json;
         const project = JSON.parse(json);
         project.extensions ||= [];
-        if (!project.extensions.includes("gowarpEditor")) project.extensions.push("gowarpEditor");
+        if(!project.extensions.includes("gowarpEditor")) project.extensions.push("gowarpEditor");
         project.extensionURLs ||= {};
         project.extensionURLs.gowarpEditor = url;
         project.monitors ||= [];
-        if (!project.monitors.some(m => m.opcode === "gowarpEditor_installed")) {
+        if(!project.monitors.some(m => m.opcode === "gowarpEditor_installed")) {
             project.monitors.push({
                 id: "gowarpEditor_installed", opcode: "gowarpEditor_installed",
                 mode: "default", params: {}, spriteName: null, value: "",
@@ -95,16 +95,16 @@
     }
     vm.toJSON = toJSON;
     const monitorHooks = new Map();
-    for (const name of ["requestAddMonitor", "requestUpdateMonitor", "requestRemoveMonitor"]) {
+    for(const name of ["requestAddMonitor", "requestUpdateMonitor", "requestRemoveMonitor"]) {
         const original = runtime[name];
-        if (typeof original !== "function") continue;
+        if(typeof original !== "function") continue;
         const hook = function (delta) {
             const result = original.call(this, delta);
-            if (connection && ["preparing", "receiving", "building", "running"].includes(phase)) {
+            if(connection && ["preparing", "receiving", "building", "running"].includes(phase)) {
                 const change = typeof delta?.toJS === "function" ? delta.toJS() : delta;
-                if (typeof change !== "string" && Object.keys(change).every(key => key === "id" || key === "value")) return result;
+                if(typeof change !== "string" && Object.keys(change).every(key => key === "id" || key === "value")) return result;
                 const id = typeof change === "string" ? change : change.id ?? change.get?.("id");
-                if (id) {
+                if(id) {
                     pendingMonitors.add(id);
                     Promise.resolve().then(flushMonitors);
                 }
@@ -116,28 +116,30 @@
     }
 
     function flushMonitors() {
-        if (!connection || phase !== "running" || socket?.readyState !== WebSocket.OPEN) return;
-        for (const id of pendingMonitors) {
+        if(!connection || phase !== "running" || socket?.readyState !== WebSocket.OPEN) return;
+        for(const id of pendingMonitors) {
             const record = runtime.getMonitorState().get(id);
             const monitor = record ? {} : {id, visible: false};
-            if (record) {
-                for (const key of ["id", "opcode", "params", "spriteName", "mode", "visible", "x", "y", "width", "height", "sliderMin", "sliderMax", "isDiscrete"]) {
+            if(record) {
+                for(const key of ["id", "opcode", "params", "spriteName", "mode", "visible", "x", "y", "width", "height", "sliderMin", "sliderMax", "isDiscrete"]) {
                     monitor[key] = typeof record.get === "function" ? record.get(key) : record[key];
                 }
                 monitor.x = (monitor.x ?? 0) - (runtime.stageWidth - 480) / 2;
                 monitor.y = (monitor.y ?? 0) - (runtime.stageHeight - 360) / 2;
             }
-            if (!send({action: "monitor", monitor})) return;
+            if(!send({action: "monitor", monitor})) return;
             pendingMonitors.delete(id);
         }
     }
 
     function answerQuestion(answer) {
-        if (!questionID || !connection || phase !== "running" || activeDisplay !== "embedded") return;
-        if (send({action: "answer", questionId: questionID, text: String(answer)})) questionID = 0;
+        if(!questionID || !connection || phase !== "running" || activeDisplay !== "embedded") return;
+        if(send({action: "answer", questionId: questionID, text: String(answer)})) questionID = 0;
     }
     runtime.on("ANSWER", answerQuestion);
-    const changed = () => { revision++; };
+    const changed = () => {
+        revision++;
+    };
     const projectEvents = ["PROJECT_CHANGED", "PROJECT_LOADED", "TURBO_MODE_ON", "TURBO_MODE_OFF"];
     const settingsEvents = ["FRAMERATE_CHANGED", "INTERPOLATION_CHANGED", "STAGE_SIZE_CHANGED", "RUNTIME_OPTIONS_CHANGED", "COMPILER_OPTIONS_CHANGED"];
     for(const event of projectEvents) vm.on(event, changed);
@@ -145,8 +147,8 @@
 
     function element(tag, text, parent) {
         const node = document.createElement(tag);
-        if (text) node.textContent = text;
-        if (parent) parent.appendChild(node);
+        if(text) node.textContent = text;
+        if(parent) parent.appendChild(node);
         return node;
     }
     
@@ -228,7 +230,7 @@
         if(button) button.title = active ? `${tr("GoWarp Run", "GoWarp 실행")} · ${messages[phase]}` : tr("Run this project in GoWarp", "현재 프로젝트를 GoWarp에서 실행");
         const parent = runtime.renderer?.canvas?.parentElement;
         if(parent && ["preparing", "receiving", "building", "stopping"].includes(phase)) {
-            if (!loading) {
+            if(!loading) {
                 loading = element("div", "", parent);
                 loading.id = "gowarp-preview-loading";
                 loading.setAttribute("role", "status");
@@ -262,7 +264,9 @@
     async function request(target, path, method = "GET", body, options, controller = new AbortController()) {
         const timeout = setTimeout(() => controller.abort(), body ? 120000 : 8000);
         try {
-            const headers = {Authorization: `Bearer ${target.token}`};
+            const headers = {
+                Authorization: `Bearer ${target.token}`
+            };
             if (body) {
                 headers["Content-Type"] = path === "/connect" ? "application/json" : "application/x.scratch.sb3";
                 headers["X-GoWarp-Options"] = encodeURIComponent(JSON.stringify(options));
@@ -288,7 +292,7 @@
     }
 
     function applyStatus(value) {
-        if (!value.connected) {
+        if(!value.connected) {
             resetConnection();
             return;
         }
@@ -297,9 +301,9 @@
         multiWindow = Boolean(value.multiWindow);
         const wasRunning = phase === "running";
         phase = value.phase;
-        if (value.display) activeDisplay = value.display;
-        if (multiWindow) displayMode.value = "native";
-        else if (value.display) displayMode.value = value.display;
+        if(value.display) activeDisplay = value.display;
+        if(multiWindow) displayMode.value = "native";
+        else if(value.display) displayMode.value = value.display;
         status.textContent = value.error || messages[phase] || phase;
         refresh();
         if(phase === "running") {
@@ -319,9 +323,9 @@
             const value = await request(target, "/status");
             if(connection !== target || disposed) return;
             applyStatus(value);
-            if (connection) polling = setTimeout(poll, phase === "ready" ? 1000 : 500);
+            if(connection) polling = setTimeout(poll, phase === "ready" ? 1000 : 500);
         } catch (error) {
-            if (connection === target && !disposed) {
+            if(connection === target && !disposed) {
                 resetConnection();
                 showError(error);
             }
@@ -347,10 +351,10 @@
         const targets = project.targets.map(({isStage, name, variables, comments}) => ({isStage, name, variables, comments}));
         const body = new Blob([JSON.stringify({targets})], {type: "application/json"});
         const value = await request(target, "/connect", "POST", body, projectOptions());
-        if (disposed) return;
+        if(disposed) return;
         connection = target;
         applyStatus(value);
-        if (connection) polling = setTimeout(poll, 1000);
+        if(connection) polling = setTimeout(poll, 1000);
     }
 
     function snapshot() {
@@ -358,16 +362,20 @@
         const targets = runtime.targets.filter(target => target.isOriginal);
         const graphs = project.targets.map((target, index) => {
             const blocks = target.blocks || {};
-            for (const block of Object.values(blocks)) {
-                if (Array.isArray(block)) {
-                    if (block[0] === 12 || block[0] === 13) block.length = 3;
+            for(const block of Object.values(blocks)) {
+                if(Array.isArray(block)) {
+                    if(block[0] === 12 || block[0] === 13) block.length = 3;
                 }else {
                     delete block.x;
                     delete block.y;
                     delete block.comment;
                 }
             }
-            const graph = {target: index, blocks, scriptOrder: [...targets[index].blocks.getScripts()]};
+            const graph = {
+                target: index,
+                blocks,
+                scriptOrder: [...targets[index].blocks.getScripts()]
+            };
             delete target.blocks;
             delete target.comments;
             return graph;
@@ -406,13 +414,16 @@
         busy = true;
         refresh();
         try {
-            if (!connection) { open(); return; }
-            if (!connection || disposed) return;
+            if(!connection) {
+                open();
+                return;
+            }
+            if(!connection || disposed) return;
             const connected = connection;
             const state = await request(connected, "/status");
-            if (connection !== connected || disposed) return;
+            if(connection !== connected || disposed) return;
             applyStatus(state);
-            if (!connection) { open(); return; }
+            if(!connection) { open(); return; }
             if(phase === "running") {
                 const currentRevision = revision;
                 const current = previewRevision === revision ? previewSnapshot : snapshot();
@@ -457,17 +468,13 @@
             previewTargets = new Map(runtime.targets.filter(target => target.isOriginal).map((target, index) => [target.id, index]));
             initialCommand = clicked;
             const options = {...projectOptions(), clickStart: Boolean(clicked)};
-            // Keep editor IDs; the normal SB3 exporter renames them.
-            const json = vm.toJSON(undefined, {allowOptimization: false});
+            const json = vm.toJSON(undefined, { allowOptimization: false });
             const assets = vm.serializeAssets();
-            const matches = cached => cached?.json === json && assets.length === cached.assets.length &&
-                assets.every((asset, index) => asset.fileName === cached.assets[index].fileName &&
-                    asset.fileContent === cached.assets[index].fileContent);
-            const reuse = serverSnapshot && lastUpload?.target === target &&
-                lastUpload.snapshot === serverSnapshot && matches(lastUpload);
+            const matches = cached => cached?.json === json && assets.length === cached.assets.length && assets.every((asset, index) => asset.fileName === cached.assets[index].fileName && asset.fileContent === cached.assets[index].fileContent);
+            const reuse = serverSnapshot && lastUpload?.target === target && lastUpload.snapshot === serverSnapshot && matches(lastUpload);
             let project = reuse ? new Blob([]) : matches(archiveCache) ? archiveCache.blob : null;
-            if (reuse) options.snapshot = serverSnapshot;
-            if (!project) {
+            if(reuse) options.snapshot = serverSnapshot;
+            if(!project) {
                 const zip = new vm.exports.JSZip();
                 zip.file("project.json", json, {compression: "DEFLATE"});
                 for (const asset of assets) {
@@ -478,7 +485,7 @@
                     type: "blob", mimeType: "application/x.scratch.sb3",
                     compressionOptions: {level: 1}
                 });
-                if (disposed || upload.signal.aborted || connection !== target) return;
+                if(disposed || upload.signal.aborted || connection !== target) return;
                 archiveCache = project.size <= 64 * 1024 * 1024 ? {json, assets, blob: project} : null;
             }
             if(disposed || upload.signal.aborted || connection !== target) return;
@@ -487,7 +494,7 @@
             refresh();
             options.volume = editorVolume();
             const receipt = await request(target, "/run", "POST", project, options, upload);
-            if (disposed || upload.signal.aborted || connection !== target) return;
+            if(disposed || upload.signal.aborted || connection !== target) return;
             previewSettingsRevision = receipt.settingsRevision || "";
             activeDisplay = receipt.display || options.display;
             displayMode.value = activeDisplay;
@@ -500,7 +507,7 @@
             upload = null;
             busy = false;
             refresh();
-            if (connection && ["receiving", "building", "running", "stopping"].includes(phase)) poll();
+            if(connection && ["receiving", "building", "running", "stopping"].includes(phase)) poll();
         }
     }
 
@@ -530,8 +537,14 @@
         if(busy) return;
         busy = true;
         refresh();
-        try { await connect(); } catch (error) { showError(error); }
-        finally { busy = false; refresh(); }
+        try {
+            await connect();
+        } catch (error) {
+            showError(error);
+        } finally {
+            busy = false;
+            refresh();
+        }
     };
     runButton.onclick = () => run();
     stopButton.onclick = stop;
@@ -541,16 +554,16 @@
         address.value = "";
         address.focus();
         try {
-            if (target) await request(target, "/disconnect", "POST");
+            if(target) await request(target, "/disconnect", "POST");
         } catch (error) {
-            if (!connection && !busy && !disposed) showError(error);
+            if(!connection && !busy && !disposed) showError(error);
         }
     };
 
     function resetConnection() {
         clearTimeout(polling);
         polling = null;
-        if (upload) upload.abort();
+        if(upload) upload.abort();
         connection = null;
         multiWindow = false;
         archiveCache = null;
@@ -580,7 +593,7 @@
         clearTimeout(volumeTimer);
         volumeTimer = null;
         sentVolume = null;
-        if (questionID) runtime.emit("QUESTION", null);
+        if(questionID) runtime.emit("QUESTION", null);
         questionID = 0;
         pendingMonitors.clear();
         pendingFrames = 0;
@@ -592,7 +605,7 @@
         cancelAnimationFrame(mouseRequest);
         mouseRequest = 0;
         pendingMouse = null;
-        if (overlay) {
+        if(overlay) {
             overlay.width = overlay.height = 0;
             overlay.remove();
             overlay = null;
@@ -604,7 +617,7 @@
             pending.reject(new Error(tr("Preview connection closed.", "미리보기 연결이 종료되었습니다.")));
         }
         requests.clear();
-        if (suspendedLoop) {
+        if(suspendedLoop) {
             suspendedLoop = false;
             runtime.emit("PROJECT_RUN_STOP");
             runtime.frameLoop.start();
@@ -639,9 +652,9 @@
     function syncVolume() {
         clearTimeout(volumeTimer);
         volumeTimer = null;
-        if (disposed || phase !== "running" || socket?.readyState !== WebSocket.OPEN) return;
+        if(disposed || phase !== "running" || socket?.readyState !== WebSocket.OPEN) return;
         const volume = editorVolume();
-        if (volume !== sentVolume && send({action: "volume", volume})) sentVolume = volume;
+        if(volume !== sentVolume && send({action: "volume", volume})) sentVolume = volume;
         volumeTimer = setTimeout(syncVolume, 100);
     }
 
@@ -657,7 +670,7 @@
             sentVolume = null;
             syncVolume();
             flushMonitors();
-            send({action: "state"});
+            send({ action: "state" });
             if(activeDisplay === "embedded") {
                 attachPreview();
                 requestFrame();
@@ -708,19 +721,18 @@
             }
         };
         ws.onclose = () => {
-            if (socket !== ws || disposed) return;
+            if(socket !== ws || disposed) return;
             socket = null;
-            if (questionID) runtime.emit("QUESTION", null);
+            if(questionID) runtime.emit("QUESTION", null);
             questionID = 0;
             overlay?.remove();
             overlay = null;
-            // Status polling reconnects while the same preview remains active.
         };
     }
     
     function attachPreview() {
         const parent = runtime.renderer?.canvas?.parentElement;
-        if (!parent || overlay) return;
+        if(!parent || overlay) return;
         overlay = element("canvas", "", parent);
         overlay.id = "gowarp-preview";
         overlay.tabIndex = 0;
@@ -728,15 +740,15 @@
         overlay.oncontextmenu = event => event.preventDefault();
         const pointer = event => {
             const rect = overlay.getBoundingClientRect();
-            if (!rect.width || !rect.height) return;
+            if(!rect.width || !rect.height) return;
             pendingMouse = {
                 action: "mouse", x: (event.clientX-rect.left)/rect.width,
                 y: (event.clientY-rect.top)/rect.height, down: (event.buttons & 1) !== 0
             };
-            if (!mouseRequest) {
+            if(!mouseRequest) {
                 mouseRequest = requestAnimationFrame(() => {
                     mouseRequest = 0;
-                    if (pendingMouse) send(pendingMouse);
+                    if(pendingMouse) send(pendingMouse);
                     pendingMouse = null;
                 });
             }
@@ -748,7 +760,6 @@
             overlay.focus();
             overlay.setPointerCapture(event.pointerId);
             pointer(event);
-            // Preserve a quick press/release occurring within one animation frame.
             send(pendingMouse);
             pendingMouse = null;
         };
@@ -783,23 +794,23 @@
         cancelAnimationFrame(mouseRequest);
         mouseRequest = 0;
         pendingMouse = null;
-        if (socket?.readyState === WebSocket.OPEN) send({action: "release-input"});
+        if(socket?.readyState === WebSocket.OPEN) send({action: "release-input"});
     }
     
     function visibilityChanged() {
-        if (document.hidden) releaseInput();
+        if(document.hidden) releaseInput();
         else requestFrame();
     }
     
     function requestFrame() {
-        if (document.hidden || !overlay || phase !== "running" || activeDisplay !== "embedded" || pendingFrames >= 2) return;
+        if(document.hidden || !overlay || phase !== "running" || activeDisplay !== "embedded" || pendingFrames >= 2) return;
         const bounds = overlay.getBoundingClientRect();
         const ratio = window.devicePixelRatio || 1;
         const width = Math.max(1, Math.round(bounds.width * ratio));
         const height = Math.max(1, Math.round(bounds.height * ratio));
         const scale = Math.min(1, maxFrameEdge / Math.max(width, height));
         const frames = 2 - pendingFrames;
-        if (send({
+        if(send({
             action: "frame", frames, width: Math.max(1, Math.floor(width * scale)),
             height: Math.max(1, Math.floor(height * scale))
         })) pendingFrames += frames;
@@ -809,43 +820,41 @@
     document.addEventListener("visibilitychange", visibilityChanged);
     
     function displayFrame(buffer) {
-        if (buffer.byteLength < 9) return;
+        if(buffer.byteLength < 9) return;
         const header = new DataView(buffer);
         const width = header.getUint32(1, true), height = header.getUint32(5, true);
-        if (header.getUint8(0) !== 1 || !width || !height || width > maxFrameEdge || height > maxFrameEdge ||
+        if(header.getUint8(0) !== 1 || !width || !height || width > maxFrameEdge || height > maxFrameEdge ||
         buffer.byteLength !== 9+width*height*4) return;
         pendingFrames = Math.max(0, pendingFrames - 1);
-        if (document.hidden) return;
+        if(document.hidden) return;
         attachPreview();
         requestFrame();
-        if (overlay) {
-            if (overlay.width !== width) overlay.width = width;
-            if (overlay.height !== height) overlay.height = height;
+        if(overlay) {
+            if(overlay.width !== width) overlay.width = width;
+            if(overlay.height !== height) overlay.height = height;
             overlay.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(buffer, 9), width, height), 0, 0);
         }
     }
     
     function toggleScript(blockId, options = {}) {
-        if (!connection) return originalToggle.call(this, blockId, options);
+        if(!connection) return originalToggle.call(this, blockId, options);
         const target = options.target || runtime.getEditingTarget();
-        const index = phase === "running" && previewRevision === revision
-        ? previewTargets.get(target?.id)
-        : runtime.targets.filter(item => item.isOriginal).indexOf(target);
-        if (index === undefined || index < 0) return;
+        const index = phase === "running" && previewRevision === revision ? previewTargets.get(target?.id) : runtime.targets.filter(item => item.isOriginal).indexOf(target);
+        if(index === undefined || index < 0) return;
         const block = window.ScratchBlocks?.getMainWorkspace()?.getBlockById(blockId);
         const command = {action: "toggle", target: index, block: blockId, reporter: Boolean(block?.outputConnection)};
         run(command);
     }
     
     function greenFlag() {
-        if (!connection || phase === "ready" || phase === "error") return originalFlag.call(this);
+        if(!connection || phase === "ready" || phase === "error") return originalFlag.call(this);
         run();
     }
     
     function stopScripts() {
-        if (!connection || phase === "ready" || phase === "error") return originalStop.call(this);
-        if (phase === "running") send({action: "stop"});
-        else if (busy) stop();
+        if(!connection || phase === "ready" || phase === "error") return originalStop.call(this);
+        if(phase === "running") send({action: "stop"});
+        else if(busy) stop();
     }
     
     runtime.toggleScript = toggleScript;
@@ -853,22 +862,21 @@
     runtime.stopAll = stopScripts;
     
     function attachButton() {
-        if (disposed || document.getElementById("gowarp-editor-button")) return;
-        const bar = document.querySelector('[class*="menu-bar_main-menu"]') ||
-        document.querySelector('[class*="menu-bar_menu-bar_"]');
-        if (!bar) return;
+        if(disposed || document.getElementById("gowarp-editor-button")) return;
+        const bar = document.querySelector('[class*="menu-bar_main-menu"]') || document.querySelector('[class*="menu-bar_menu-bar_"]');
+        if(!bar) return;
         const button = element("button", tr("GoWarp Run", "GoWarp 실행"), bar);
         button.id = "gowarp-editor-button";
         button.className = "gowarp-editor-control";
         button.type = "button";
         button.title = tr("Run this project in GoWarp", "현재 프로젝트를 GoWarp에서 실행");
         button.onclick = async () => {
-            if (!connection) {
+            if(!connection) {
                 open();
                 return;
             }
-            if (busy || ["receiving", "building", "stopping"].includes(phase)) return;
-            if (dialog.open) dialog.close();
+            if(busy || ["receiving", "building", "stopping"].includes(phase)) return;
+            if(dialog.open) dialog.close();
             await run();
         };
         const menuStop = element("button", tr("GoWarp Stop", "GoWarp 중지"), bar);
@@ -881,13 +889,13 @@
     }
     
     const observer = new MutationObserver(attachButton);
-    observer.observe(document.body, {childList: true, subtree: true});
+    observer.observe(document.body, { childList: true, subtree: true });
     attachButton();
     refresh();
     const dispose = () => {
-        if (disposed) return;
+        if(disposed) return;
         disposed = true;
-        if (connection) {
+        if(connection) {
             fetch(connection.base + "/disconnect", {
                 method: "POST", headers: {Authorization: `Bearer ${connection.token}`},
                 credentials: "omit", keepalive: true, targetAddressSpace
@@ -896,15 +904,15 @@
         observer.disconnect();
         resetConnection();
         runtime.removeListener("ANSWER", answerQuestion);
-        for (const [name, {original, hook}] of monitorHooks) {
-            if (runtime[name] === hook) runtime[name] = original;
+        for(const [name, {original, hook}] of monitorHooks) {
+            if(runtime[name] === hook) runtime[name] = original;
         }
-        for (const event of projectEvents) vm.removeListener(event, changed);
-        for (const event of settingsEvents) runtime.removeListener(event, changed);
-        if (runtime.toggleScript === toggleScript) runtime.toggleScript = originalToggle;
-        if (runtime.greenFlag === greenFlag) runtime.greenFlag = originalFlag;
-        if (runtime.stopAll === stopScripts) runtime.stopAll = originalStop;
-        if (vm.toJSON === toJSON) vm.toJSON = originalToJSON;
+        for(const event of projectEvents) vm.removeListener(event, changed);
+        for(const event of settingsEvents) runtime.removeListener(event, changed);
+        if(runtime.toggleScript === toggleScript) runtime.toggleScript = originalToggle;
+        if(runtime.greenFlag === greenFlag) runtime.greenFlag = originalFlag;
+        if(runtime.stopAll === stopScripts) runtime.stopAll = originalStop;
+        if(vm.toJSON === toJSON) vm.toJSON = originalToJSON;
         document.getElementById("gowarp-editor-button")?.remove();
         document.getElementById("gowarp-editor-stop")?.remove();
         dialog.remove();
@@ -914,20 +922,34 @@
         document.removeEventListener("visibilitychange", visibilityChanged);
     };
     window.addEventListener("pagehide", dispose);
-    window.__gowarpEditor = {dispose};
+    window.__gowarpEditor = { dispose };
     
     class GoWarpEditor {
         getInfo() {
             return {
                 id: "gowarpEditor", name: "GoWarp", color1: "#b52e35",
                 blocks: [
-                    {blockType: Scratch.BlockType.BUTTON, text: tr("GoWarp connection settings", "GoWarp 연결 설정"), func: "open"},
-                    {opcode: "installed", blockType: Scratch.BlockType.REPORTER, text: "GoWarp", hideFromPalette: true, disableMonitor: true}
+                    {
+                        blockType: Scratch.BlockType.BUTTON,
+                        text: tr("GoWarp connection settings", "GoWarp 연결 설정"),
+                        func: "open"
+                    },
+                    {
+                        opcode: "installed",
+                        blockType: Scratch.BlockType.REPORTER,
+                        text: "GoWarp",
+                        hideFromPalette: true,
+                        disableMonitor: true
+                    }
                 ]
             };
         }
-        open() { open(); }
-        installed() { return ""; }
+        open() {
+            open();
+        }
+        installed() {
+            return "";
+        }
     }
     Scratch.extensions.register(new GoWarpEditor());
 })(Scratch);
