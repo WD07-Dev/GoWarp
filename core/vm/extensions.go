@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 
 	"gowarp/core/extension"
@@ -166,6 +167,94 @@ type extensionContext struct {
 	th                *thread
 	event             string
 	readDeletedTarget bool
+	callDepth         int
+}
+
+func (c *extensionContext) extensionsCall(operation string, args []any) (any, error) {
+	switch operation {
+	case "extensions.loaded":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("extensions.loaded requires an extension ID")
+		}
+		id := extension.String(args[0])
+		for _, instance := range c.r.extensions {
+			if instance.ID == id {
+				return true, nil
+			}
+		}
+		return false, nil
+	case "extensions.call":
+	default:
+		return nil, fmt.Errorf("unsupported extension host operation %q", operation)
+	}
+	if len(args) < 1 || len(args) > 4 {
+		return nil, fmt.Errorf("extensions.call requires opcode, optional args, fields and local maps")
+	}
+	opcode := extension.String(args[0])
+	registered := c.r.extensionBlocks[opcode]
+	if registered == nil {
+		return nil, fmt.Errorf("extension block %q is not loaded", opcode)
+	}
+	switch registered.block.Kind {
+	case "command", "reporter", "boolean", "menu":
+	default:
+		return nil, fmt.Errorf("extension block %s: cannot directly call a %s block", opcode, registered.block.Kind)
+	}
+	if c.callDepth >= 64 {
+		return nil, fmt.Errorf("extension call nesting limit exceeded at %s", opcode)
+	}
+	var inputs map[string]any
+	var fields map[string]string
+	var local map[string]any
+	var ok bool
+	if len(args) > 1 && args[1] != nil {
+		if inputs, ok = args[1].(map[string]any); !ok {
+			return nil, fmt.Errorf("extensions.call args must be map[string]any")
+		}
+	}
+	if len(args) > 2 && args[2] != nil {
+		if fields, ok = args[2].(map[string]string); !ok {
+			return nil, fmt.Errorf("extensions.call fields must be map[string]string")
+		}
+	}
+	if len(args) > 3 && args[3] != nil {
+		if local, ok = args[3].(map[string]any); !ok {
+			return nil, fmt.Errorf("extensions.call local must be map[string]any")
+		}
+	}
+	persistent := local != nil
+	if local == nil {
+		local = make(map[string]any)
+	}
+	call := &extension.Context{
+		Args:   make(map[string]any, len(inputs)),
+		Fields: make(map[string]string, len(fields)),
+		State:  registered.owner.State,
+		Local:  local,
+		Host:   c,
+	}
+	maps.Copy(call.Args, inputs)
+	maps.Copy(call.Fields, fields)
+	c.callDepth++
+	defer func() { c.callDepth-- }()
+	result, err := registered.block.Handler(call)
+	if err != nil {
+		return nil, fmt.Errorf("extension %s: %w", opcode, err)
+	}
+	waiting := result.Again || result.Yield || result.YieldTick
+	if registered.block.BorrowContext && (waiting || result.Branch != "") {
+		return nil, fmt.Errorf("extension %s: borrowed context handler must finish without yielding or branching", opcode)
+	}
+	if result.Branch != "" {
+		return nil, fmt.Errorf("extension %s: direct calls cannot start a substack", opcode)
+	}
+	if waiting && c.event != "" {
+		return nil, fmt.Errorf("extension %s: cannot yield during %s", opcode, c.event)
+	}
+	if result.Again && !persistent {
+		return nil, fmt.Errorf("extension %s: a repeating call requires a persistent local map", opcode)
+	}
+	return result, nil
 }
 
 func (r *Runtime) SetExtensions(bundle extension.Bundle) error {

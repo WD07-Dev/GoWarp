@@ -44,7 +44,7 @@ func TestExampleCommentsMatchTestModules(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("example files: %v", err)
 	}
-	builtinRoot, err := filepath.Abs(filepath.Join("..", "..", "app", "assets", "embed", "extensions"))
+	builtinRoot, err := filepath.Abs(filepath.Join("..", "..", "app", "assets", "extensions"))
 	if err != nil {
 		t.Fatal(err)
 	}

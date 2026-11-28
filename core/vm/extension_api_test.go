@@ -230,7 +230,9 @@ func TestExtensionCallsRejectInvalidCalls(t *testing.T) {
 				_, err := c.Call("extensions.call", "other_recurse")
 				return extension.Result{}, err
 			}},
-			{Opcode: "other_wait", Kind: "command", Handler: func(*extension.Context) (extension.Result, error) { return extension.Result{Again: true, YieldTick: true}, nil }},
+			{Opcode: "other_wait", Kind: "command", Handler: func(*extension.Context) (extension.Result, error) {
+				return extension.Result{Again: true, YieldTick: true}, nil
+			}},
 			{Opcode: "other_borrow", Kind: "command", BorrowContext: true, Handler: func(*extension.Context) (extension.Result, error) { return extension.Result{Yield: true}, nil }},
 			{Opcode: "other_branchResult", Kind: "command", Handler: func(*extension.Context) (extension.Result, error) { return extension.Result{Branch: "SUBSTACK"}, nil }},
 		}

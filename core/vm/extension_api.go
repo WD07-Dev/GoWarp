@@ -14,6 +14,9 @@ type extensionAPI struct {
 }
 
 var hostAPIs = map[string]extensionAPI{
+	"extensions": {
+		call: (*extensionContext).extensionsCall,
+	},
 	"window": {
 		call: func(c *extensionContext, operation string, args []any) (any, error) {
 			if c.r.host.windowAPI == nil {

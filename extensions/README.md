@@ -35,7 +35,7 @@ Supported built-in extensions do not need an annotated JS source in the SB3.
 | Extension | Supported features | Implementation |
 | --- | --- | --- |
 | Pen (`pen`) | Clear, stamp, pen up/down, pen color, color parameters, and pen size | Built into the VM |
-| Music (`music`) | Play drums, rest for beats, set/change tempo, and report tempo | [Bundled source](../app/assets/embed/extensions/music.js), compiled automatically when used |
+| Music (`music`) | Play drums, rest for beats, set/change tempo, and report tempo | [Bundled source](../app/assets/extensions/music.js), compiled automatically when used |
 
 Music's note playback and instrument selection blocks are not supported yet.
 

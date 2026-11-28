@@ -24,6 +24,7 @@ TurboWarp's JS VM objects or browser APIs.
 | Host API | Topics |
 | --- | --- |
 | [Calling conventions](#host-calls) | Arguments, return values and target references |
+| [Calling other extensions](#calling-other-extensions) | Loaded blocks, shared state and waiting calls |
 | [Runtime and options](#runtime-and-options) | Time, FPS and execution settings |
 | [Events and input](#events-and-input) | Broadcasts, hats, keyboard and mouse |
 | [Project and procedures](#project-and-procedures) | Stored extension data and custom blocks |
@@ -355,6 +356,83 @@ return e.Result{}, err
 
 All calls belong on the VM thread. Background workers must return data to a
 later handler invocation rather than calling the host themselves.
+
+### Calling other extensions
+
+| Operation and arguments | Result or action |
+| --- | --- |
+| `extensions.loaded(id)` | `bool`: whether a Go extension instance is registered. |
+| `extensions.call(opcode, args?, fields?, local?)` | Calls a registered block handler and returns `e.Result`. |
+
+Use the full opcode, including the extension ID, such as `music_getTempo`.
+The target extension must already be included in the project's loaded extensions.
+These calls do not load JS, download dependencies, or construct another instance.
+VM-native pen blocks are not registered Go handlers; use the drawing API for pen
+operations. `extensions.loaded("pen")` therefore returns false.
+
+Like a direct call between TurboWarp extension objects, the handler runs on the
+calling VM thread and uses the existing extension instance. Its `State` and Go
+closure state belong to the **called** extension. Target-dependent host operations
+still refer to the **calling** sprite or clone.
+
+- `args` is a `map[string]any` of already evaluated input values.
+- `fields` is a `map[string]string` for literal fields, including menus with
+  `acceptReporters: false`.
+- Both maps are shallow-copied for the call. Nested objects are not copied.
+- `local` is a `map[string]any` used directly as the callee's `Local`. Omit it for
+  a one-shot call. Unlike most host operations, these optional maps accept `nil`.
+- Command, reporter, boolean and menu handlers are callable. Hats, branch blocks
+  and terminal blocks need VM control-flow context and cannot be called this way.
+- Missing blocks, invalid arguments and handler errors are returned as errors.
+  Nested calls are limited to 64 levels to stop unbounded mutual recursion.
+
+For example, a reporter can forward the built-in Music extension's tempo:
+
+```go
+func tempo(c *e.Context) (e.Result, error) {
+    value, err := c.Call("extensions.call", "music_getTempo")
+    if err != nil {
+        return e.Result{}, err
+    }
+    return value.(e.Result), nil
+}
+```
+
+The host returns the handler's `Result`; it does not suspend the caller itself.
+To delegate a waiting block, keep a separate child `Local` map in your own `Local`
+and return the child's result to the VM. Use `BorrowContext: false` for this wrapper.
+For example, this command waits for one beat using Music:
+
+```go
+func waitOneBeat(c *e.Context) (e.Result, error) {
+    local, ok := c.Local["musicWait"].(map[string]any)
+    if !ok {
+        local = make(map[string]any)
+        c.Local["musicWait"] = local
+    }
+    value, err := c.Call("extensions.call", "music_restForBeats",
+        map[string]any{"BEATS": 1}, nil, local)
+    if err != nil {
+        return e.Result{}, err
+    }
+    result := value.(e.Result)
+    if !result.Again {
+        delete(c.Local, "musicWait")
+    }
+    return result, nil
+}
+```
+
+An `Again` result requires an explicit non-nil `local` map. Reuse it only for that
+pending call; concurrent or subsequent calls need separate maps. Inputs and fields
+come from each `extensions.call` invocation, so the wrapper decides whether to
+retain or recompute them. `ReevaluateInputs` applies to the wrapper's Scratch inputs
+when forwarded to the VM. If the wrapper has other work, use its own continuation
+state to avoid repeating earlier side effects when the child resumes.
+
+Lifecycle events cannot wait, and borrowed-context handlers must still finish
+without yielding or branching. Calls do not expose another extension's private
+Go functions or TurboWarp's JS objects.
 
 ### Runtime and options
 
