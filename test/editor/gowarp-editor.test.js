@@ -50,6 +50,17 @@ function editor(t, language = "en") {
         }, comments: {}}], extensions: []
     };
     const runtime = new EventEmitter();
+    const monitors = new Map();
+    runtime.getMonitorState = () => monitors;
+    runtime.requestUpdateMonitor = delta => {
+        if (!monitors.has(delta.id)) return false;
+        Object.assign(monitors.get(delta.id), delta);
+        return true;
+    };
+    runtime.requestAddMonitor = monitor => {
+        if (!runtime.requestUpdateMonitor(monitor)) monitors.set(monitor.id, {...monitor});
+    };
+    runtime.requestRemoveMonitor = id => monitors.delete(id);
     const extensionURLs = {gowarpEditor: "data:text/javascript,editor-source"};
     runtime.extensionManager = {getExtensionURLs: () => extensionURLs};
     const stage = new Element("div");
@@ -210,6 +221,7 @@ function editor(t, language = "en") {
             header.setUint32(5, height, true);
             sockets.at(-1).onmessage({data});
         },
+        reply: reply => sockets.at(-1).onmessage({data: JSON.stringify(reply)}),
         run: () => document.getElementById("gowarp-editor-button").onclick(),
         connect: async () => {
             nodes.find(node => node.tagName === "input").value = "http://127.0.0.1:12345/#" + "a".repeat(64);
@@ -524,4 +536,42 @@ test("opening settings after the packager closes unlocks the connection address"
     await settle();
     assert.equal(e.address().disabled, false);
     assert.equal(e.runtime.frameLoop.running, true);
+});
+
+test("preview forwards monitor checkboxes without restarting", async t => {
+    const e = editor(t);
+    await e.connect();
+    await e.run();
+    await settle();
+    e.runtime.requestAddMonitor({id: "score", opcode: "data_variable", params: {VARIABLE: "score"}, visible: true, spriteName: null});
+    await new Promise(resolve => setImmediate(resolve));
+    let command = e.commands.findLast(c => c.action === "monitor");
+    assert.equal(command?.monitor.visible, true);
+    e.runtime.requestUpdateMonitor({id: "score", visible: false});
+    await new Promise(resolve => setImmediate(resolve));
+    command = e.commands.findLast(c => c.action === "monitor");
+    assert.equal(command?.monitor.visible, false);
+    assert.equal(e.uploads(), 1);
+});
+
+test("embedded questions use the editor answer input and clean up on disconnect", async t => {
+    const e = editor(t);
+    const questions = [];
+    e.runtime.on("QUESTION", text => questions.push(text));
+    await e.connect();
+    e.embedded();
+    await e.run();
+    await settle();
+    e.reply({action: "question", questionId: 1, question: "이름?"});
+    assert.equal(questions.at(-1), "이름?");
+    e.runtime.emit("ANSWER", "한글 answer");
+    const answer = e.commands.findLast(c => c.action === "answer");
+    assert.equal(answer?.text, "한글 answer");
+    assert.equal(answer?.questionId, 1);
+    e.reply({action: "question", questionId: 2, question: "이름?"});
+    await e.disconnect();
+    assert.equal(questions.at(-1), null);
+    const count = e.commands.length;
+    e.runtime.emit("ANSWER", "Scratch answer");
+    assert.equal(e.commands.length, count);
 });

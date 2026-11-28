@@ -128,7 +128,7 @@ func (c *controller) paintOverlays(painter overlayPainter, scene []vm.DisplayTar
 		}
 	}
 	drawMonitorPanels(painter, c.vm.MonitorWindow(c.monitors.offsets, max(1, (hStage-44)/22)), top, wStage, hStage, &c.monitors)
-	if q := c.vm.Question(); q != nil {
+	if q := c.vm.Question(); q != nil && (c.options.Editor == nil || !c.options.Editor.Embedded) {
 		answerTop := top + hStage
 		if c.options.Settings != nil {
 			answerTop = max(0, hStage-AnswerHeight)
@@ -144,7 +144,7 @@ func (c *controller) paintOverlays(painter overlayPainter, scene []vm.DisplayTar
 			count++
 		}
 		painter.text(8, answerTop+18, prompt, color.Black)
-		answer := c.answer
+		answer := c.answer + c.composition
 		for painter.measure(answer) > wStage-30 && answer != "" {
 			_, n := utf8.DecodeRuneInString(answer)
 			answer = answer[n:]

@@ -10,10 +10,12 @@ import (
 )
 
 type editorInput struct {
-	keys  map[string]bool
-	x, y  float64
-	down  bool
-	frame *ebiten.Image
+	question       *vm.Question
+	questionSynced bool
+	keys           map[string]bool
+	x, y           float64
+	down           bool
+	frame          *ebiten.Image
 }
 
 func (g *game) editorInput(in *Input) {
@@ -29,6 +31,22 @@ func (g *game) editorInput(in *Input) {
 		case command := <-peer.Commands:
 			reply := editorbridge.Reply{ID: command.ID}
 			switch command.Action {
+			case "state":
+				g.editor.questionSynced = false
+			case "monitor":
+				if command.Monitor != nil {
+					if err := g.controller.vm.UpdateEditorMonitor(*command.Monitor); err != nil {
+						reply.Error = err.Error()
+					}
+				}
+				peer.Reply(reply)
+			case "answer":
+				q := g.controller.vm.Question()
+				if peer.Embedded && q != nil && q.ID == command.QuestionID && len(command.Text) <= 4096 {
+					in.Answer = &command.Text
+					in.Enter = true
+				}
+
 			case "edit":
 				var edits []vm.EditorBlocks
 				err := json.Unmarshal(command.Edits, &edits)
@@ -131,4 +149,22 @@ func (g *game) streamEditorFrame(screen *ebiten.Image) {
 	op.GeoM.Scale(float64(w)/float64(width), float64(h)/float64(height))
 	g.editor.frame.DrawImage(screen, op)
 	peer.Frame(w, h, g.editor.frame.ReadPixels)
+}
+
+func (g *game) syncEditorQuestion() {
+	peer := g.options.Editor
+	if peer == nil || !peer.Embedded {
+		return
+	}
+	q := g.controller.vm.Question()
+	previous := g.editor.question
+	if g.editor.questionSynced && ((q == nil && previous == nil) || (q != nil && previous != nil && *q == *previous)) {
+		return
+	}
+	reply := editorbridge.Reply{Action: "question"}
+	if q != nil {
+		reply.Question, reply.QuestionID = &q.Text, q.ID
+	}
+	peer.Reply(reply)
+	g.editor.question, g.editor.questionSynced = q, true
 }

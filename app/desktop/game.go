@@ -33,6 +33,7 @@ type game struct {
 
 	native                      *nativeViews
 	editor                      editorInput
+	answerInput                 answerInput
 	stageNoAntialias            bool
 	displayLogged               bool
 	nextPresentation            time.Time
@@ -362,6 +363,9 @@ func (g *game) update() error {
 		}
 	}
 	g.editorInput(&in)
+	if err := g.updateAnswerInput(&in); err != nil {
+		return err
+	}
 	if err := g.audio.poll(g.controller.vm); err != nil {
 		return err
 	}
@@ -381,6 +385,7 @@ func (g *game) update() error {
 		return err
 	}
 	ebiten.SetTPS(g.updateTPS())
+	g.syncEditorQuestion()
 	g.recordUpdate()
 	return nil
 }

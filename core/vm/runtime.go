@@ -192,6 +192,7 @@ type Runtime struct {
 	loudness                  float64
 	askThread                 *thread
 	askPrompt                 string
+	askID                     uint64
 	now                       func() time.Time
 	drawList                  []*target
 	drawOrderDirty            bool
@@ -918,6 +919,7 @@ func (r *Runtime) stepBody(ctx context.Context, th *thread) error {
 			if err != nil {
 				return err
 			}
+			r.askID++
 			r.askThread = th
 			r.askPrompt = text(value)
 			th.asking = true

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"golang.org/x/net/websocket"
+	"gowarp/core/project"
 )
 
 func TestPreviewFrameSizeUsesBrowserPixels(t *testing.T) {
@@ -143,6 +144,35 @@ func TestPreviewStreamsFramesAndCommandsWithoutRebuilding(t *testing.T) {
 		if reply.ID != id || reply.Running != (id == 1) {
 			t.Fatalf("reply = %+v", reply)
 		}
+	}
+
+	for _, sent := range []Command{
+		{Action: "monitor", Monitor: &project.Monitor{ID: "score", Opcode: "data_variable", Visible: true}},
+		{Action: "answer", QuestionID: 17, Text: "한글"},
+		{Action: "state"},
+	} {
+		if err := websocket.JSON.Send(ws, sent); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case got := <-peer.Commands:
+			a, _ := json.Marshal(sent)
+			b, _ := json.Marshal(got)
+			if !bytes.Equal(a, b) {
+				t.Fatalf("command changed: %s / %s", a, b)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("preview UI command not delivered")
+		}
+	}
+	question := "Name?"
+	peer.Reply(Reply{Action: "question", QuestionID: 17, Question: &question})
+	var prompt Reply
+	if err := websocket.JSON.Receive(ws, &prompt); err != nil {
+		t.Fatal(err)
+	}
+	if prompt.QuestionID != 17 || prompt.Question == nil || *prompt.Question != question {
+		t.Fatalf("question: %+v", prompt)
 	}
 	if builds != 1 {
 		t.Fatal("click rebuilt the project")

@@ -95,3 +95,38 @@ func TestClickedReporterReturnsNativeValue(t *testing.T) {
 		t.Fatal("missing block accepted")
 	}
 }
+
+func TestEditorMonitorVisibilityPreservesLiveState(t *testing.T) {
+	r := monitorRuntime(t)
+	r.createClone(r.targets[1])
+	r.SetMonitorValue(1, "live")
+	monitor := r.data.monitors[1].source
+	monitor.Visible = false
+	if err := r.UpdateEditorMonitor(monitor); err != nil {
+		t.Fatal(err)
+	}
+	if !r.MonitorVisible(0) || r.MonitorVisible(1) {
+		t.Fatal("changed the wrong variable monitor")
+	}
+	monitor.Visible = true
+	if err := r.UpdateEditorMonitor(monitor); err != nil {
+		t.Fatal(err)
+	}
+	if value, ok := r.MonitorValue(1, -1); !ok || value != "live" {
+		t.Fatal("monitor update reset the variable")
+	}
+	list := r.data.monitors[2].source
+	r.data.monitors = r.data.monitors[:2]
+	if err := r.UpdateEditorMonitor(list); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.Monitors()[2]; !got.List || len(got.Items) != 1 || got.Items[0] != "original" {
+		t.Fatalf("list: %+v", got)
+	}
+	if text(r.targets[2].variables["v"].Value) != "2" {
+		t.Fatal("monitor update changed clone state")
+	}
+	if err := r.UpdateEditorMonitor(project.Monitor{ID: "missing", Opcode: "data_variable"}); err == nil {
+		t.Fatal("accepted a missing variable")
+	}
+}

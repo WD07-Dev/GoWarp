@@ -43,31 +43,36 @@ type MonitorState struct {
 func (r *Runtime) InitData(p *project.Project) {
 	r.data = dataState{saved: map[string]any{}}
 	for _, m := range p.Monitors {
-		for _, t := range r.targets {
-			if t.state.CloneID != 0 || (m.SpriteName == "" && !t.state.IsStage) || (m.SpriteName != "" && m.SpriteName != t.state.Name) {
-				continue
-			}
-			if m.Opcode == "data_variable" {
-				if _, ok := t.variables[m.ID]; !ok {
-					break
-				}
-			} else if m.Opcode == "data_listcontents" {
-				if _, ok := t.state.Lists[m.ID]; !ok {
-					break
-				}
-			}
-			monitor := dataMonitor{source: m, owner: t}
-			if m.Opcode != "data_variable" && m.Opcode != "data_listcontents" {
-				monitor.reporter = &project.Block{Opcode: m.Opcode, Fields: make(map[string][]any, len(m.Params))}
-				for name, value := range m.Params {
-					monitor.reporter.Fields[name] = []any{text(value)}
-				}
-				monitor.thread = &thread{target: t}
-			}
-			r.data.monitors = append(r.data.monitors, monitor)
-			break
-		}
+		r.addDataMonitor(m)
 	}
+}
+
+func (r *Runtime) addDataMonitor(m project.Monitor) bool {
+	for _, t := range r.targets {
+		if t.state.CloneID != 0 || (m.SpriteName == "" && !t.state.IsStage) || (m.SpriteName != "" && m.SpriteName != t.state.Name) {
+			continue
+		}
+		if m.Opcode == "data_variable" {
+			if _, ok := t.variables[m.ID]; !ok {
+				break
+			}
+		} else if m.Opcode == "data_listcontents" {
+			if _, ok := t.state.Lists[m.ID]; !ok {
+				break
+			}
+		}
+		monitor := dataMonitor{source: m, owner: t}
+		if m.Opcode != "data_variable" && m.Opcode != "data_listcontents" {
+			monitor.reporter = &project.Block{Opcode: m.Opcode, Fields: make(map[string][]any, len(m.Params))}
+			for name, value := range m.Params {
+				monitor.reporter.Fields[name] = []any{text(value)}
+			}
+			monitor.thread = &thread{target: t}
+		}
+		r.data.monitors = append(r.data.monitors, monitor)
+		return true
+	}
+	return false
 }
 
 func (r *Runtime) Monitors() []MonitorState {

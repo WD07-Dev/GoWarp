@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"gowarp/core/project"
+
 	"golang.org/x/net/websocket"
 )
 
@@ -24,28 +26,33 @@ const maxCommandSize = 4 << 20
 
 // Command messages are applied by the player on its VM thread.
 type Command struct {
-	Frames   int             `json:"frames,omitempty"`
-	Width    int             `json:"width,omitempty"`
-	Height   int             `json:"height,omitempty"`
-	Edits    json.RawMessage `json:"edits,omitempty"`
-	ID       uint64          `json:"id,omitempty"`
-	Action   string          `json:"action"`
-	Target   int             `json:"target,omitempty"`
-	Block    string          `json:"block,omitempty"`
-	Reporter bool            `json:"reporter,omitempty"`
-	X        float64         `json:"x,omitempty"`
-	Y        float64         `json:"y,omitempty"`
-	Down     bool            `json:"down,omitempty"`
-	Key      string          `json:"key,omitempty"`
-	Text     string          `json:"text,omitempty"`
+	Monitor    *project.Monitor `json:"monitor,omitempty"`
+	QuestionID uint64           `json:"questionId,omitempty"`
+	Frames     int              `json:"frames,omitempty"`
+	Width      int              `json:"width,omitempty"`
+	Height     int              `json:"height,omitempty"`
+	Edits      json.RawMessage  `json:"edits,omitempty"`
+	ID         uint64           `json:"id,omitempty"`
+	Action     string           `json:"action"`
+	Target     int              `json:"target,omitempty"`
+	Block      string           `json:"block,omitempty"`
+	Reporter   bool             `json:"reporter,omitempty"`
+	X          float64          `json:"x,omitempty"`
+	Y          float64          `json:"y,omitempty"`
+	Down       bool             `json:"down,omitempty"`
+	Key        string           `json:"key,omitempty"`
+	Text       string           `json:"text,omitempty"`
 }
 
 type Reply struct {
-	ID       uint64 `json:"id"`
-	Value    string `json:"value,omitempty"`
-	Reporter bool   `json:"reporter,omitempty"`
-	Running  bool   `json:"running,omitempty"`
-	Error    string `json:"error,omitempty"`
+	Action     string  `json:"action,omitempty"`
+	Question   *string `json:"question,omitempty"`
+	QuestionID uint64  `json:"questionId,omitempty"`
+	ID         uint64  `json:"id"`
+	Value      string  `json:"value,omitempty"`
+	Reporter   bool    `json:"reporter,omitempty"`
+	Running    bool    `json:"running,omitempty"`
+	Error      string  `json:"error,omitempty"`
 }
 
 type relay struct {
@@ -271,7 +278,7 @@ func (s *relay) serve(ws *websocket.Conn, player bool) {
 				return
 			}
 			switch command.Action {
-			case "toggle", "flag", "stop", "frame", "key", "mouse", "text", "release-input", "edit":
+			case "toggle", "flag", "stop", "frame", "key", "mouse", "text", "release-input", "edit", "monitor", "answer", "state":
 			default:
 				return
 			}

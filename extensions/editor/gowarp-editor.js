@@ -62,6 +62,8 @@
     const maxFrameEdge = 1920;
     let mouseRequest = 0;
     let pendingMouse = null;
+    let questionID = 0;
+    const pendingMonitors = new Set();
     const reports = new Map();
     const requests = new Map();
     const runtime = vm.runtime;
@@ -90,6 +92,49 @@
         return JSON.stringify(project);
     }
     vm.toJSON = toJSON;
+    const monitorHooks = new Map();
+    for (const name of ["requestAddMonitor", "requestUpdateMonitor", "requestRemoveMonitor"]) {
+        const original = runtime[name];
+        if (typeof original !== "function") continue;
+        const hook = function (delta) {
+            const result = original.call(this, delta);
+            if (connection && ["preparing", "receiving", "building", "running"].includes(phase)) {
+                const change = typeof delta?.toJS === "function" ? delta.toJS() : delta;
+                if (typeof change !== "string" && Object.keys(change).every(key => key === "id" || key === "value")) return result;
+                const id = typeof change === "string" ? change : change.id ?? change.get?.("id");
+                if (id) {
+                    pendingMonitors.add(id);
+                    Promise.resolve().then(flushMonitors);
+                }
+            }
+            return result;
+        };
+        monitorHooks.set(name, {original, hook});
+        runtime[name] = hook;
+    }
+
+    function flushMonitors() {
+        if (!connection || phase !== "running" || socket?.readyState !== WebSocket.OPEN) return;
+        for (const id of pendingMonitors) {
+            const record = runtime.getMonitorState().get(id);
+            const monitor = record ? {} : {id, visible: false};
+            if (record) {
+                for (const key of ["id", "opcode", "params", "spriteName", "mode", "visible", "x", "y", "width", "height", "sliderMin", "sliderMax", "isDiscrete"]) {
+                    monitor[key] = typeof record.get === "function" ? record.get(key) : record[key];
+                }
+                monitor.x = (monitor.x ?? 0) - (runtime.stageWidth - 480) / 2;
+                monitor.y = (monitor.y ?? 0) - (runtime.stageHeight - 360) / 2;
+            }
+            if (!send({action: "monitor", monitor})) return;
+            pendingMonitors.delete(id);
+        }
+    }
+
+    function answerQuestion(answer) {
+        if (!questionID || !connection || phase !== "running" || activeDisplay !== "embedded") return;
+        if (send({action: "answer", questionId: questionID, text: String(answer)})) questionID = 0;
+    }
+    runtime.on("ANSWER", answerQuestion);
     const changed = () => { revision++; };
     const projectEvents = ["PROJECT_CHANGED", "PROJECT_LOADED", "TURBO_MODE_ON", "TURBO_MODE_OFF"];
     const settingsEvents = ["FRAMERATE_CHANGED", "INTERPOLATION_CHANGED", "STAGE_SIZE_CHANGED", "RUNTIME_OPTIONS_CHANGED", "COMPILER_OPTIONS_CHANGED"];
@@ -117,6 +162,7 @@
     #gowarp-editor-dialog h2 {margin:0 0 12px;color:#ff4b51;}
     #gowarp-editor-dialog input, #gowarp-editor-dialog select {box-sizing:border-box;width:100%;padding:10px;border:1px solid #666;border-radius:5px;background:#111;color:#eee;font:13px monospace;}
     #gowarp-preview {position:absolute;inset:0;width:100%;height:100%;z-index:100;outline:none;touch-action:none;background:#000;image-rendering:pixelated;}
+    body:has(#gowarp-preview) [class*="stage_question-wrapper"] {z-index:102;}
     #gowarp-preview:focus-visible {outline:2px solid #ff4b51;outline-offset:-2px;}
     #gowarp-preview-loading {position:absolute;inset:0;z-index:101;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#202020ed;color:#eee;font:14px sans-serif;}
     #gowarp-preview-loading strong {color:#ff4b51;font-size:22px;}
@@ -325,6 +371,7 @@
             return graph;
         });
         delete project.meta;
+        delete project.monitors;
         return {
             structure: JSON.stringify({
                 project, targets: targets.map(target => target.id),
@@ -527,6 +574,9 @@
     }
     
     function restoreEditor() {
+        if (questionID) runtime.emit("QUESTION", null);
+        questionID = 0;
+        pendingMonitors.clear();
         pendingFrames = 0;
         if(socket) {
             const old = socket;
@@ -584,6 +634,8 @@
         ws.onopen = () => {
             if(socket !== ws) return;
             ws.send(JSON.stringify({token: connection.token}));
+            flushMonitors();
+            send({action: "state"});
             if(activeDisplay === "embedded") {
                 attachPreview();
                 requestFrame();
@@ -603,6 +655,12 @@
             try {
                 reply = JSON.parse(event.data);
             } catch {
+                return;
+            }
+            if (reply.action === "question" && activeDisplay === "embedded") {
+                questionID = reply.question == null ? 0 : reply.questionId;
+                releaseInput();
+                runtime.emit("QUESTION", reply.question ?? null);
                 return;
             }
             const pending = requests.get(reply.id);
@@ -630,6 +688,8 @@
         ws.onclose = () => {
             if (socket !== ws || disposed) return;
             socket = null;
+            if (questionID) runtime.emit("QUESTION", null);
+            questionID = 0;
             overlay?.remove();
             overlay = null;
             // Status polling reconnects while the same preview remains active.
@@ -813,6 +873,10 @@
         }
         observer.disconnect();
         resetConnection();
+        runtime.removeListener("ANSWER", answerQuestion);
+        for (const [name, {original, hook}] of monitorHooks) {
+            if (runtime[name] === hook) runtime[name] = original;
+        }
         for (const event of projectEvents) vm.removeListener(event, changed);
         for (const event of settingsEvents) runtime.removeListener(event, changed);
         if (runtime.toggleScript === toggleScript) runtime.toggleScript = originalToggle;

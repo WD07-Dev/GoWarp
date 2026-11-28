@@ -283,6 +283,7 @@ func (g *game) restoreGameWindowSize() error {
 }
 
 func (g *game) close() {
+	g.answerInput.composer.Cancel()
 	if g.frameTiming != nil && g.options.Diagnostic != nil {
 		g.frameTiming.flush(time.Now(), "exit", g.options.Diagnostic)
 	}

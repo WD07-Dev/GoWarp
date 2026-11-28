@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"testing"
 
+	"gowarp/app/editorbridge"
 	"gowarp/core/media"
 	"gowarp/core/project"
 	"gowarp/core/vm"
@@ -45,12 +46,28 @@ func TestControllerClickAndAnswer(t *testing.T) {
 	if c.vm.Question() == nil {
 		t.Fatal("sprite click did not start question")
 	}
+	answer := "Go"
 	if err := c.advance(context.Background(), Input{
-		MouseX:    250,
-		MouseY:    ToolbarHeight + 170,
-		MouseDown: true,
-		Text:      "Go한글",
+		MouseX:      250,
+		MouseY:      ToolbarHeight + 170,
+		MouseDown:   true,
+		Answer:      &answer,
+		Composition: "ㅎ",
 	}); err != nil {
+		t.Fatal(err)
+	}
+	if c.vm.Question() == nil || c.answer != "Go" || c.composition != "ㅎ" {
+		t.Fatal("composition submitted or changed the committed answer")
+	}
+	answer = "Go한"
+	if err := c.advance(context.Background(), Input{Answer: &answer, Composition: "글"}); err != nil {
+		t.Fatal(err)
+	}
+	if c.vm.Question() == nil || c.answer != "Go한" {
+		t.Fatal("committing a syllable submitted the answer")
+	}
+	answer = "Go한글"
+	if err := c.advance(context.Background(), Input{Answer: &answer}); err != nil {
 		t.Fatal(err)
 	}
 	if c.vm.Scene()[1].State.X != 10 || c.vm.Scene()[1].State.Y != 10 {
@@ -61,6 +78,9 @@ func TestControllerClickAndAnswer(t *testing.T) {
 	}
 	if c.vm.Question() != nil || c.vm.Snapshot()[0].Variables["v"].Value != "Go한글" {
 		t.Fatal("answer not delivered")
+	}
+	if c.composition != "" {
+		t.Fatal("composition remained after submitting")
 	}
 }
 
@@ -172,5 +192,52 @@ func TestControllerKeyReleaseWhileStopped(t *testing.T) {
 	}
 	if got := c.vm.Snapshot()[0].Variables["v"].Value; got != false {
 		t.Fatalf("released key stuck after restart: %v", got)
+	}
+}
+
+func TestEditorAnswerUsesQuestionIDAndAcceptsUnicode(t *testing.T) {
+	var p project.Project
+	if err := json.Unmarshal([]byte(`{"targets":[{"isStage":true,"variables":{"a":["a",0],"b":["b",0]},"blocks":{
+ "flag":{"opcode":"event_whenflagclicked","topLevel":true,"next":"ask"},
+ "ask":{"opcode":"sensing_askandwait","inputs":{"QUESTION":[1,[10,"Name?"]]},"next":"first"},
+ "first":{"opcode":"data_setvariableto","fields":{"VARIABLE":["a","a"]},"inputs":{"VALUE":[2,"answer"]},"next":"again"},
+ "again":{"opcode":"sensing_askandwait","inputs":{"QUESTION":[1,[10,"Name?"]]},"next":"last"},
+ "last":{"opcode":"data_setvariableto","fields":{"VARIABLE":["b","b"]},"inputs":{"VALUE":[2,"answer"]}},
+ "answer":{"opcode":"sensing_answer"}
+ }}]}`), &p); err != nil {
+		t.Fatal(err)
+	}
+	c := newController(&p, &media.Library{}, Options{FPS: 30})
+	peer := &editorbridge.Peer{Embedded: true, Commands: make(chan editorbridge.Command, 4)}
+	g := &game{controller: c, options: Options{Editor: peer}}
+	if err := c.advance(context.Background(), Input{Restart: true}); err != nil {
+		t.Fatal(err)
+	}
+	first := c.vm.Question()
+	if first == nil {
+		t.Fatal("no initial question")
+	}
+	submit := func(id uint64, text string) {
+		t.Helper()
+		peer.Commands <- editorbridge.Command{Action: "answer", QuestionID: id, Text: text}
+		var in Input
+		g.editorInput(&in)
+		if err := c.advance(context.Background(), in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	submit(first.ID, "한글 Answer")
+	second := c.vm.Question()
+	if second == nil || second.ID == first.ID || second.Text != first.Text {
+		t.Fatalf("repeated question has no fresh ID: %+v", second)
+	}
+	submit(first.ID, "stale")
+	if c.vm.Question() == nil {
+		t.Fatal("old answer consumed the next question")
+	}
+	submit(second.ID, "")
+	state := c.vm.Snapshot()[0]
+	if c.vm.Question() != nil || state.Variables["a"].Value != "한글 Answer" || state.Variables["b"].Value != "" {
+		t.Fatalf("answers: %+v", state.Variables)
 	}
 }

@@ -26,6 +26,7 @@ type InputEvent struct {
 }
 
 type Question struct {
+	ID      uint64 `json:"id"`
 	Text    string `json:"text"`
 	Target  string `json:"target"`
 	CloneID int    `json:"cloneId,omitempty"`
@@ -73,6 +74,7 @@ func (r *Runtime) Question() *Question {
 		return nil
 	}
 	return &Question{
+		ID:      r.askID,
 		Text:    r.askPrompt,
 		Target:  r.askThread.target.state.Name,
 		CloneID: r.askThread.target.state.CloneID,

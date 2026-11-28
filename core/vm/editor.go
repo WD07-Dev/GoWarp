@@ -125,3 +125,38 @@ func (r *Runtime) ToggleScript(source int, id string, reporter bool, report func
 	}
 	return true, nil
 }
+
+// UpdateEditorMonitor changes display metadata without touching live variable or list values.
+func (r *Runtime) UpdateEditorMonitor(m project.Monitor) error {
+	if m.ID == "" {
+		return fmt.Errorf("monitor has no ID")
+	}
+	for i := range r.data.monitors {
+		current := &r.data.monitors[i]
+		if current.source.ID != m.ID || (m.Opcode != "" && current.source.SpriteName != m.SpriteName) {
+			continue
+		}
+		if m.Opcode == "" {
+			current.source.Visible = false
+			return nil
+		}
+		if current.source.Opcode != m.Opcode || current.source.SpriteName != m.SpriteName {
+			return fmt.Errorf("monitor %q changed its owner or opcode", m.ID)
+		}
+		current.source = m
+		return nil
+	}
+	if m.Opcode == "" {
+		return nil
+	}
+	if m.Opcode != "data_variable" && m.Opcode != "data_listcontents" {
+		block := r.extensionBlocks[m.Opcode]
+		if block == nil || (block.block.Kind != "reporter" && block.block.Kind != "boolean") {
+			return fmt.Errorf("monitor %q is not supported by this preview", m.Opcode)
+		}
+	}
+	if !r.addDataMonitor(m) {
+		return fmt.Errorf("monitor %q refers to a missing variable or target", m.ID)
+	}
+	return nil
+}

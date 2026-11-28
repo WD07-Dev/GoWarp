@@ -39,12 +39,14 @@ type Options struct {
 }
 
 type Input struct {
+	Answer                          *string
 	MouseX, MouseY                  float64
 	MouseDown, MousePressed         bool
 	WheelY                          float64
 	Escape, Delete, SelectAll       bool
 	Pressed, Released               []string
 	Text                            string
+	Composition                     string
 	Enter, Backspace, Restart, Stop bool
 }
 
@@ -79,6 +81,7 @@ type controller struct {
 	options         Options
 	monitors        monitorUI
 	answer          string
+	composition     string
 	question        *vm.Question
 	drag            *vm.DisplayTarget
 	dragX, dragY    float64
@@ -231,6 +234,7 @@ func (c *controller) advance(ctx context.Context, in Input) error {
 			c.answerSubmitted = false
 		}
 		c.question = q
+		c.composition = in.Composition
 		if !c.answerSubmitted && in.Backspace {
 			runes := []rune(c.answer)
 			if len(runes) > 0 {
@@ -240,6 +244,9 @@ func (c *controller) advance(ctx context.Context, in Input) error {
 		if !c.answerSubmitted && len(c.answer)+len(in.Text) <= 4096 {
 			c.answer += in.Text
 		}
+		if !c.answerSubmitted && in.Answer != nil {
+			c.answer = *in.Answer
+		}
 		if !c.answerSubmitted && in.Enter {
 			events = append(events, vm.InputEvent{
 				Frame:  frame,
@@ -247,10 +254,12 @@ func (c *controller) advance(ctx context.Context, in Input) error {
 				Answer: c.answer,
 			})
 			c.answer = ""
+			c.composition = ""
 			c.answerSubmitted = true
 		}
 	} else {
 		c.answer = ""
+		c.composition = ""
 		c.question = nil
 		c.answerSubmitted = false
 	}
