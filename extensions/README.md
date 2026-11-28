@@ -28,6 +28,17 @@ Go must be installed on the creator's PC to preview or export projects. The firs
 
 GoWarp loads the sources referenced by the SB3. It does not scan this directory or automatically replace an existing extension with a similarly named file. A project that still references the original JS-only source needs its source reference updated.
 
+### Built-in Scratch extensions
+
+Supported built-in extensions do not need an annotated JS source in the SB3.
+
+| Extension | Supported features | Implementation |
+| --- | --- | --- |
+| Pen (`pen`) | Clear, stamp, pen up/down, pen color, color parameters, and pen size | Built into the VM |
+| Music (`music`) | Play drums, rest for beats, set/change tempo, and report tempo | [Bundled source](../app/assets/embed/extensions/music.js), compiled automatically when used |
+
+Music's note playback and instrument selection blocks are not supported yet.
+
 ### Editing extension code in GoWarp
 
 1. Open an SB3 and select **Extensions -> Edit extension sources** to switch to the extension editor screen.

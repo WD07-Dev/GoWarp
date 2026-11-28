@@ -6,7 +6,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 	"unicode/utf8"
+
+	"gowarp/app/assets"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/gobold"
@@ -21,131 +24,214 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-var svgFonts = [8]struct {
+var svgFonts = [9]struct {
 	once sync.Once
 	font *sfnt.Font
-	err  error
 }{}
 
-/*
-svgGlyphPath returns outlines in SVG coordinates relative to the text baseline.
-Bundled Go fonts make the fallback independent of fonts installed on the host.
-*/
+func bundledFont(variant int) *sfnt.Font {
+	c := &svgFonts[variant]
+	c.once.Do(func() {
+		data := [9][]byte{goregular.TTF, gobold.TTF, goitalic.TTF, gobolditalic.TTF, gomono.TTF, gomonobold.TTF, gomonoitalic.TTF, gomonobolditalic.TTF, assets.NotoSansMedium}
+		c.font, _ = sfnt.Parse(data[variant])
+	})
+	return c.font
+}
+
+func defaultTextFont(family, weight, style string) *sfnt.Font {
+	// Scratch's "Sans Serif" names a bundled font; CSS "sans-serif" uses the OS.
+	name, _, _ := strings.Cut(family, ",")
+	if strings.EqualFold(strings.Trim(strings.TrimSpace(name), "\"'"), "Sans Serif") {
+		return bundledFont(8)
+	}
+
+	if f := browserFont(family, weight, style); f != nil {
+		return f.face
+	}
+	v := fontVariant(weight, style)
+	if fontFamily(family) == 2 {
+		v |= 4
+	}
+	return bundledFont(v)
+}
+
 func svgGlyphPath(text string, size float64, family, weight, style string) (string, float64, error) {
 	return svgGlyphPathWithFont(text, size, family, weight, style, nil)
 }
 
 func svgGlyphPathWithFont(text string, size float64, family, weight, style string, resolve svgFontResolver) (string, float64, error) {
+	nodes, advance, err := svgGlyphNodes(text, size, family, weight, style, resolve)
+	var path strings.Builder
+	for _, n := range nodes {
+		path.WriteString(n.attr("d"))
+	}
+	return path.String(), advance, err
+}
+
+type renderedGlyph struct {
+	face     *sfnt.Font
+	index    sfnt.GlyphIndex
+	segments sfnt.Segments
+	color    []*svgNode
+	width    fixed.Int26_6
+}
+
+func readGlyph(face *sfnt.Font, r rune, ppem fixed.Int26_6, b *sfnt.Buffer) (renderedGlyph, bool) {
+	index, err := face.GlyphIndex(b, r)
+	if err != nil || index == 0 {
+		return renderedGlyph{}, false
+	}
+	width, err := face.GlyphAdvance(b, index, ppem, font.HintingNone)
+	if err != nil {
+		return renderedGlyph{}, false
+	}
+	g := renderedGlyph{face: face, index: index, width: width}
+	if v, ok := systemFontFaces.Load(face); ok {
+		g.color = v.(*systemFont).colorGlyph(index, float64(ppem)/64)
+		if len(g.color) > 0 {
+			return g, true
+		}
+	}
+	g.segments, err = face.LoadGlyph(b, index, ppem, nil)
+	if err != nil || (len(g.segments) == 0 && !unicode.IsSpace(r)) {
+		return renderedGlyph{}, false
+	}
+	return g, true
+}
+
+func findGlyph(primary *sfnt.Font, r rune, ppem fixed.Int26_6, b *sfnt.Buffer) (renderedGlyph, bool) {
+	if g, ok := readGlyph(primary, r, ppem, b); ok {
+		return g, true
+	}
+	for _, family := range []int{3, 4, 5, 0} {
+		f := loadSystemFont(family, 0)
+		if f == nil || f.face == primary {
+			continue
+		}
+		if g, ok := readGlyph(f.face, r, ppem, b); ok {
+			return g, true
+		}
+	}
+	if f := bundledFont(0); f != primary {
+		return readGlyph(f, r, ppem, b)
+	}
+	return renderedGlyph{}, false
+}
+
+func svgGlyphNodes(text string, size float64, family, weight, style string, resolve svgFontResolver) ([]*svgNode, float64, error) {
 	if math.IsNaN(size) || math.IsInf(size, 0) || size <= 0 || size > 8192 {
-		return "", 0, fmt.Errorf("SVG text font size must be positive and at most 8192")
+		return nil, 0, fmt.Errorf("SVG text font size must be positive and at most 8192")
 	}
 	if len(text) > 4096*4 || !utf8.ValidString(text) || utf8.RuneCountInString(text) > 4096 {
-		return "", 0, fmt.Errorf("SVG text must be valid UTF-8 and at most 4096 characters")
+		return nil, 0, fmt.Errorf("SVG text must be valid UTF-8 and at most 4096 characters")
 	}
-	var face *sfnt.Font
+	var primary *sfnt.Font
 	if resolve != nil {
-		face = resolve(family)
+		primary = resolve(family)
 	}
-	if face == nil {
-		variant := 0
-		weight = strings.ToLower(strings.TrimSpace(weight))
-		numericWeight, _ := strconv.ParseFloat(weight, 64)
-		if weight == "bold" || weight == "bolder" || numericWeight >= 600 {
-			variant |= 1
-		}
-		style = strings.ToLower(strings.TrimSpace(style))
-		if style == "italic" || strings.HasPrefix(style, "oblique") {
-			variant |= 2
-		}
-		family = strings.ToLower(family)
-		if strings.Contains(family, "mono") || strings.Contains(family, "courier") || strings.Contains(family, "consolas") {
-			variant |= 4
-		}
-		cached := &svgFonts[variant]
-		cached.once.Do(func() {
-			data := [8][]byte{
-				goregular.TTF,
-				gobold.TTF,
-				goitalic.TTF,
-				gobolditalic.TTF,
-				gomono.TTF,
-				gomonobold.TTF,
-				gomonoitalic.TTF,
-				gomonobolditalic.TTF,
-			}
-			cached.font, cached.err = sfnt.Parse(data[variant])
-		})
-		if cached.err != nil {
-			return "", 0, cached.err
-		}
-		face = cached.font
+	if primary == nil {
+		primary = defaultTextFont(family, weight, style)
 	}
 	ppem := fixed.Int26_6(math.Max(1, math.Round(size*64)))
-	var buffer sfnt.Buffer
-	var path strings.Builder
+	var b, kernBuffer sfnt.Buffer
+	var nodes []*svgNode
+	var paths strings.Builder
+	var previous renderedGlyph
 	var advance float64
-	var previous sfnt.GlyphIndex
-	first := true
+	bytes := 0
+	flush := func() {
+		if paths.Len() > 0 {
+			nodes = append(nodes, svgElement("path", "d", paths.String()))
+			paths.Reset()
+		}
+	}
 	for _, r := range text {
-		index, err := face.GlyphIndex(&buffer, r)
-		if err != nil {
-			return "", 0, err
+		if r == 0xfe0e || r == 0xfe0f || r == 0x200d {
+			continue
 		}
-		if index == 0 {
-			return "", 0, fmt.Errorf("SVG text font has no glyph for %U", r)
+		if r == '\n' || r == '\r' || r == '\t' {
+			r = ' '
 		}
-		if !first {
-			kern, err := face.Kern(&buffer, previous, index, ppem, font.HintingNone)
-			// GPOS fonts may omit this pair even when both glyphs exist.
+		g, found := findGlyph(primary, r, ppem, &b)
+		if !found {
+			// Missing characters must not prevent the project from loading.
+			x, y, w, h, s := advance+size*.1, -size*.75, size*.5, size*.75, size*.06
+			p := fmt.Sprintf("M%g %g h%g v%g h%g Z M%g %g v%g h%g v%g Z ", x, y, w, h, -w, x+s, y+s, h-2*s, w-2*s, -h+2*s)
+			paths.WriteString(p)
+			bytes += len(p)
+			advance += size * .7
+			previous = renderedGlyph{}
+			continue
+		}
+		if previous.face == g.face {
+			kern, err := g.face.Kern(&kernBuffer, previous.index, g.index, ppem, font.HintingNone)
 			if err != nil && err != sfnt.ErrNotFound {
-				return "", 0, err
+				return nil, 0, err
 			}
 			advance += float64(kern) / 64
 		}
-		width, err := face.GlyphAdvance(&buffer, index, ppem, font.HintingNone)
-		if err != nil {
-			return "", 0, err
-		}
-		segments, err := face.LoadGlyph(&buffer, index, ppem, nil)
-		if err != nil {
-			return "", 0, err
-		}
-		open := false
-		for _, segment := range segments {
-			command, count := "", 0
-			switch segment.Op {
-			case sfnt.SegmentOpMoveTo:
-				if open {
-					path.WriteString("Z ")
+		if len(g.color) > 0 {
+			flush()
+			group := svgElement("g", "transform", fmt.Sprintf("translate(%g,0)", advance))
+			group.children = g.color
+			nodes = append(nodes, group)
+			for _, n := range g.color {
+				for _, a := range n.start.Attr {
+					bytes += len(a.Value)
 				}
-				open = true
-				command, count = "M ", 1
-			case sfnt.SegmentOpLineTo:
-				command, count = "L ", 1
-			case sfnt.SegmentOpQuadTo:
-				command, count = "Q ", 2
-			case sfnt.SegmentOpCubeTo:
-				command, count = "C ", 3
-			default:
-				return "", 0, fmt.Errorf("unsupported SVG font outline operation")
 			}
-			// Each segment adds at most six short finite coordinates.
-			if path.Len() > 16*1024*1024-256 {
-				return "", 0, fmt.Errorf("SVG text outline exceeds 16 MiB")
+		} else {
+			p, err := glyphOutline(g.segments, advance)
+			if err != nil {
+				return nil, 0, err
 			}
-			path.WriteString(command)
-			for _, point := range segment.Args[:count] {
-				path.WriteString(strconv.FormatFloat(advance+float64(point.X)/64, 'f', -1, 64))
-				path.WriteByte(' ')
-				path.WriteString(strconv.FormatFloat(float64(point.Y)/64, 'f', -1, 64))
-				path.WriteByte(' ')
-			}
+			paths.WriteString(p)
+			bytes += len(p)
 		}
-		if open {
-			path.WriteString("Z ")
+		if bytes > 16<<20 {
+			return nil, 0, fmt.Errorf("SVG text outlines and images exceed 16 MiB")
 		}
-		advance += float64(width) / 64
-		previous, first = index, false
+		advance += float64(g.width) / 64
+		previous = g
 	}
-	return path.String(), advance, nil
+	flush()
+	return nodes, advance, nil
+}
+
+func glyphOutline(segments sfnt.Segments, offset float64) (string, error) {
+	var path strings.Builder
+	open := false
+	for _, s := range segments {
+		command, count := "", 0
+		switch s.Op {
+		case sfnt.SegmentOpMoveTo:
+			if open {
+				path.WriteString("Z ")
+			}
+			open = true
+			command, count = "M ", 1
+		case sfnt.SegmentOpLineTo:
+			command, count = "L ", 1
+		case sfnt.SegmentOpQuadTo:
+			command, count = "Q ", 2
+		case sfnt.SegmentOpCubeTo:
+			command, count = "C ", 3
+		default:
+			return "", fmt.Errorf("unsupported SVG font outline operation")
+		}
+		if path.Len() > 16*1024*1024-256 {
+			return "", fmt.Errorf("SVG text outline exceeds 16 MiB")
+		}
+		path.WriteString(command)
+		for _, p := range s.Args[:count] {
+			path.WriteString(strconv.FormatFloat(offset+float64(p.X)/64, 'f', -1, 64))
+			path.WriteByte(' ')
+			path.WriteString(strconv.FormatFloat(float64(p.Y)/64, 'f', -1, 64))
+			path.WriteByte(' ')
+		}
+	}
+	if open {
+		path.WriteString("Z ")
+	}
+	return path.String(), nil
 }

@@ -44,6 +44,15 @@ func TestExampleCommentsMatchTestModules(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("example files: %v", err)
 	}
+	builtinRoot, err := filepath.Abs(filepath.Join("..", "..", "app", "assets", "embed", "extensions"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	builtinFiles, err := filepath.Glob(filepath.Join(builtinRoot, "*.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files = append(files, builtinFiles...)
 	for _, path := range files {
 		name := strings.TrimSuffix(filepath.Base(path), ".js")
 		t.Run(name, func(t *testing.T) {

@@ -2,9 +2,65 @@ package vm
 
 import (
 	"gowarp/core/extension"
+	spriteeffects "gowarp/test/extensions/SPspriteEffectsV2"
 	penplus "gowarp/test/extensions/penP"
 	"testing"
 )
+
+func TestSpriteEffectsV2NamedCanvasFilters(t *testing.T) {
+	r := fixture(t, "{}")
+	def := spriteeffects.New()
+	ctx := &extension.Context{Host: &extensionContext{r: r, th: &thread{target: r.stage}}, State: def.State}
+	if _, err := def.Events["load"](ctx); err != nil {
+		t.Fatal(err)
+	}
+	call := func(op string, args map[string]any) any {
+		t.Helper()
+		ctx.Args = args
+		for _, b := range def.Blocks {
+			if b.Opcode == "SPspriteEffectsV2_"+op {
+				result, err := b.Handler(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return result.Value
+			}
+		}
+		t.Fatalf("missing block %s", op)
+		return nil
+	}
+	filter := func(effect string, n float64) any {
+		return call("applySimpleEffect", map[string]any{"SRC": "</svg>", "EFFECT": effect, "NUM": n})
+	}
+	call("addCanvasFilter", map[string]any{"NAME": "glow", "FILTER": filter("bloom v2", 30)})
+	call("addCanvasFilter", map[string]any{"NAME": "tone", "FILTER": filter("contrast", 25)})
+	first := r.View().Shader
+	if first == nil || first.Next == nil || first.Next.Next != nil || first.Overrides["Mode"] != float32(2) || first.Next.Overrides["Mode"] != float32(1) {
+		t.Fatal("wrong filter order")
+	}
+	call("addCanvasFilter", map[string]any{"NAME": "glow", "FILTER": filter("bloom v2", 30)})
+	if r.View().Shader != first {
+		t.Fatal("unchanged filter rebuilt the pipeline")
+	}
+	call("addCanvasFilter", map[string]any{"NAME": "glow", "FILTER": filter("bloom v2", 50)})
+	if r.View().Shader.Overrides["Amount"] != float32(50) || first.Overrides["Amount"] != float32(30) {
+		t.Fatal("replacement mutated a prior frame")
+	}
+	motion := call("applySpecialBlur", map[string]any{"SRC": "</svg>", "TYPE": "motion", "x": 3.0, "y": 0.0})
+	call("addCanvasFilter", map[string]any{"NAME": "motion", "FILTER": motion})
+	chroma := call("applyColorSplit", map[string]any{"SRC": "</svg>", "TYPE": "chroma", "x": 2.0, "y": 1.0, "COL1": "#ff0000", "COL2": "#00ffff"})
+	call("addCanvasFilter", map[string]any{"NAME": "split", "FILTER": chroma})
+	call("removeCanvasFilter", map[string]any{"NAME": "glow"})
+	if r.View().Shader.Overrides["Mode"] != float32(1) {
+		t.Fatal("removed wrong filter")
+	}
+	if _, err := def.Events["flag"](ctx); err != nil {
+		t.Fatal(err)
+	}
+	if r.View().Shader != nil {
+		t.Fatal("green flag retained filters")
+	}
+}
 
 func TestGenericShaderPipelinePreservesNamesAndDefersInvalidSource(t *testing.T) {
 	r := fixture(t, "{}")

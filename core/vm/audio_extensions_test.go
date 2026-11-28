@@ -2,12 +2,70 @@ package vm
 
 import (
 	"context"
+	"gowarp/core/extension"
 	"gowarp/core/project"
+	music "gowarp/test/extensions/music"
 	"math"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestMusicTempoAndBeatWait(t *testing.T) {
+	r := fixture(t, "{}")
+	r.project.Targets[0].Tempo = 120
+	def := music.New()
+	if err := def.Prepare(r.project); err != nil {
+		t.Fatal(err)
+	}
+	ctx := &extension.Context{Host: &extensionContext{r: r, th: &thread{target: r.stage}}, Local: map[string]any{}}
+	call := func(op string, args map[string]any) extension.Result {
+		t.Helper()
+		ctx.Args = args
+		for _, b := range def.Blocks {
+			if b.Opcode == "music_"+op {
+				out, err := b.Handler(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return out
+			}
+		}
+		t.Fatalf("missing music block %s", op)
+		return extension.Result{}
+	}
+	if got := call("getTempo", nil).Value; got != 120.0 {
+		t.Fatalf("initial tempo: %v", got)
+	}
+	if out := call("restForBeats", map[string]any{"BEATS": 2}); !out.Again || !out.Yield {
+		t.Fatal("rest did not yield")
+	}
+	call("setTempo", map[string]any{"TEMPO": 500})
+	r.elapsed = .99
+	if !call("restForBeats", map[string]any{"BEATS": 2}).Again {
+		t.Fatal("tempo change shortened a running rest")
+	}
+	r.elapsed = 1
+	if call("restForBeats", map[string]any{"BEATS": 2}).Again {
+		t.Fatal("rest exceeded its deadline")
+	}
+	call("changeTempo", map[string]any{"TEMPO": -1000})
+	if got := call("getTempo", nil).Value; got != 20.0 {
+		t.Fatalf("clamped tempo: %v", got)
+	}
+	ctx.Local = map[string]any{}
+	r.audioEnabled = true
+	if !call("playDrumForBeats", map[string]any{"DRUM": 19, "BEATS": 0}).Again {
+		t.Fatal("zero-beat drum did not yield once")
+	}
+	commands := r.DrainAudio()
+	if len(commands) == 0 || !strings.HasPrefix(commands[0].URL, "data:audio/mpeg;base64,") {
+		t.Fatalf("drum did not play embedded sample: %d commands", len(commands))
+	}
+	if call("playDrumForBeats", map[string]any{"DRUM": 19, "BEATS": 0}).Again {
+		t.Fatal("zero-beat drum did not finish")
+	}
+}
 
 func TestSoundExpandedLoop(t *testing.T) {
 	r := soundRuntime(t, `{

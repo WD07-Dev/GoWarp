@@ -9,8 +9,24 @@ import (
 //go:embed embed/fonts/Pretendard-Regular.otf
 var PretendardRegular []byte
 
+//go:embed embed/fonts/NotoSans-Medium.ttf
+var NotoSansMedium []byte
+
 //go:embed embed/fonts/LICENSE.txt
 var FontLicense string
+
+//go:embed embed/extensions/music.js
+var musicExtension []byte
+
+// BuiltinExtensionSource returns the bundled implementation for a Scratch extension.
+// The returned bytes are read-only.
+func BuiltinExtensionSource(id string) []byte {
+	switch id {
+	case "music":
+		return musicExtension
+	}
+	return nil
+}
 
 //go:embed embed/translations.csv
 var Translations []byte

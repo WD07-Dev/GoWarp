@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"unicode/utf8"
 
+	"gowarp/app/assets"
 	"gowarp/core/project"
 )
 
@@ -71,7 +72,7 @@ func OpenExtensionDocument(ctx context.Context, path string) (*ExtensionDocument
 			return nil, fmt.Errorf("duplicate extension ID %q", id)
 		}
 		seen[id] = true
-		if id == "pen" {
+		if id == "pen" || assets.BuiltinExtensionSource(id) != nil {
 			continue
 		}
 		entry := EditableExtension{ID: id}

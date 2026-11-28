@@ -12,6 +12,14 @@ import (
 
 func New() e.Extension {
 	return e.Extension{ID: "lmsLooksPlus", State: map[string]any{}, Blocks: []e.Block{
+		{Opcode: "lmsLooksPlus_hideSprite", Kind: "command", Inputs: []string{"TARGET"}, Handler: func(c *e.Context) (e.Result, error) {
+			target, err := sprite(c)
+			if err != nil || target == nil {
+				return e.Result{}, err
+			}
+			_, err = c.Call("target.set", "visible", false, target)
+			return e.Result{}, err
+		}},
 		{Opcode: "lmsLooksPlus_menu_spriteMenu", Kind: "reporter", Handler: func(c *e.Context) (e.Result, error) {
 			return e.Result{Value: c.Field("spriteMenu")}, nil
 		}},

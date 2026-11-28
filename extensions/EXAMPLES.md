@@ -17,6 +17,7 @@ Each **JavaScript** link opens a complete extension file with an embedded Go imp
 | My Blocks+ (`SPmbpCST`) | SharkPool, [CST1229](https://scratch.mit.edu/users/CST1229/), [0znzw](https://scratch.mit.edu/users/0znzw/) | [JavaScript](examples/SPmbpCST.js) · [Go module](../test/extensions/SPmbpCST/module.go) |
 | Renderer Control (`SPrenderControl`) | SharkPool | [JavaScript](examples/SPrenderControl.js) · [Go module](../test/extensions/SPrenderControl/module.go) |
 | Sprite Effects (`SPspriteEffects`) | SharkPool | [JavaScript](examples/SPspriteEffects.js) · [Go module](../test/extensions/SPspriteEffects/module.go) |
+| Sprite Effects V2 (`SPspriteEffectsV2`) | SharkPool | [JavaScript](examples/SPspriteEffectsV2.js) · [Go module](../test/extensions/SPspriteEffectsV2/module.go) |
 | Tune Shark V3 (`SPtuneShark3`) | SharkPool | [JavaScript](examples/SPtuneShark3.js) · [Go module](../test/extensions/SPtuneShark3/module.go) |
 | `ShovelUtils` | TheShovel, [Mio](https://scratch.mit.edu/users/0znzw/) | [JavaScript](examples/ShovelUtils.js) · [Go module](../test/extensions/ShovelUtils/module.go) |
 | Window Controls (`cubesterWindowControls`) | [CubesterYT](https://scratch.mit.edu/users/CubesterYT/), BlueDome77 (original implementation) | [JavaScript](examples/cubesterWindowControls.js) · [Go module](../test/extensions/cubesterWindowControls/module.go) |

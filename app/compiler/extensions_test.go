@@ -60,6 +60,53 @@ func TestResolveExtensionSources(t *testing.T) {
 	}
 }
 
+func TestResolveBuiltinMusic(t *testing.T) {
+	var implementation []byte
+	for _, location := range []string{"", "data:text/javascript,void%200;", "missing-music.js"} {
+		p := &project.Project{Extensions: []string{"pen", "music"}, ExtensionURLs: map[string]string{"music": location}}
+		sources, err := resolveExtensionSources(context.Background(), t.TempDir(), p)
+		if err != nil {
+			t.Fatalf("builtin music with URL %q: %v", location, err)
+		}
+		if len(sources) != 1 || sources[0].ID != "music" || !bytes.Contains(sources[0].Go, []byte("music_getTempo")) {
+			t.Fatal("music implementation was not included")
+		}
+		if implementation != nil && !bytes.Equal(implementation, sources[0].Go) {
+			t.Fatal("project URL replaced builtin music")
+		}
+		implementation = sources[0].Go
+	}
+	p := &project.Project{Extensions: []string{"music", "music"}}
+	if _, err := resolveExtensionSources(context.Background(), "", p); err == nil {
+		t.Fatal("duplicate builtin accepted")
+	}
+}
+
+func TestBuiltinMusicRuntimeBuild(t *testing.T) {
+	p := &project.Project{Extensions: []string{"music"}, Monitors: []project.Monitor{{Opcode: "music_getTempo", Visible: true}}}
+	sources, err := resolveExtensionSources(context.Background(), "", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sdk := writePreparationSDK(t, extensionSDKFixture(t))
+	tpl := Template{Version: config.Version, OS: runtime.GOOS, Arch: runtime.GOARCH}
+	built, err := buildExtensionRuntime(context.Background(), tpl, sources, sdk, t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := exec.Command(built.Path).CombinedOutput()
+	if err != nil || string(output) != "music\n" {
+		t.Fatalf("compiled music registration: %q, %v", output, err)
+	}
+	if err := validateExtensionProject(context.Background(), built.validatorPath, p); err != nil {
+		t.Fatal(err)
+	}
+	p.Monitors[0].Opcode = "music_unsupported"
+	if err := validateExtensionProject(context.Background(), built.validatorPath, p); err == nil {
+		t.Fatal("unsupported music opcode was silently accepted")
+	}
+}
+
 func TestIgnoredEditorExtensionBuild(t *testing.T) {
 	p := &project.Project{
 		Extensions: []string{"editor", "fresh"},

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"gowarp/app/assets"
 	"gowarp/core/extension"
 	"gowarp/core/project"
 )
@@ -91,7 +92,7 @@ func rewriteExtensions(ctx context.Context, input, output string, sources map[st
 			return fmt.Errorf("duplicate extension ID %q", id)
 		}
 		declared[id] = true
-		if id == "pen" {
+		if id == "pen" || assets.BuiltinExtensionSource(id) != nil {
 			continue
 		}
 		source, ok := sources[id]
@@ -112,7 +113,7 @@ func rewriteExtensions(ctx context.Context, input, output string, sources map[st
 		urls[id] = "data:application/javascript;base64," + base64.StdEncoding.EncodeToString(source)
 	}
 	for id := range sources {
-		if !declared[id] || id == "pen" {
+		if !declared[id] || id == "pen" || assets.BuiltinExtensionSource(id) != nil {
 			return fmt.Errorf("source %s is not a declared custom extension", id)
 		}
 	}

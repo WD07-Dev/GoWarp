@@ -56,12 +56,17 @@ func resolveExtensionSources(ctx context.Context, input string, p *project.Proje
 			return nil, fmt.Errorf("duplicate extension ID %q", id)
 		}
 		seen[id] = true
-		location := p.ExtensionURLs[id]
-		if location == "" {
-			failures = append(failures, id+": no extensionURLs source")
-			continue
+		data := assets.BuiltinExtensionSource(id)
+		var path string
+		var err error
+		if data == nil {
+			location := p.ExtensionURLs[id]
+			if location == "" {
+				failures = append(failures, id+": no extensionURLs source")
+				continue
+			}
+			data, path, err = readExtensionSource(ctx, input, location)
 		}
-		data, path, err := readExtensionSource(ctx, input, location)
 		var source extension.Source
 		if err == nil {
 			source, err = extension.ExtractSource(id+".js", data)

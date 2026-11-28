@@ -53,7 +53,7 @@ func TestExtensionDocumentEditsInPlace(t *testing.T) {
 	url := "data:application/javascript;base64," + base64.StdEncoding.EncodeToString([]byte(source))
 	manifest, err := json.Marshal(map[string]any{
 		"targets":        []any{map[string]any{"isStage": true, "name": "Stage"}},
-		"extensions":     []string{"pen", "inline", "local", "missing"},
+		"extensions":     []string{"pen", "music", "inline", "local", "missing"},
 		"extensionURLs":  map[string]string{"inline": url, "local": "extensions/local.js"},
 		"customMetadata": map[string]int{"keep": 42},
 	})
@@ -70,7 +70,7 @@ func TestExtensionDocumentEditsInPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(doc.Sources) != 3 {
-		t.Fatalf("custom sources = %d, want 3 (excluding pen)", len(doc.Sources))
+		t.Fatalf("custom sources = %d, want 3 (excluding builtins)", len(doc.Sources))
 	}
 	if got := doc.Sources[0].Source; got != source {
 		t.Fatalf("inline source = %q, want %q", got, source)

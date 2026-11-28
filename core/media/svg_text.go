@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// SVG text uses project fonts and bundled fallbacks, independent of host fonts.
+// Project fonts take precedence over the system's default and fallback fonts.
 type svgTextStyle struct {
 	size                          float64
 	family, weight, style, anchor string
@@ -154,22 +154,18 @@ func svgLayoutText(n *svgNode, inherited svgTextStyle, cursor *svgTextCursor, bu
 		if style.size == 0 || text == "" {
 			continue
 		}
-		path, advance, err := svgGlyphPathWithFont(text, style.size, style.family, style.weight, style.style, style.fonts)
+		glyphs, advance, err := svgGlyphNodes(text, style.size, style.family, style.weight, style.style, style.fonts)
 		if err != nil {
 			return 0, err
 		}
-		*budget += len(path)
+		*budget += svgGlyphBytes(glyphs)
 		if *budget > 16<<20 {
 			return 0, fmt.Errorf("excessive SVG text outlines")
 		}
-		if path != "" {
-			children = append(children, &svgNode{start: xml.StartElement{
-				Name: xml.Name{Local: "path"},
-				Attr: []xml.Attr{
-					{Name: xml.Name{Local: "d"}, Value: path},
-					{Name: xml.Name{Local: "transform"}, Value: fmt.Sprintf("translate(%g,%g)", cursor.x, cursor.y)},
-				},
-			}})
+		if len(glyphs) != 0 {
+			group := svgElement("g", "transform", fmt.Sprintf("translate(%g,%g)", cursor.x, cursor.y))
+			group.children = glyphs
+			children = append(children, group)
 		}
 		cursor.x += advance
 	}
@@ -203,4 +199,15 @@ func svgLayoutText(n *svgNode, inherited svgTextStyle, cursor *svgTextCursor, bu
 		presentation attributes still apply normally to the generated outlines.
 	*/
 	return width, nil
+}
+
+func svgGlyphBytes(nodes []*svgNode) int {
+	size := 0
+	for _, node := range nodes {
+		for _, attr := range node.start.Attr {
+			size += len(attr.Value)
+		}
+		size += svgGlyphBytes(node.children)
+	}
+	return size
 }

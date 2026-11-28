@@ -56,12 +56,11 @@ func (s *Sound) Duration() float64 {
 }
 
 type Library struct {
-	noAntialias  bool
-	fonts        map[string]*opentype.Font
-	fallbackFont *opentype.Font
-	Costumes     [][]*Costume
-	Sounds       [][]*Sound
-	cache        *runtimeCache
+	noAntialias bool
+	fonts       map[string]*opentype.Font
+	Costumes    [][]*Costume
+	Sounds      [][]*Sound
+	cache       *runtimeCache
 }
 
 func Load(path string, p *project.Project) (*Library, error) {

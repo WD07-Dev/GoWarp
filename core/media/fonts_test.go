@@ -45,7 +45,6 @@ func TestSVGUsesProjectFont(t *testing.T) {
 			t.Fatalf("scale %g: Korean text is blank", scale)
 		}
 		fallback, _, err := rasterSVGWithFonts(data, scale, nil)
-		// The built-in fallback may reject Korean glyphs entirely.
 		if err == nil && bytes.Equal(img.Pix, fallback.Pix) {
 			t.Fatalf("scale %g: custom font rendered as the fallback font", scale)
 		}

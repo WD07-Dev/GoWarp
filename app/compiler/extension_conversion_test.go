@@ -171,3 +171,19 @@ func TestConvertExtensionsAllowsManifestLargerThanJSSourceLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestConvertExtensionsDoesNotRequireBuiltinSources(t *testing.T) {
+	input := filepath.Join(t.TempDir(), "builtin.sb3")
+	output := filepath.Join(t.TempDir(), "converted.sb3")
+	writeExtensionArchive(t, input, map[string]string{"project.json": `{"targets":[{"isStage":true}],"extensions":["pen","music"]}`})
+	if err := ConvertExtensions(context.Background(), input, output, nil); err != nil {
+		t.Fatal(err)
+	}
+	p, err := project.Load(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.ExtensionURLs) != 0 {
+		t.Fatal("builtin source embedded into project")
+	}
+}

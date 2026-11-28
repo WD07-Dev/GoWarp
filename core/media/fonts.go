@@ -3,7 +3,6 @@ package media
 import (
 	"strings"
 
-	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
 
 	"gowarp/core/project"
@@ -49,8 +48,5 @@ func (lib *Library) TextFont(family string) *opentype.Font {
 	if face := lib.customFont(family); face != nil {
 		return face
 	}
-	if lib.fallbackFont == nil {
-		lib.fallbackFont, _ = opentype.Parse(goregular.TTF)
-	}
-	return lib.fallbackFont
+	return defaultTextFont(family, "", "")
 }
