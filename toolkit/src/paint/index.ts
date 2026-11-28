@@ -23,7 +23,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
     const theme = createTheme(document, window);
     const { nativeClass, readTheme, applyTheme } = theme;
     let lastLanguage = tr().lang;
-    const context: PaintContext = {document, window, lifecycle, editor, theme};
+    const context: PaintContext = { document, window, lifecycle, editor, theme };
     let disposed = false;
     let unsubscribe: (() => void) | undefined;
     let sheet: CSSStyleSheet | undefined;
@@ -76,14 +76,14 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
         }
         return null;
     }
-    function paintingLayer () {
+    function paintingLayer() {
         return findLayer('isPaintingLayer');
     }
-    function rasterItem () {
+    function rasterItem() {
         var layer = findLayer('isRasterLayer');
         return layer && layer.children.length ? layer.children[0] : null;
     }
-    function guideLayer () {
+    function guideLayer() {
         var p = paper();
         if(!p) return null;
         var layer = findLayer('isGuideLayer');
@@ -247,7 +247,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
     function nibSwatch(profile: typeof PENS[number]) {
         var pts = [];
         var i: number;
-        for(i = 0; i <= 16; i++) {
+        for(i=0; i <= 16; i++) {
             var u = i / 16;
             pts.push({x: 3 + u * 38, y: 10 - Math.sin(u * Math.PI) * 4.5, p: 0.25 + 0.6 * Math.sin(Math.PI * u)});
         }
@@ -290,6 +290,7 @@ export function installPaintTools(Scratch: typeof globalThis.Scratch): PaintTool
             settings.grad.extras.push(usable(c) ? c : '#8899aa');
         }
     })();
+    
     function saveSettings() {
         save(settings);
     }
