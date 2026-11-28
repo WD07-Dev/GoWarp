@@ -31,7 +31,7 @@ func (r *Runtime) Scene() []DisplayTarget {
 }
 
 func (r *Runtime) SceneInto(dst []DisplayTarget) []DisplayTarget {
-	if len(r.visual.layers) > 0 {
+	if r.drawOrderDirty && len(r.visual.layers) > 0 {
 		rank := func(t *target) int {
 			if t.state.IsStage {
 				return 0
@@ -49,6 +49,7 @@ func (r *Runtime) SceneInto(dst []DisplayTarget) []DisplayTarget {
 		slices.SortStableFunc(r.drawList, func(a, b *target) int { return cmp.Compare(rank(a), rank(b)) })
 		r.updateLayers()
 	}
+	r.drawOrderDirty = false
 	n := len(r.drawList)
 	if dst == nil || cap(dst) < n || cap(dst) > max(64, 4*n) {
 		dst = make([]DisplayTarget, n)

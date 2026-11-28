@@ -16,13 +16,16 @@ const Width = 480
 const Height = 360
 
 type Renderer struct {
-	layers          map[string]*Renderer
-	surfaceParent   *Renderer
-	colorCandidates []colorCandidate
-
+	layers           map[string]*Renderer
+	surfaceParent    *Renderer
+	colorCandidates  []colorCandidate
 	textSkinBytes    int
 	textSkinUse      uint64
 	textSkins        map[textSkinKey]cachedTextSkin
+	textFaces        map[textFaceKey]*cachedTextFace
+	textRasters      map[textSkinKey]*textRaster
+	textLayouts      map[textSkinKey]*TextLayout
+	textLayoutBytes  int
 	Assets           *media.Library
 	frame            *image.RGBA
 	displayFrame     *image.RGBA
@@ -62,7 +65,6 @@ func (r *Renderer) transform(t vm.DisplayTarget) (transform, bool) {
 	if !ok {
 		return tr, false
 	}
-	// Hold pixels during CPU rendering or collision even if the asset LRU evicts them.
 	tr.image = r.Assets.CostumeImage(tr.c)
 	return tr, tr.image != nil
 }
@@ -85,6 +87,10 @@ func (r *Renderer) transformGeometry(t vm.DisplayTarget) (transform, bool) {
 		}
 		c = costumes[i]
 	}
+	return r.costumeTransform(t, c)
+}
+
+func (r *Renderer) costumeTransform(t vm.DisplayTarget, c *media.Costume) (transform, bool) {
 	s := t.State
 	tr := transform{
 		c:  c,
@@ -217,10 +223,6 @@ func (r *Renderer) draw(scene []vm.DisplayTarget, display bool) *image.RGBA {
 					if t.State.IsStage {
 						stencil[i] = false
 					} else if isMask {
-						/*
-							Normal WebGL drawing writes stencil for the quad even
-							when the costume or ghost effect makes it transparent.
-						*/
 						dx, dy := wx-tr.x, wy-tr.y
 						u := ((tr.cos*dx+tr.sin*dy)/tr.sx + tr.c.CenterX) / tr.c.Width
 						v := (tr.c.CenterY - (-tr.sin*dx+tr.cos*dy)/tr.sy) / tr.c.Height

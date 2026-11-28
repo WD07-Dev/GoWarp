@@ -70,6 +70,8 @@ type stageGPU struct {
 	textureContent  map[*ebiten.Image]image.Rectangle
 	bytes           int
 	clock           uint64
+	textGlyphs      map[*image.Alpha]stageTexture
+	textGlyphBytes  int
 	pen             *ebiten.Image
 	penRenderer     *render.Renderer
 	penRevision     uint64
@@ -87,6 +89,9 @@ type stageGPU struct {
 func (g *stageGPU) Close() {
 	g.releaseTransientTexture()
 	g.canvas.close()
+	for _, glyph := range g.textGlyphs {
+		glyph.image.Deallocate()
+	}
 	if g.mask != nil {
 		g.mask.Deallocate()
 		g.mask = nil
@@ -186,7 +191,6 @@ func (g *stageGPU) recentTexture(texture stageTexture) bool {
 	return texture.reused && g.clock-texture.used <= stageTextureReuseWindow
 }
 
-// Track reuse without retaining image pixels.
 func (g *stageGPU) rememberTexture(key stageTextureKey, used uint64) {
 	if g.clock-used > stageTextureReuseWindow {
 		return
@@ -207,14 +211,12 @@ func (g *stageGPU) rememberTexture(key stageTextureKey, used uint64) {
 	g.evictedTextures[key] = used
 }
 
-// Upload straight alpha for shader filtering without retaining the CPU pixels.
 func stageUpload(dst *ebiten.Image, src *image.NRGBA) {
 	stageUploadPixels(dst, src, false)
 }
 
 func stageUploadPixels(dst *ebiten.Image, src *image.NRGBA, premultiplied bool) {
 	w, h := src.Bounds().Dx(), src.Bounds().Dy()
-	// Bound upload chunks because Ebitengine retains pooled buffers after texture eviction.
 	const uploadBytes = 256 << 10
 	rows := min(h, max(1, uploadBytes/(w*4)))
 	var buffer *image.RGBA
@@ -245,7 +247,6 @@ func (g *stageGPU) texture(r *render.Renderer, d render.DisplaySprite) (*ebiten.
 	return g.textureRegion(r, d, image.Rectangle{})
 }
 
-// Uniform images need one texel; geometry and effects still use the original size.
 func compactTexturePixels(pixels *image.NRGBA) *image.NRGBA {
 	bounds := pixels.Bounds()
 	if bounds.Empty() || bounds.Size() == image.Pt(1, 1) {
@@ -268,7 +269,6 @@ func compactTexturePixels(pixels *image.NRGBA) *image.NRGBA {
 func textureContentBounds(pixels *image.NRGBA) image.Rectangle {
 	w, h := pixels.Rect.Dx(), pixels.Rect.Dy()
 	left, top, right, bottom := w, h, 0, 0
-	// Skip trimming large images to bound CPU work.
 	remaining := 256 << 10
 	for y := 0; y < h; y++ {
 		if w > remaining {
@@ -480,35 +480,44 @@ func (g *stageGPU) textureRegion(r *render.Renderer, d render.DisplaySprite, reg
 	}
 	var pixels *image.NRGBA
 	repeated := false
-	if region.Empty() {
-		pixels, repeated = r.Assets.DisplayCostumeImage(d.Costume, density)
-	} else {
-		// Regions are expressed in original pixels, including odd offsets.
-		pixels = r.Assets.CostumeImageRegionAtScale(d.Costume, density, region)
+	if d.Text == nil {
+		if region.Empty() {
+			pixels, repeated = r.Assets.DisplayCostumeImage(d.Costume, density)
+		} else {
+			// Regions are expressed in original pixels, including odd offsets.
+			pixels = r.Assets.CostumeImageRegionAtScale(d.Costume, density, region)
+		}
 	}
 	if g.measureUploads {
 		now := time.Now()
 		g.prepareTime += now.Sub(phaseStart)
 		phaseStart = now
 	}
-	if pixels == nil {
+	if pixels == nil && d.Text == nil {
 		return nil, false
 	}
-	pixels = compactTexturePixels(pixels)
-	if pixels.Bounds().Size() == image.Pt(1, 1) {
-		repeated = false
-	} else if d.Costume.Bitmap && !region.Empty() {
-		pixels, repeated = media.CompactRepeatedPixels(pixels)
+	var width, height int
+	var content image.Rectangle
+	if d.Text != nil {
+		width, height = d.Text.Size.X, d.Text.Size.Y
+		content = image.Rect(0, 0, width, height)
+	} else {
+		pixels = compactTexturePixels(pixels)
+		if pixels.Bounds().Size() == image.Pt(1, 1) {
+			repeated = false
+		} else if d.Costume.Bitmap && !region.Empty() {
+			pixels, repeated = media.CompactRepeatedPixels(pixels)
+		}
+		width, height = pixels.Bounds().Dx(), pixels.Bounds().Dy()
+		content = textureContentBounds(pixels)
 	}
-	width, height := pixels.Bounds().Dx(), pixels.Bounds().Dy()
-	content := textureContentBounds(pixels)
 	bytes := width * height * 4
-	if g.measureUploads {
+	if g.measureUploads && d.Text == nil {
 		g.uploadCount++
 		g.uploadBytes += int64(bytes)
 	}
 	// Keep small images on the atlas; large entries can pin oversized padded allocations.
-	unmanaged := repeated || bytes >= 1<<20
+	unmanaged := d.Text != nil || repeated || bytes >= 1<<20
 	if unmanaged {
 		// Charge standalone textures for their power-of-two GPU allocation.
 		gpuWidth, gpuHeight := 16, 16
@@ -648,7 +657,11 @@ func (g *stageGPU) textureRegion(r *render.Renderer, d render.DisplaySprite, reg
 		g.textureTime += now.Sub(phaseStart)
 		phaseStart = now
 	}
-	stageUpload(im, pixels)
+	if d.Text != nil {
+		g.drawTextTexture(im, r, d.Text)
+	} else {
+		stageUpload(im, pixels)
+	}
 	if g.textureContent == nil {
 		g.textureContent = make(map[*ebiten.Image]image.Rectangle)
 	}
@@ -991,7 +1004,7 @@ func (g *stageGPU) protectSceneTextures(r *render.Renderer, scene []vm.DisplayTa
 		if !t.State.Visible || t.State.Effects.Ghost >= 100 {
 			continue
 		}
-		// Text geometry can rasterize; defer it to the actual draw.
+		// Eviction planning must not prepare changing text ahead of drawing.
 		if t.State.Text != nil && t.State.Text.Visible {
 			continue
 		}
@@ -1128,7 +1141,7 @@ func (g *stageGPU) drawScene(dst *ebiten.Image, r *render.Renderer, scene []vm.D
 		if t.State.MaskMode && !isMask {
 			mask = g.mask
 		}
-		g.quadVisual(target, texture, d.Corners, d.Costume.Width, d.Costume.Height, t.State.Effects, d.Costume.Bitmap || r.DisplayView().NoAntialias || r.DisplayView().Canvas.Nearest, false, t.State.BlendMode, mask)
+		g.quadVisual(target, texture, d.Corners, d.Costume.Width, d.Costume.Height, t.State.Effects, d.Costume.Bitmap || r.DisplayView().NoAntialias || r.DisplayView().Canvas.Nearest, d.Text != nil, t.State.BlendMode, mask)
 		if temporary {
 			delete(g.repeatedPixels, texture)
 			delete(g.textureContent, texture)

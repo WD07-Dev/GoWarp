@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 
 	"gowarp/core/media"
@@ -24,6 +23,12 @@ type textSkinKey struct {
 type cachedTextSkin struct {
 	costume  *media.Costume
 	lastUsed uint64
+	raster   *textRaster
+}
+
+type textRaster struct {
+	costume    media.Costume
+	references int
 }
 
 var textSkinSerial atomic.Uint64
@@ -44,18 +49,17 @@ func (r *Renderer) textCostume(t vm.DisplayTarget) *media.Costume {
 		r.textSkins[key] = cached
 		return cached.costume
 	}
+	rasterKey := key
+	rasterKey.Skin.AnchorY = 0
+	if raster := r.textRasters[rasterKey]; raster != nil {
+		return r.cacheTextSkin(key, rasterKey, raster)
+	}
 	const density = 2
 	fontSize := skin.FontSize
-	face, err := opentype.NewFace(r.Assets.TextFont(skin.Font), &opentype.FaceOptions{
-		Size: fontSize * density, DPI: 72, Hinting: font.HintingNone,
-	})
+	face, err := r.textFace(fontSize*density, skin.Font)
 	if err != nil {
 		return nil
 	}
-	if r.view.NoAntialias {
-		face = media.WithoutFontAntialias(face)
-	}
-	defer face.Close()
 	wrapWidth := math.Max(1, math.Min(4096, skin.Width/scale))
 	lines := wrapSkinText(face, skin.Text, wrapWidth*density)
 	outline := skin.OutlineWidth
@@ -73,7 +77,6 @@ func (r *Renderer) textCostume(t vm.DisplayTarget) *media.Costume {
 		w := float64(font.MeasureString(face, line)) / 64
 		x := (wrapWidth*density-w)*skin.Align + outline*density
 		y := (skin.PaddingY + float64(i)*skin.LineHeight/skin.LineHeightDivisor + fontSize + outline) * density
-		// Canvas strokeText centers its stroke on the glyph outline.
 		radius := outline * density / 2
 		if radius > 0 {
 			drawer.Src = stroke
@@ -86,11 +89,25 @@ func (r *Renderer) textCostume(t vm.DisplayTarget) *media.Costume {
 		drawer.Dot = fixed.Point26_6{X: fixed.Int26_6(x * 64), Y: fixed.Int26_6(y * 64)}
 		drawer.DrawString(line)
 	}
-	c := &media.Costume{Image: img, Width: width, Height: height, CenterX: width / 2, CenterY: skin.AnchorY + outline}
+	return r.cacheTextSkin(key, rasterKey, &textRaster{costume: media.Costume{
+		Image: img, Width: width, Height: height, CenterX: width / 2, CenterY: outline,
+		CacheKey: fmt.Sprintf("text:%d", textSkinSerial.Add(1)),
+	}})
+}
+
+func (r *Renderer) cacheTextSkin(key, rasterKey textSkinKey, raster *textRaster) *media.Costume {
 	if r.textSkins == nil {
 		r.textSkins = make(map[textSkinKey]cachedTextSkin)
 	}
-	for len(r.textSkins) > 0 && (len(r.textSkins) >= 128 || r.textSkinBytes+len(img.Pix) > 16<<20) {
+	if r.textRasters == nil {
+		r.textRasters = make(map[textSkinKey]*textRaster)
+	}
+	if raster.references == 0 {
+		r.textRasters[rasterKey] = raster
+		r.textSkinBytes += len(raster.costume.Image.Pix)
+	}
+	raster.references++
+	for len(r.textSkins) > 0 && (len(r.textSkins) >= 128 || r.textSkinBytes > 16<<20) {
 		var oldest textSkinKey
 		lastUsed := ^uint64(0)
 		for k, cached := range r.textSkins {
@@ -98,14 +115,24 @@ func (r *Renderer) textCostume(t vm.DisplayTarget) *media.Costume {
 				oldest, lastUsed = k, cached.lastUsed
 			}
 		}
-		removed := r.textSkins[oldest].costume
-		r.textSkinBytes -= len(removed.Image.Pix)
-		delete(r.hulls, removed)
+		removed := r.textSkins[oldest]
+		removed.raster.references--
+		if removed.raster.references == 0 {
+			rasterKey := oldest
+			rasterKey.Skin.AnchorY = 0
+			delete(r.textRasters, rasterKey)
+			r.textSkinBytes -= len(removed.costume.Image.Pix)
+		}
+		delete(r.hulls, removed.costume)
 		delete(r.textSkins, oldest)
 	}
-	r.textSkins[key] = cachedTextSkin{costume: c, lastUsed: r.textSkinUse}
-	c.CacheKey = fmt.Sprintf("text:%d", textSkinSerial.Add(1))
-	r.textSkinBytes += len(img.Pix)
+	c := &raster.costume
+	if key.Skin.AnchorY != 0 {
+		variant := *c
+		variant.CenterY += key.Skin.AnchorY
+		c = &variant
+	}
+	r.textSkins[key] = cachedTextSkin{costume: c, lastUsed: r.textSkinUse, raster: raster}
 	return c
 }
 

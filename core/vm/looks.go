@@ -284,6 +284,7 @@ func (r *Runtime) looksStatement(th *thread, b *project.Block, input func(string
 }
 
 func (r *Runtime) updateLayers() {
+	r.drawOrderDirty = true
 	for i, t := range r.drawList {
 		t.state.LayerOrder = i
 	}

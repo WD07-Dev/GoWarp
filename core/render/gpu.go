@@ -14,6 +14,7 @@ corners run clockwise from the costume's top left in display pixel space.
 */
 type DisplaySprite struct {
 	Costume *media.Costume
+	Text    *TextLayout
 	Corners [4][2]float64
 	Density float64
 }
@@ -50,11 +51,22 @@ func (r *Renderer) PenSprite(t vm.DisplayTarget) (DisplaySprite, bool) {
 }
 
 func (r *Renderer) DisplaySprite(t vm.DisplayTarget, width, height int) (DisplaySprite, bool) {
-	tr, ok := r.transformGeometry(t)
+	var tr transform
+	var ok bool
+	var text *TextLayout
+	if t.Source >= 0 && t.Source < len(r.Assets.Costumes) && t.State.Text != nil && t.State.Text.Visible {
+		var c *media.Costume
+		text, c = r.displayText(t)
+		if c != nil {
+			tr, ok = r.costumeTransform(t, c)
+		}
+	} else {
+		tr, ok = r.transformGeometry(t)
+	}
 	if !ok || tr.sx == 0 || tr.sy == 0 {
 		return DisplaySprite{}, false
 	}
-	d := DisplaySprite{Costume: tr.c}
+	d := DisplaySprite{Costume: tr.c, Text: text}
 	for i, uv := range [4][2]float64{{0, 0}, {1, 0}, {1, 1}, {0, 1}} {
 		lx, ly := (uv[0]*tr.c.Width-tr.c.CenterX)*tr.sx, (tr.c.CenterY-uv[1]*tr.c.Height)*tr.sy
 		x, y := tr.x+tr.cos*lx-tr.sin*ly, tr.y+tr.sin*lx+tr.cos*ly

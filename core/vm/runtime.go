@@ -192,6 +192,7 @@ type Runtime struct {
 	askPrompt                 string
 	now                       func() time.Time
 	drawList                  []*target
+	drawOrderDirty            bool
 	sensingScene              []DisplayTarget
 	cloneCount                int
 	nextCloneID               int

@@ -14,6 +14,55 @@ func hostResult(t *testing.T, c *extensionContext, op string, args ...any) any {
 	}
 	return v
 }
+
+func TestSceneLayersFollowReorderingAndClones(t *testing.T) {
+	r := eventProject(t, `[{"isStage":true,"name":"Stage"},{"name":"A"},{"name":"B"}]`)
+	c := &extensionContext{r: r, th: &thread{target: r.targets[1]}}
+	hostResult(t, c, "graphics.layer.create", "paper")
+	hostResult(t, c, "graphics.layer.placement", "paper", "above")
+	check := func() {
+		t.Helper()
+		scene := r.Scene()
+		if scene[0].State.Name != "Stage" || scene[len(scene)-1].State.Name != "paper" {
+			t.Fatalf("render layer order: %+v", scene)
+		}
+		for i, entry := range scene {
+			if entry.State.LayerOrder != i {
+				t.Fatal("layer indices are stale")
+			}
+		}
+	}
+	check()
+	r.moveLayer(r.targets[1], math.Inf(1), false, false)
+	check()
+	hostResult(t, c, "target.clone")
+	check()
+	hostResult(t, c, "graphics.layer.placement", "paper", "below")
+	for range 3 {
+		scene := r.Scene()
+		if scene[1].State.Name != "paper" {
+			t.Fatal("placement change was not applied")
+		}
+	}
+}
+
+func BenchmarkSceneWithRenderLayers(b *testing.B) {
+	r := &Runtime{}
+	r.visual.layers = make(map[string]*renderLayer)
+	for i := range 1000 {
+		t := &target{state: TargetState{IsStage: i == 0, LayerOrder: i}}
+		r.drawList = append(r.drawList, t)
+	}
+	layer := &target{state: TargetState{Name: "paper", RenderLayer: "paper"}}
+	r.drawList = append(r.drawList, layer)
+	r.visual.layers["paper"] = &renderLayer{target: layer, placement: "above"}
+	r.updateLayers()
+	scene := r.Scene()
+	b.ReportAllocs()
+	for b.Loop() {
+		scene = r.SceneInto(scene)
+	}
+}
 func TestLocalDataEnumerationAndAtomicSetXY(t *testing.T) {
 	r := eventProject(t, `[{"isStage":true,"name":"Stage","variables":{"global":["global name",3]},"lists":{"global-list":["global list",[1]]}},{"name":"A","x":2,"y":4,"variables":{"local":["local name",1]},"lists":{"local-list":["local list",[2]]}}]`)
 	c := &extensionContext{r: r, th: &thread{target: r.targets[1]}}

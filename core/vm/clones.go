@@ -73,6 +73,7 @@ func (r *Runtime) createClone(source *target) {
 	r.drawList = append(r.drawList, clone)
 	copy(r.drawList[layer+1:], r.drawList[layer:len(r.drawList)-1])
 	r.drawList[layer] = clone
+	r.drawOrderDirty = true
 	for i := layer + 1; i < len(r.drawList); i++ {
 		r.drawList[i].state.LayerOrder = i
 	}

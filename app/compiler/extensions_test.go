@@ -185,7 +185,7 @@ func TestExtensionRuntimeBuildCacheAndFailure(t *testing.T) {
 
 func extensionSDKFixture(t *testing.T) map[string]string {
 	t.Helper()
-	files := map[string]string{"go.mod": "module gowarp\n\ngo 1.25.0\n", "go.sum": "", "app/player/main.go": "package player\nimport (\"fmt\"; \"gowarp/core/extension\")\nfunc MainWithExtensions(b extension.Bundle) { for _, f := range b { fmt.Println(f().ID) } }\n"}
+	files := map[string]string{"go.mod": "module gowarp\n\ngo 1.27\n", "go.sum": "", "app/player/main.go": "package player\nimport (\"fmt\"; \"gowarp/core/extension\")\nfunc MainWithExtensions(b extension.Bundle) { for _, f := range b { fmt.Println(f().ID) } }\n"}
 	files["platform/linux/native/fixture.go"] = "package native\n"
 	root, err := sourceRoot()
 	if err != nil {
