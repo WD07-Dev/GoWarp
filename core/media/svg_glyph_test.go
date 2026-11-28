@@ -249,3 +249,41 @@ func TestScratchSansSerifMetrics(t *testing.T) {
 		t.Fatal("built-in Scratch font overrides project font")
 	}
 }
+
+func TestScratchMarkerMetrics(t *testing.T) {
+	// Knewave: advances 6303, OR kerning -15, units/em 1000.
+	for _, family := range []string{"Marker", `"Marker", sans-serif`} {
+		_, advance, err := svgGlyphPath("EDITOR MENU", 40, family, "normal", "normal")
+		if err != nil || math.Abs(advance-251.52) > 0.15 {
+			t.Fatalf("%s: advance=%g, want Knewave width 251.52; error=%v", family, advance, err)
+		}
+	}
+}
+
+func TestYaHeiFontFamily(t *testing.T) {
+	for _, family := range []string{"Microsoft YaHei", `"微软雅黑", STXihei`, `"Microsoft YaHei", "微软雅黑", STXihei, "华文细黑"`} {
+		if fontFamily(family) != 6 {
+			t.Errorf("%s fell back to a different font family", family)
+		}
+	}
+}
+
+func TestSVGScaledTextStroke(t *testing.T) {
+	for _, scale := range []float64{1, 2} {
+		got, _, err := rasterSVGWithFonts([]byte(`<svg width="160" height="60"><g stroke="black" stroke-width="10" fill="white"><text transform="translate(5,45) scale(0.5)" font-family="Sans Serif" font-size="80">MENU</text></g></svg>`), scale, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, _, err := rasterSVGWithFonts([]byte(`<svg width="160" height="60"><text x="5" y="45" stroke="black" stroke-width="5" fill="white" font-family="Sans Serif" font-size="40">MENU</text></svg>`), scale, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var total int
+		for i, v := range got.Pix {
+			total += int(math.Abs(float64(int(v) - int(want.Pix[i]))))
+		}
+		if float64(total)/float64(len(got.Pix)) > 1 {
+			t.Fatalf("scale %g: scaled text stroke differs from equivalent geometry: mean error %g", scale, float64(total)/float64(len(got.Pix)))
+		}
+	}
+}

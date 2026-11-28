@@ -24,7 +24,7 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-var svgFonts = [9]struct {
+var svgFonts = [10]struct {
 	once sync.Once
 	font *sfnt.Font
 }{}
@@ -32,17 +32,20 @@ var svgFonts = [9]struct {
 func bundledFont(variant int) *sfnt.Font {
 	c := &svgFonts[variant]
 	c.once.Do(func() {
-		data := [9][]byte{goregular.TTF, gobold.TTF, goitalic.TTF, gobolditalic.TTF, gomono.TTF, gomonobold.TTF, gomonoitalic.TTF, gomonobolditalic.TTF, assets.NotoSansMedium}
+		data := [10][]byte{goregular.TTF, gobold.TTF, goitalic.TTF, gobolditalic.TTF, gomono.TTF, gomonobold.TTF, gomonoitalic.TTF, gomonobolditalic.TTF, assets.NotoSansMedium, assets.Knewave}
 		c.font, _ = sfnt.Parse(data[variant])
 	})
 	return c.font
 }
 
 func defaultTextFont(family, weight, style string) *sfnt.Font {
-	// Scratch's "Sans Serif" names a bundled font; CSS "sans-serif" uses the OS.
+	// Scratch font names refer to bundled fonts, not CSS generic families.
 	name, _, _ := strings.Cut(family, ",")
-	if strings.EqualFold(strings.Trim(strings.TrimSpace(name), "\"'"), "Sans Serif") {
+	switch strings.ToLower(strings.Trim(strings.TrimSpace(name), "\"'")) {
+	case "sans serif":
 		return bundledFont(8)
+	case "marker":
+		return bundledFont(9)
 	}
 
 	if f := browserFont(family, weight, style); f != nil {

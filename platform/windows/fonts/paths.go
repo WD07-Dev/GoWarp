@@ -33,6 +33,12 @@ func Candidates(family string, bold, italic bool) []string {
 		names = []string{"cour" + suffix + ".ttf"}
 	case "emoji":
 		names = []string{"seguiemj.ttf", "seguisym.ttf"}
+	case "yahei":
+		name := "msyh"
+		if bold {
+			name += "bd"
+		}
+		names = []string{name + ".ttc", name + ".ttf"}
 	case "cjk":
 		names = []string{"malgun.ttf", "meiryo.ttc", "msyh.ttc"}
 	case "symbols":

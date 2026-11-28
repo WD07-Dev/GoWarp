@@ -240,6 +240,9 @@ func rasterSVGWithAntialias(data []byte, scale float64, fonts svgFontResolver, n
 			return nil, svgBox{}, err
 		}
 	}
+	if err := svgScaleStrokes(root, rasterx.Identity, svgStrokeStyle{width: "1"}); err != nil {
+		return nil, svgBox{}, err
+	}
 	// Parse the original viewport separately from the mixed content.
 	shell := *root
 	shell.children = nil

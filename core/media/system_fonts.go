@@ -24,11 +24,11 @@ type cachedSystemFont struct {
 	font *systemFont
 }
 
-var systemFonts [6][4]cachedSystemFont
+var systemFonts [7][4]cachedSystemFont
 var systemFontFiles sync.Map
 var systemFontFaces sync.Map
 
-var systemFontFamilies = [...]string{"sans", "serif", "mono", "emoji", "cjk", "symbols"}
+var systemFontFamilies = [...]string{"sans", "serif", "mono", "emoji", "cjk", "symbols", "yahei"}
 
 func fontVariant(weight, style string) int {
 	variant := 0
@@ -46,6 +46,12 @@ func fontVariant(weight, style string) int {
 
 func fontFamily(family string) int {
 	family = strings.ToLower(family)
+	for _, name := range strings.Split(family, ",") {
+		switch strings.Trim(strings.TrimSpace(name), "\"'") {
+		case "microsoft yahei", "微软雅黑":
+			return 6
+		}
+	}
 	if strings.Contains(family, "mono") || strings.Contains(family, "courier") || strings.Contains(family, "consolas") {
 		return 2
 	}
@@ -59,7 +65,13 @@ func fontFamily(family string) int {
 }
 
 func browserFont(family, weight, style string) *systemFont {
-	return loadSystemFont(fontFamily(family), fontVariant(weight, style))
+	variant := fontVariant(weight, style)
+	kind := fontFamily(family)
+	face := loadSystemFont(kind, variant)
+	if face == nil && kind == 6 {
+		return loadSystemFont(0, variant)
+	}
+	return face
 }
 
 func loadSystemFont(family, variant int) *systemFont {

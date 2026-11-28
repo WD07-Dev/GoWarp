@@ -12,6 +12,9 @@ var PretendardRegular []byte
 //go:embed embed/fonts/NotoSans-Medium.ttf
 var NotoSansMedium []byte
 
+//go:embed embed/fonts/Knewave.ttf
+var Knewave []byte
+
 //go:embed embed/fonts/LICENSE.txt
 var FontLicense string
 

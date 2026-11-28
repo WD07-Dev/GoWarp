@@ -17,6 +17,7 @@ const (
 func Match(family string, bold, italic bool) (string, int) {
 	pattern := map[string]string{
 		"sans": "sans-serif", "serif": "serif", "mono": "monospace",
+		"yahei": "Microsoft YaHei",
 		"emoji": "emoji", "cjk": "sans-serif:lang=ko", "symbols": "Symbola",
 	}[family]
 	if pattern == "" {
