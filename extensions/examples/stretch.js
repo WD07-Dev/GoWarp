@@ -22,22 +22,15 @@ func cmd(op string, inputs []string, fn e.Handler) e.Block {
 func rep(op string, inputs []string, fn e.Handler) e.Block {
 	return e.Block{Opcode: op, Kind: "reporter", Inputs: inputs, Handler: fn}
 }
-func menu(op, key string) e.Block {
-	return rep(op, nil, func(c *e.Context) (e.Result, error) {
-		return e.Result{Value: c.Field(key)}, nil
-	})
-}
 func New() e.Extension {
 
 	x := e.Extension{ID: "stretch"}
 	for _, axis := range []string{"X", "Y"} {
-		axis := axis
 		x.Blocks = append(x.Blocks, rep("stretch_get"+axis, nil, func(c *e.Context) (e.Result, error) {
 			return call(c, "stretch.get", strings.ToLower(axis))
 		}))
 	}
 	for _, op := range []string{"setStretch", "changeStretch", "setStretchX", "setStretchY", "changeStretchX", "changeStretchY"} {
-		op := op
 		change := strings.HasPrefix(op, "change")
 		axes := []string{"X", "Y"}
 		if strings.HasSuffix(op, "X") {
@@ -88,7 +81,6 @@ func rawNumber(v any) float64 {
 	}
 	return n
 }
-
 }
 */
 // Name: Stretch

@@ -55,7 +55,6 @@ func New() e.Extension {
 		x.Blocks = append(x.Blocks, menu("runtimeoptions_menu_"+key, key))
 	}
 	for _, entry := range []struct{ op, key, input string }{{"Framerate", "framerate", "fps"}, {"CloneLimit", "cloneLimit", "limit"}, {"Username", "username", "username"}} {
-		entry := entry
 		x.Blocks = append(x.Blocks, rep("runtimeoptions_get"+entry.op, nil, func(c *e.Context) (e.Result, error) {
 			return call(c, "options.get", entry.key)
 		}), cmd("runtimeoptions_set"+entry.op, []string{entry.input}, func(c *e.Context) (e.Result, error) {
@@ -63,7 +62,6 @@ func New() e.Extension {
 		}))
 	}
 	for _, set := range []bool{false, true} {
-		set := set
 		op, kind := "getEnabled", "reporter"
 		inputs := []string{"thing"}
 		if set {
@@ -94,7 +92,6 @@ func New() e.Extension {
 	}
 	return x
 }
-
 }
 */
 // Name: Runtime Options

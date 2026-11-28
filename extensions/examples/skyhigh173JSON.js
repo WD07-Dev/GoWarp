@@ -361,7 +361,6 @@ func New() e.Extension {
 		return e.Result{Value: ""}, nil
 	})
 	for _, name := range []string{"types", "get_list", "get_all", "equal", "sort_order", "analysis"} {
-		name := name
 		add("menu_"+name, "reporter", nil, func(c *e.Context) (e.Result, error) { return e.Result{Value: c.Field(name)}, nil })
 	}
 	add("json_new", "reporter", []string{"json"}, func(c *e.Context) (e.Result, error) {
@@ -862,7 +861,6 @@ func itemCompare(v any) any {
 	}
 	return v
 }
-
 }
 */
 // Name: JSON

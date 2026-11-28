@@ -216,7 +216,6 @@ func New() e.Extension {
 			return e.Result{}, nil
 		}))
 	for _, op := range []string{"pauseSound", "deleteSound", "toggleOverlap", "setThingNew", "resetEffect"} {
-		op := op
 		inputs := []string{"NAME"}
 		if op == "setThingNew" {
 			inputs = append(inputs, "TYPE", "VALUE")
@@ -280,7 +279,6 @@ func New() e.Extension {
 		}))
 	}
 	for _, op := range []string{"startSound", "startSoundAt", "playAndStop", "stopSound", "toggleLoop", "setVol"} {
-		op := op
 		inputs := []string{"NAME"}
 		if op == "startSoundAt" || op == "playAndStop" {
 			inputs = append(inputs, "TIME")
@@ -349,7 +347,6 @@ func New() e.Extension {
 		}))
 	}
 	for _, op := range []string{"soundProperty", "soundCheck"} {
-		op := op
 		key := "PROP"
 		kind := "reporter"
 		if op == "soundCheck" {
@@ -416,7 +413,6 @@ func New() e.Extension {
 	}
 
 	for _, op := range []string{"allSounds", "allPlaySounds"} {
-		op := op
 		label := "all sounds"
 		if op == "allPlaySounds" {
 			label = "all playing sounds"

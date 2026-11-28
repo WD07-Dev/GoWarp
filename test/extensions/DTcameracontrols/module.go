@@ -31,7 +31,6 @@ func New() e.Extension {
 		return call(c, "options.set", "interpolation", false)
 	}}}
 	for _, entry := range []struct{ name, key string }{{"X", "x"}, {"Y", "y"}, {"Zoom", "zoom"}, {"Direction", "direction"}, {"Col", "color"}} {
-		entry := entry
 		x.Blocks = append(x.Blocks, rep("DTcameracontrols_get"+entry.name, nil, func(c *e.Context) (e.Result, error) {
 			return call(c, "camera.get", entry.key)
 		}), cmd("DTcameracontrols_set"+entry.name, []string{"val"}, func(c *e.Context) (e.Result, error) {
@@ -54,7 +53,6 @@ func New() e.Extension {
 		return call(c, "camera.set", "y", c.Number("y"))
 	}))
 	for _, op := range []string{"rotateCW", "rotateCCW"} {
-		op := op
 		x.Blocks = append(x.Blocks, cmd("DTcameracontrols_"+op, []string{"val"}, func(c *e.Context) (e.Result, error) {
 			v, err := c.Call("camera.get", "direction")
 			if err != nil {
@@ -69,7 +67,6 @@ func New() e.Extension {
 	}
 
 	for _, axis := range []string{"x", "y"} {
-		axis := axis
 		x.Blocks = append(x.Blocks, rep("DTcameracontrols_blockt"+axis, []string{axis}, func(c *e.Context) (e.Result, error) {
 			pos, err := c.Call("camera.get", axis)
 			if err != nil {
@@ -81,7 +78,6 @@ func New() e.Extension {
 	}
 	x.Blocks = append(x.Blocks, menu("DTcameracontrols_menu_sprites", "sprites"))
 	for _, op := range []string{"moveSteps", "goTo", "pointTowards"} {
-		op := op
 		inputs := []string{"sprite"}
 		if op == "moveSteps" {
 			inputs = []string{"val"}

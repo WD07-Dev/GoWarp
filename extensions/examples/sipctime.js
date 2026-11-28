@@ -43,11 +43,9 @@ func New() e.Extension {
 		{"differenceBetweenDates", "difference between [START] and [END] in [TIME_MENU]", []string{"START", "END", "TIME_MENU"}},
 		{"daysInMonth", "number of days in [MONTH] [YEAR]", []string{"MONTH", "YEAR"}},
 	} {
-		entry := entry
 		x.Blocks = append(x.Blocks, e.Block{Opcode: "sipctime_" + entry.op, Text: entry.text, Kind: "reporter", Inputs: entry.inputs, Handler: func(c *e.Context) (e.Result, error) { return e.Result{Value: dateReporter(c, entry.op)}, nil }})
 	}
 	for _, menu := range []string{"Time", "DurationUnit", "Months"} {
-		menu := menu
 		x.Blocks = append(x.Blocks, e.Block{Opcode: "sipctime_menu_" + menu, Kind: "reporter", Handler: func(c *e.Context) (e.Result, error) { return e.Result{Value: c.Field(menu)}, nil }})
 	}
 	return x
@@ -206,7 +204,6 @@ func dateReporter(c *e.Context, op string) any {
 	}
 	return float64(0)
 }
-
 }
 */
 // Name: Time

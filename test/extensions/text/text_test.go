@@ -27,7 +27,7 @@ func (h *textHost) Call(operation string, args ...any) (any, error) {
 func TestAnimatedTextSuppliesLayoutWithoutChangingProtocol(t *testing.T) {
 	host := &textHost{}
 	properties := map[string]any{"text": "hello", "width": 480.0, "visible": true}
-	if _, err := textCall(host, "set", []any{properties}); err != nil {
+	if _, err := setTextProperties(host, properties); err != nil {
 		t.Fatal(err)
 	}
 	wantLayout := map[string]any{
@@ -41,18 +41,18 @@ func TestAnimatedTextSuppliesLayoutWithoutChangingProtocol(t *testing.T) {
 		}
 	}
 	if len(properties) != 3 {
-		t.Fatal("animatedtext.set mutated caller properties")
+		t.Fatal("text update mutated caller properties")
 	}
 	want := map[string]any{"text": "hello", "width": 480.0, "visible": true, "align": .5}
-	got, err := textCall(host, "get", nil)
+	got, err := textProperties(host)
 	if err != nil || !reflect.DeepEqual(got, want) {
-		t.Fatalf("animatedtext.get exposed native layout: %v, %v", got, err)
+		t.Fatalf("text properties exposed native layout: %v, %v", got, err)
 	}
 }
 
 func TestAnimatedTextRejectsNativeOnlyLayoutProperties(t *testing.T) {
 	host := &textHost{}
-	if _, err := textCall(host, "set", []any{map[string]any{"fontSize": 40}}); err == nil {
+	if _, err := setTextProperties(host, map[string]any{"fontSize": 40}); err == nil {
 		t.Fatal("native-only property changed the extension protocol")
 	}
 	if host.properties != nil {

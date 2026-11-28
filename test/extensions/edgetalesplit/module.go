@@ -2,15 +2,10 @@
 package extension
 
 import (
-	"fmt"
 	e "gowarp/core/extension"
 	"math"
 )
 
-func call(c *e.Context, op string, args ...any) (e.Result, error) {
-	v, err := c.Call(op, args...)
-	return e.Result{Value: v}, err
-}
 func cmd(op string, inputs []string, fn e.Handler) e.Block {
 	return e.Block{Opcode: op, Kind: "command", Inputs: inputs, Handler: fn}
 }
@@ -38,8 +33,9 @@ func update(c *e.Context) (e.Result, error) {
 	if err != nil {
 		return e.Result{}, err
 	}
-	rows := []any{}
-	for _, s := range splits(c) {
+	active := splits(c)
+	parts := make([]e.ScreenSplit, 0, len(active))
+	for _, s := range active {
 		elapsed := e.Number(now) - s.Start
 		factor := float64(1)
 		if s.Returning {
@@ -55,9 +51,11 @@ func update(c *e.Context) (e.Result, error) {
 		} else if s.Duration > 0 {
 			factor = ease(elapsed/s.Duration, s.Easing)
 		}
-		rows = append(rows, map[string]any{"x": s.X, "y": s.Y, "width": s.Width, "offset": s.Offset * factor, "angle": s.Angle, "direction": s.Direction})
+		parts = append(parts, part{
+			x: s.X, y: s.Y, offset: s.Offset * factor, angle: s.Angle, direction: s.Direction,
+		})
 	}
-	value, err := setSplits(c, []any{rows, e.Bool(c.State["original"]), e.String(c.State["color"])})
+	value, err := c.Call("graphics.screenSplits", parts, e.Bool(c.State["original"]))
 	return e.Result{Value: value}, err
 }
 func New() e.Extension {
@@ -129,31 +127,6 @@ func ease(x float64, name string) float64 {
 type part struct {
 	x, y, offset, angle float64
 	direction           string
-}
-
-func setSplits(host e.Host, args []any) (any, error) {
-	var input any
-	if len(args) > 0 {
-		input = args[0]
-	}
-	rows, ok := input.([]any)
-	if !ok && input != nil {
-		return nil, fmt.Errorf("edgetalesplit.set requires an array")
-	}
-	parts := make([]e.ScreenSplit, 0, len(rows))
-	for _, row := range rows {
-		values, ok := row.(map[string]any)
-		if !ok {
-			continue
-		}
-		parts = append(parts, part{
-			x: e.Number(values["x"]), y: e.Number(values["y"]),
-			offset: e.Number(values["offset"]), angle: e.Number(values["angle"]),
-			direction: e.String(values["direction"]),
-		})
-	}
-	original := len(args) > 1 && e.Bool(args[1])
-	return host.Call("graphics.screenSplits", parts, original)
 }
 
 func (p part) Project(width, height, pixelScale float64) e.SplitGeometry {

@@ -46,7 +46,6 @@ func New() e.Extension {
 		return call(c, "canvas.get", key)
 	}))
 	for _, op := range []string{"seteffect", "changeEffect"} {
-		op := op
 		x.Blocks = append(x.Blocks, cmd("theshovelcanvaseffects_"+op, []string{"EFFECT", "NUMBER"}, func(c *e.Context) (e.Result, error) {
 			if !validEffect(c.String("EFFECT")) {
 				return e.Result{}, nil
@@ -115,7 +114,6 @@ func validEffect(key string) bool {
 	}
 	return false
 }
-
 }
 */
 // Name: Canvas Effects

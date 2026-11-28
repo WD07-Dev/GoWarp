@@ -33,9 +33,13 @@ func TestProjectPreservesSplitCoordinatesAndRounding(t *testing.T) {
 type screenHost struct {
 	parts    []extension.ScreenSplit
 	original bool
+	now      float64
 }
 
 func (h *screenHost) Call(operation string, args ...any) (any, error) {
+	if operation == "runtime.time" {
+		return h.now, nil
+	}
 	if operation != "graphics.screenSplits" {
 		return nil, fmt.Errorf("unexpected operation %s", operation)
 	}
@@ -43,26 +47,43 @@ func (h *screenHost) Call(operation string, args ...any) (any, error) {
 	return nil, nil
 }
 
-func TestAdapterCopiesInputAndKeepsUnusedFieldsHarmless(t *testing.T) {
+func TestSplitAnimationAndClear(t *testing.T) {
 	host := &screenHost{}
-	row := map[string]any{"x": 12, "offset": 20, "angle": 0, "direction": "horizontal", "width": 5}
-	if _, err := setSplits(host, []any{[]any{row, "ignored"}, true, "unused color"}); err != nil {
-		t.Fatal(err)
+	active := []split{{X: 12, Y: 34, Offset: 20, Start: 10, Duration: 1, Wait: .5,
+		Direction: "horizontal", Easing: "sin", ReturnEasing: "sin", Returning: true}}
+	c := &extension.Context{Host: host, State: map[string]any{"splits": active, "original": true}}
+	ext := New()
+	var previous extension.ScreenSplit
+	for _, tc := range []struct{ now, offset float64 }{{10, 0}, {10.5, 20}, {11.25, 20}, {12, 0}, {12.5, 0}} {
+		host.now = tc.now
+		if _, err := ext.Events["tick"](c); err != nil {
+			t.Fatal(err)
+		}
+		if len(host.parts) != 1 || !host.original {
+			t.Fatalf("parts=%v original=%v", host.parts, host.original)
+		}
+		want := extension.SplitGeometry{TopX: 252, BottomX: 252, MoveX: tc.offset}
+		if got := host.parts[0].Project(480, 360, 1); got != want {
+			t.Fatalf("time %v: geometry=%+v want=%+v", tc.now, got, want)
+		}
+		if tc.now == 10.5 {
+			previous = host.parts[0]
+		}
 	}
-	row["x"], row["offset"] = 1000, 2000
-	if len(host.parts) != 1 || !host.original {
-		t.Fatalf("parts=%v original=%v", host.parts, host.original)
+	active[0].X = 1000
+	if got := previous.Project(480, 360, 1); got.TopX != 252 || got.MoveX != 20 {
+		t.Fatalf("later updates changed previous geometry: %+v", got)
 	}
-	if got := host.parts[0].Project(480, 360, 1); got != (extension.SplitGeometry{TopX: 252, BottomX: 252, MoveX: 20, MoveY: 0}) {
-		t.Fatalf("input mutation changed geometry: %+v", got)
+	for _, block := range ext.Blocks {
+		if block.Opcode == "edgetalesplit_clearSplits" {
+			if _, err := block.Handler(c); err != nil {
+				t.Fatal(err)
+			}
+			if len(host.parts) != 0 {
+				t.Fatal("clear retained screen splits")
+			}
+			return
+		}
 	}
-	if _, err := setSplits(host, []any{"not an array"}); err == nil {
-		t.Fatal("accepted invalid parts")
-	}
-	if len(host.parts) != 1 {
-		t.Fatal("invalid call cleared the previous state")
-	}
-	if _, err := setSplits(host, nil); err != nil || len(host.parts) != 0 || host.original {
-		t.Fatalf("clear: parts=%v original=%v error=%v", host.parts, host.original, err)
-	}
+	t.Fatal("clear block is missing")
 }

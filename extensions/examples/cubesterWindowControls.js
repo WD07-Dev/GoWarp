@@ -37,7 +37,6 @@ func New() e.Extension {
 		{"isFocused", "focused", "is window focused?", "boolean"},
 		{"windowTitle", "title", "window title", "reporter"},
 	} {
-		entry := entry
 		x.Blocks = append(x.Blocks, e.Block{Opcode: "cubesterWindowControls_" + entry.op, Text: entry.text, Kind: entry.kind, Handler: func(c *e.Context) (e.Result, error) {
 			v, err := c.Call("host.window", entry.key)
 			return e.Result{Value: v}, err
@@ -45,7 +44,6 @@ func New() e.Extension {
 	}
 	return x
 }
-
 }
 */
 // Name: Window Controls
