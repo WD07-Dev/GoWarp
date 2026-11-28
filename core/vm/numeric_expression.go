@@ -16,6 +16,8 @@ const (
 	exprArgument
 	exprListItem
 	exprListLength
+	exprListIndex
+	exprListContains
 	exprJoin
 	exprLetter
 	exprStringLength
@@ -46,6 +48,8 @@ var expressionOpcodes = map[string]expressionOpcode{
 	"argument_reporter_string_number": exprArgument,
 	"data_itemoflist":                 exprListItem,
 	"data_lengthoflist":               exprListLength,
+	"data_itemnumoflist":              exprListIndex,
+	"data_listcontainsitem":           exprListContains,
 	"operator_join":                   exprJoin,
 	"operator_letter_of":              exprLetter,
 	"operator_length":                 exprStringLength,
@@ -71,7 +75,6 @@ var expressionOpcodes = map[string]expressionOpcode{
 	"operator_or":                     exprOr,
 }
 
-// Prepare synchronous expressions; the outer continuation retains results across later yields.
 type numericExpression struct {
 	op          expressionOpcode
 	binding     int
@@ -182,7 +185,7 @@ func (r *Runtime) numericExpression(t *target, b *project.Block, depth int) *num
 		return nil
 	}
 	n := &numericExpression{op: op, blocks: 1, height: 1, conditional: op == exprAnd || op == exprOr}
-	n.numeric = op >= exprTimer && op <= exprMath || op == exprListLength || op == exprStringLength
+	n.numeric = op >= exprTimer && op <= exprMath || op == exprListLength || op == exprListIndex || op == exprStringLength
 	var left, right string
 	switch b.Opcode {
 	case "operator_equals", "operator_lt", "operator_gt", "operator_and", "operator_or":
@@ -214,6 +217,9 @@ func (r *Runtime) numericExpression(t *target, b *project.Block, depth int) *num
 	case "data_itemoflist":
 		n.name = field(b, "LIST", 1)
 		left = "INDEX"
+	case "data_itemnumoflist", "data_listcontainsitem":
+		n.name = field(b, "LIST", 1)
+		left = "ITEM"
 	default:
 		return nil
 	}
@@ -335,6 +341,24 @@ func (n *numericExpression) listItem(ctx context.Context, r *Runtime, th *thread
 	return list.Items[i], nil
 }
 
+func (n *numericExpression) findListItem(ctx context.Context, r *Runtime, th *thread) (int, error) {
+	owner, list, err := r.list(th.target, n.name)
+	if err != nil {
+		return 0, err
+	}
+	value, err := n.left.read(ctx, r, th)
+	if err != nil {
+		return 0, err
+	}
+	// A nested search may have built the same list's text index.
+	list = owner.state.Lists[n.name]
+	index, err := list.find(ctx, value)
+	if err == nil && list.textIndex != nil {
+		owner.state.Lists[n.name] = list
+	}
+	return index, err
+}
+
 func (n *numericExpression) readTyped(ctx context.Context, r *Runtime, th *thread, budget *int) (calculationValue, error) {
 	if n.op == exprArgument {
 		*budget -= n.blocks
@@ -410,6 +434,9 @@ func (n *numericExpression) read(ctx context.Context, r *Runtime, th *thread) (a
 		return nativeArgument(th, n.name).boxed(), nil
 	case exprListItem:
 		return n.listItem(ctx, r, th)
+	case exprListContains:
+		index, err := n.findListItem(ctx, r, th)
+		return index != 0, err
 	case exprLetter:
 		var index float64
 		var err error
@@ -520,7 +547,6 @@ func (n *numericExpression) compare(ctx context.Context, r *Runtime, th *thread)
 	case exprEqual, exprLess, exprGreater:
 		var order float64
 		if n.textOnly {
-			// A nonnumeric literal forces Scratch's text comparison for both operands.
 			order = compareText(text(a), text(b))
 		} else {
 			order = compare(a, b)
@@ -585,12 +611,15 @@ func (n *numericExpression) evaluate(ctx context.Context, r *Runtime, th *thread
 	case exprListLength:
 		_, list, err := r.list(th.target, n.name)
 		return float64(len(list.Items)), err
+	case exprListIndex:
+		index, err := n.findListItem(ctx, r, th)
+		return float64(index), err
 	case exprArgument:
 		return nativeArgument(th, n.name).num(), nil
 	case exprListItem:
 		value, err := n.listItem(ctx, r, th)
 		return number(value), err
-	case exprJoin, exprLetter:
+	case exprJoin, exprLetter, exprListContains:
 		value, err := n.read(ctx, r, th)
 		return number(value), err
 	}

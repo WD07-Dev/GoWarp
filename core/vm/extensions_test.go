@@ -422,6 +422,101 @@ func constantExtensionRuntime(t testing.TB) (*Runtime, *thread, *project.Block) 
 	return r, &thread{target: r.stage, expression: newExpression("call")}, block
 }
 
+func listSearchExtension(t testing.TB) (*Runtime, *thread, *project.Block) {
+	r, th := listSearchRuntime("data_itemnumoflist")
+	if err := r.SetExtensions(extension.Bundle{func() extension.Extension {
+		return extension.Extension{ID: "example", Blocks: []extension.Block{{
+			Opcode: "example_search", Kind: "reporter", Inputs: []string{"INDEX"}, BorrowContext: true,
+			Handler: func(c *extension.Context) (extension.Result, error) {
+				return extension.Result{Value: c.Args["INDEX"]}, nil
+			},
+		}}}
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	block := &project.Block{Opcode: "example_search", Inputs: map[string][]any{"INDEX": {float64(2), "search"}}}
+	r.stage.source.Blocks["call"] = block
+	return r, th, block
+}
+
+func TestExtensionListSearchInputsAvoidContinuations(t *testing.T) {
+	r, th, block := listSearchExtension(t)
+	reads := 0
+	for _, tc := range []struct {
+		needle string
+		index  float64
+	}{{"02", 2}, {"RED", 3}, {"missing", 0}} {
+		th.params["needle"] = calculationValue{value: tc.needle}
+		th.expression.reset("call")
+		budget := stepsPerFrame
+		got, _, err := r.invokeExtension(context.Background(), th, block, func(name string) (any, error) {
+			reads++
+			return r.input(context.Background(), th, block, name, 0, &budget)
+		}, true, 0, &budget)
+		if err != nil || got.Value != tc.index || budget != stepsPerFrame-2 {
+			t.Fatalf("result=%v err=%v", got, err)
+		}
+	}
+	if reads != 0 || th.expression.root.children != nil {
+		t.Fatalf("synchronous list inputs used continuation evaluation: %d reads", reads)
+	}
+}
+
+func TestExtensionListSearchInputLimits(t *testing.T) {
+	for _, budgetLimit := range []int{2, 3} {
+		r, th, _ := listSearchExtension(t)
+		budget := budgetLimit
+		value, err := r.eval(context.Background(), th, "call", 0, &budget)
+		if budgetLimit == 2 {
+			if err == nil || !strings.Contains(err.Error(), "evaluation limit") {
+				t.Fatalf("limit bypassed: %v", err)
+			}
+		} else if err != nil || value != float64(2) || budget != 0 {
+			t.Fatalf("value=%v budget=%d err=%v", value, budget, err)
+		}
+	}
+}
+
+func TestExtensionListSearchInputSurvivesYield(t *testing.T) {
+	r, th, block := listSearchExtension(t)
+	registered := r.extensionBlocks[block.Opcode]
+	registered.block.BorrowContext = false
+	registered.block.Handler = func(c *extension.Context) (extension.Result, error) {
+		if c.Local["waiting"] == nil {
+			c.Local["waiting"] = true
+			return extension.Result{Again: true, YieldTick: true}, nil
+		}
+		return extension.Result{Value: c.Args["INDEX"]}, nil
+	}
+	budget := stepsPerFrame
+	_, err := r.eval(context.Background(), th, "call", 0, &budget)
+	if !errors.Is(err, errExtensionYield) {
+		t.Fatalf("expected suspended reporter, got %v", err)
+	}
+	list := r.stage.state.Lists["items"]
+	list.replace(1, "removed")
+	r.stage.state.Lists["items"] = list
+	r.frame++
+	budget = stepsPerFrame
+	value, err := r.eval(context.Background(), th, "call", 0, &budget)
+	if err != nil || value != float64(2) {
+		t.Fatalf("suspended reporter reread its list input: value=%v err=%v", value, err)
+	}
+}
+
+func BenchmarkExtensionListSearchInputs(b *testing.B) {
+	r, th, _ := listSearchExtension(b)
+	b.ReportAllocs()
+	for b.Loop() {
+		th.expression.reset("test")
+		budget := stepsPerFrame
+		got, err := r.eval(context.Background(), th, "call", 0, &budget)
+		if err != nil || got != float64(2) || budget != stepsPerFrame-3 {
+			b.Fatalf("result=%v budget=%d err=%v", got, budget, err)
+		}
+	}
+}
+
 func TestExtensionConstantInputsPreserveIndependentContexts(t *testing.T) {
 	r, th, block := constantExtensionRuntime(t)
 	var saved []*extension.Context

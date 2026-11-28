@@ -10,6 +10,131 @@ import (
 	"gowarp/core/project"
 )
 
+func listSearchRuntime(opcode string) (*Runtime, *thread) {
+	blocks := project.Blocks{
+		"search":    {Opcode: opcode, Fields: map[string][]any{"LIST": {"items", "items"}}, Inputs: map[string][]any{"ITEM": {float64(2), "needle"}}},
+		"needle":    {Opcode: "argument_reporter_string_number", Fields: map[string][]any{"VALUE": {"needle"}}},
+		"condition": {Opcode: "operator_equals", Inputs: map[string][]any{"OPERAND1": {float64(2), "search"}, "OPERAND2": {float64(1), []any{float64(4), "2"}}}},
+	}
+	r := New(&project.Project{Targets: []*project.Target{{IsStage: true, Blocks: blocks,
+		Lists: map[string][]any{"items": {"items", []any{"zero", "02", "RED", true, "", " ", "아야네"}}},
+	}}})
+	return r, &thread{target: r.stage, params: procedureParameters{"needle": {value: "02"}}, expression: newExpression("test")}
+}
+
+func TestPreparedListSearchMatchesInterpreter(t *testing.T) {
+	for _, opcode := range []string{"data_itemnumoflist", "data_listcontainsitem"} {
+		t.Run(opcode, func(t *testing.T) {
+			r, th := listSearchRuntime(opcode)
+			plan := r.numericExpression(r.stage, r.stage.source.Blocks["search"], 0)
+			if plan == nil {
+				t.Fatal("list search cannot use the prepared expression path")
+			}
+			for _, needle := range []any{"02", 2.0, "red", "아야네", "", " ", true, false, math.NaN(), "missing"} {
+				th.params["needle"] = calculationValue{value: needle}
+				budget := stepsPerFrame
+				got, err := plan.readConditional(context.Background(), r, th, &budget)
+				if err != nil {
+					t.Fatal(err)
+				}
+				prepared := r.numericExpressions
+				r.numericExpressions = map[*project.Block]*numericExpression{}
+				for _, block := range r.stage.source.Blocks {
+					r.numericExpressions[block] = nil
+				}
+				th.expression.reset("test")
+				wantBudget := stepsPerFrame
+				want, err := r.eval(context.Background(), th, "search", 0, &wantBudget)
+				r.numericExpressions = prepared
+				if err != nil || !reflect.DeepEqual(got, want) || budget != wantBudget {
+					t.Fatalf("needle=%#v: got=%#v budget=%d, want=%#v budget=%d err=%v", needle, got, budget, want, wantBudget, err)
+				}
+			}
+			th.params["needle"] = calculationValue{value: "new"}
+			list := r.stage.state.Lists["items"]
+			list.replace(0, "new")
+			r.stage.state.Lists["items"] = list
+			got, err := plan.read(context.Background(), r, th)
+			want := any(float64(1))
+			if opcode == "data_listcontainsitem" {
+				want = true
+			}
+			if err != nil || got != want {
+				t.Fatalf("changed list: got=%v want=%v err=%v", got, want, err)
+			}
+		})
+	}
+}
+
+func BenchmarkListSearchCondition(b *testing.B) {
+	r, th := listSearchRuntime("data_itemnumoflist")
+	b.ReportAllocs()
+	for b.Loop() {
+		th.expression.reset("test")
+		budget := stepsPerFrame
+		got, err := r.eval(context.Background(), th, "condition", 0, &budget)
+		if err != nil || got != true || budget != stepsPerFrame-3 {
+			b.Fatalf("condition=%v budget=%d err=%v", got, budget, err)
+		}
+	}
+}
+
+func TestPreparedListSearchScopeAndClone(t *testing.T) {
+	for _, opcode := range []string{"data_itemnumoflist", "data_listcontainsitem"} {
+		r, _ := listSearchRuntime(opcode)
+		r.project.Targets = append(r.project.Targets, &project.Target{Name: "Sprite", Blocks: r.stage.source.Blocks,
+			Lists: map[string][]any{"items": {"items", []any{"RED"}}}})
+		r = New(r.project)
+		original := r.targets[1]
+		r.createClone(original)
+		clone := r.targets[2]
+		list := clone.state.Lists["items"]
+		list.replace(0, "other")
+		clone.state.Lists["items"] = list
+		plan := r.numericExpression(original, original.source.Blocks["search"], 0)
+		for _, tc := range []struct {
+			target *target
+			index  float64
+		}{{original, 1}, {clone, 0}, {r.stage, 3}} {
+			th := &thread{target: tc.target, params: procedureParameters{"needle": {value: "red"}}}
+			got, err := plan.read(context.Background(), r, th)
+			want := any(tc.index)
+			if opcode == "data_listcontainsitem" {
+				want = tc.index != 0
+			}
+			if err != nil || got != want {
+				t.Fatalf("%s clone=%d: got=%v want=%v err=%v", opcode, tc.target.state.CloneID, got, want, err)
+			}
+		}
+	}
+}
+
+func TestPreparedListSearchShortCircuitAndErrors(t *testing.T) {
+	r, th := listSearchRuntime("data_listcontainsitem")
+	r.stage.source.Blocks["and"] = &project.Block{Opcode: "operator_and", Inputs: map[string][]any{
+		"OPERAND1": {float64(1), []any{float64(10), false}}, "OPERAND2": {float64(2), "search"},
+	}}
+	plan := r.numericExpression(r.stage, r.stage.source.Blocks["and"], 0)
+	if plan == nil {
+		t.Fatal("conditional list search was not prepared")
+	}
+	delete(r.stage.state.Lists, "items")
+	budget := stepsPerFrame
+	got, err := plan.readConditional(context.Background(), r, th, &budget)
+	if err != nil || got != false || budget != stepsPerFrame-1 {
+		t.Fatalf("short circuit: value=%v budget=%d err=%v", got, budget, err)
+	}
+	_, err = plan.right.read(context.Background(), r, th)
+	if err == nil {
+		t.Fatal("missing list was accepted")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := plan.readConditional(ctx, r, th, &budget); err != context.Canceled {
+		t.Fatalf("cancellation: %v", err)
+	}
+}
+
 func TestPreparedSpriteReportersReadCurrentTarget(t *testing.T) {
 	for _, opcode := range []string{"motion_xposition", "motion_yposition", "motion_direction", "looks_size", "sound_volume"} {
 		t.Run(opcode, func(t *testing.T) {
